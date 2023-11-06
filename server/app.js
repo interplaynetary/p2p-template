@@ -19,4 +19,4 @@ const server = app.listen(8765, () => {
   console.log("Gun listening on port 8765");
 })
 
-Gun({web: server, axe:false});
+Gun({web: server, axe: false, secure: true});

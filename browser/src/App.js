@@ -5,8 +5,17 @@ import Item from "./components/Item"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 
+require("gun/lib/radix.js")
+require("gun/lib/radisk.js")
+require("gun/lib/store.js")
+require("gun/lib/rindexed.js")
+
 const gun = Gun({
-  peers: [`${process.env.REACT_APP_HOST}:8765/gun`]
+  peers: [process.env.REACT_APP_HOST],
+  axe: false,
+  secure: true,
+  localStorage: false,
+  store: window.RindexedDB(),
 })
 
 const initialState = {

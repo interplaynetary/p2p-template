@@ -24,6 +24,7 @@ development:
  - `cd browser`
  - `npm install gun`
  - `npm install @mui/material @emotion/react @emotion/styled`
+ - `npm install @babel/plugin-proposal-private-property-in-object`
  - `npm run build`
  
 To run on a host other than localhost, need to update `REACT_APP_HOST` in
