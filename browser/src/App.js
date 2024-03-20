@@ -9,6 +9,7 @@ require("gun/lib/radix.js")
 require("gun/lib/radisk.js")
 require("gun/lib/store.js")
 require("gun/lib/rindexed.js")
+require("gun/sea")
 
 const gun = Gun({
   peers: [process.env.REACT_APP_HOST],
@@ -18,83 +19,50 @@ const gun = Gun({
   store: window.RindexedDB(),
 })
 
-const initialState = {
-  messages: [],
-  timestamps: []
-}
-
 function reducer(state, m) {
   return {
-    messages: state.timestamps.includes(m.createdAt) ? state.messages : [m, ...state.messages],
+    items: state.timestamps.includes(m.createdAt) ? state.items : [m, ...state.items],
     timestamps: [m.createdAt, ...state.timestamps]
   }
 }
 
 function App() {
-  const [formState, setForm] = useState({
-    name: "", message: ""
+  const [display, dispatch] = useReducer(reducer, {items:[], timestamps:[]})
+  const [hostPublicKey, setHostPublicKey] = useState(() => {
+    // Get initial state from local storage.
+    return localStorage.getItem("hostPublicKey") || ""
   })
 
-  const [state, dispatch] = useReducer(reducer, initialState)
-
   useEffect(() => {
-    const messages = gun.get("messages")
-    messages.map().once(m => {
-      dispatch({
-        name: m.name,
-        message: m.message,
-        createdAt: m.createdAt 
+    // Update local storage whenever the host public key changes.
+    localStorage.setItem("hostPublicKey", hostPublicKey)
+
+    // Fetch it when it's not set.
+    if (hostPublicKey === "") {
+      fetch(`${window.location}host-public-key`)
+        .then(res => res.text())
+        .then(res => setHostPublicKey(res))
+        .catch(err => console.log(err))
+    } else {
+      // Display items when it is set.
+      const items = gun.get(hostPublicKey).get("public").get("items")
+      items.map().once((data, key) => {
+        dispatch({
+          name: data.name,
+          message: data.message,
+          createdAt: key,
+        })
       })
-    })
-  }, [])
-
-  function onChange(e) {
-    setForm({ ...formState, [e.target.name]: e.target.value })
-  }
-
-  function saveMessage() {
-    const messages = gun.get("messages")
-    messages.set({
-      name: formState.name,
-      message: formState.message,
-      createdAt: Date.now()
-    })
-    setForm({
-      name: "", message: ""
-    })
-  }
+    }
+  }, [hostPublicKey])
 
   return (
-    <div style={{ padding: 30 }}>
-      <Container>
-        <Grid container spacing={5}>
-          <Item/>
-        </Grid>
-        <input
-          onChange={onChange}
-          placeholder="Name"
-          name="name"
-          value={formState.name}
-        />
-        <input
-          onChange={onChange}
-          placeholder="Message"
-          name="message"
-          value={formState.message}
-        />
-        <button onClick={saveMessage}>Send Message</button>
-        {
-          state.messages.map(message => (
-            <div key={message.createdAt}>
-              <h2>{message.message}</h2>
-              <h3>From: {message.name}</h3>
-              <p>Date: {message.createdAt}</p>
-            </div> 
-          ))
-        }
-      </Container>
-    </div>
-  ) 
+    <Container maxWidth="sm">
+      <Grid container spacing={5}>
+        {display.items.map(data => <Item key={data.createdAt} message={data}/>)}
+      </Grid>
+    </Container>
+  )
 }
 
 export default App

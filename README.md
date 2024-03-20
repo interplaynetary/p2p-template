@@ -1,4 +1,4 @@
-RSStream is a [Node.js](https://nodejs.org) app that watches a [SimplePie](http://simplepie.org) cache and pushes updates to the browser using [Gun](https://gun.eco).
+RSStream is a [Node.js](https://nodejs.org) app that listens for feed updates from [Dobrado](https://dobrado.net) and pushes them to the browser using [Gun](https://gun.eco).
 
 ### Server
 
@@ -6,7 +6,6 @@ Copy this repo to a new directory and run:
 
  - `cd server`
  - `npm install`
- - `export CACHE_DIR=/path/to/cache`
  - `node app.js`
 
 For production you can start with pm2:
@@ -20,6 +19,9 @@ For production you can start with pm2:
 This will save your evironment in `~/.pm2/dump.pm2` so that it can be used on
 restarts, note that you need to run `pm2 unstartup` followed by the `pm2`
 commands listed above if you change any environment variables.
+
+You can also export `GUN_USER_ALIAS` and `GUN_USER_PASS` to change the
+default log in credentials for the server.
 
 ### Browser
 
