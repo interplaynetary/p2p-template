@@ -1,10 +1,12 @@
 import { useEffect, useState, useReducer } from "react"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Gun from "gun"
 import "./App.css"
-import Item from "./components/Item"
 import Login from "./components/Login"
 import Register from "./components/Register"
+import ResetPassword from "./components/ResetPassword"
+import UpdatePassword from "./components/UpdatePassword"
+import Display from "./components/Display"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 
@@ -15,14 +17,18 @@ require("gun/lib/rindexed.js")
 require("gun/sea")
 
 const gun = Gun({
-  peers: [process.env.REACT_APP_HOST],
+  peers: [`${window.location.protocol}//${window.location.hostname}:8765/gun`],
   axe: false,
   secure: true,
   localStorage: false,
   store: window.RindexedDB(),
 })
+
 const user = gun.user().recall({sessionStorage: true})
-const host = window.location.protocol + "//" + window.location.host
+const params = new URLSearchParams(window.location.search)
+const pages = ["login", "register", "reset-password", "update-password"]
+const redirect = params.get("redirect")
+const to = redirect ? (pages.includes(redirect) ? `/${redirect}` : "/") : ""
 
 function reducer(current, add) {
   return {
@@ -44,7 +50,7 @@ function App() {
 
     // Fetch host public key when not set.
     if (hostPublicKey === "") {
-      fetch(`${host}/host-public-key`)
+      fetch(`${window.location.origin}/host-public-key`)
         .then(res => res.text())
         .then(res => setHostPublicKey(res))
         .catch(err => console.log(err))
@@ -78,9 +84,11 @@ function App() {
       <Grid container spacing={5}>
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<Login user={user} host={host}/>}/>
-            <Route path="/register" element={<Register user={user} host={host}/>}/>
-            <Route path="/" element={display.items.map(item => <Item key={item.key} item={item}/>)}/>
+            <Route path="/login" element={<Login user={user}/>}/>
+            <Route path="/register" element={<Register loggedIn={user.is}/>}/>
+            <Route path="/reset-password" element={<ResetPassword loggedIn={user.is}/>}/>
+            <Route path="/update-password" element={<UpdatePassword loggedIn={user.is}/>}/>
+            <Route path="/" element={to ? <Navigate to={to}/> : <Display items={display.items}/>}/>
           </Routes>
         </BrowserRouter>
       </Grid>

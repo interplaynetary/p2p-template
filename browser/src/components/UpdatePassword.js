@@ -28,85 +28,83 @@ const gun = Gun({
   store: window.RindexedDB(),
 })
 
-const Register = ({loggedIn}) => {
-  const [username, setUsername] = useState("")
+const params = new URLSearchParams(window.location.search)
+
+const UpdatePassword = ({loggedIn}) => {
+  const [username, setUsername] = useState(params.get("username") ?? "")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState("")
-  const [code, setCode] = useState("")
   const [message, setMessage] = useState(loggedIn? "Already logged in" : "")
   const [disabledButton, setDisabledButton] = useState(loggedIn)
 
-  function register() {
-    if (!username) {
+  function update(alias) {
+    if (!alias) {
       setMessage("Please choose a username")
-      return
-    }
-    if (/\.\d$/.test(username)) {
-      setMessage("Username must not end in . and a number")
-      return
-    }
-    if (!email) {
-      setMessage("Please provide your email")
       return
     }
 
     setDisabledButton(true)
-    setMessage("Checking invite code...")
-    fetch(`${window.location.origin}/check-invite-code`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json;charset=utf-8"
-      },
-      body: JSON.stringify({code: code}),
-    })
-    .then(res => res.text().then(t => ({ok: res.ok, text: t})))
-    .then(res => {
-      if (!res.ok) {
+    setMessage("Updating password...")
+
+    const user = gun.user()
+    user.create(alias, password, ack => {
+      if (ack.err) {
+        if (ack.err === "User already created!") {
+          let match = alias.match(/(.*)\.(\d)$/)
+          if (match) {
+            let increment = Number(match[2]) + 1
+            if (increment === 10) {
+              setDisabledButton(false)
+              setMessage("Too many password resets")
+              return
+            }
+            update(`${match[1]}.${increment}`)
+            return
+          }
+          update(`${alias}.1`)
+          return
+        }
         setDisabledButton(false)
-        setMessage(res.text)
+        setMessage(ack.err)
         return
       }
 
-      const user = gun.user()
-      user.create(username, password, ack => {
+      user.auth(alias, password, ack => {
         if (ack.err) {
           setDisabledButton(false)
           setMessage(ack.err)
           return
         }
 
-        user.auth(username, password, ack => {
-          if (ack.err) {
+        fetch(`${window.location.origin}/update-password`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json;charset=utf-8"
+          },
+          body: JSON.stringify({
+            code: params.get("code"),
+            reset: params.get("reset"),
+            pub: ack.get,
+            alias: alias,
+            name: username,
+          }),
+        })
+        .then(res => res.text().then(t => ({ok: res.ok, text: t})))
+        .then(res => {
+          if (!res.ok) {
             setDisabledButton(false)
-            setMessage(ack.err)
+            user.delete(alias, password)
+            setMessage(res.text)
             return
           }
 
-          fetch(`${window.location.origin}/claim-invite-code`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json;charset=utf-8"
-            },
-            body: JSON.stringify({
-              code: code,
-              pub: ack.get,
-              alias: username,
-              email: email,
-            }),
-          })
-          .then(res => res.text().then(t => ({ok: res.ok, text: t})))
-          .then(res => {
+          // The previous public key is returned to copy over public user data.
+          gun.get(res.text).get("public").once(data => user.get("public").put(data), {wait: 2})
+          setTimeout(() => {
             setDisabledButton(false)
-            if (!res.ok) {
-              user.delete(username, password)
-              setMessage(res.text)
-              return
-            }
-
-            setMessage("Account created")
+            setMessage("Password updated")
             window.location = "/login"
-          })
+          }, 5000)
         })
       })
     })
@@ -116,9 +114,9 @@ const Register = ({loggedIn}) => {
     <Grid item xs={12}>
       <Card sx={{mt:2}}>
         <CardContent>
-          <Typography variant="h5">Register</Typography>
+          <Typography variant="h5">Update Password</Typography>
           <TextField
-            id="register-username"
+            id="update-username"
             label="Username"
             variant="outlined"
             fullWidth={true}
@@ -132,9 +130,9 @@ const Register = ({loggedIn}) => {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           >
-            <InputLabel htmlFor="register-password">Password</InputLabel>
+            <InputLabel htmlFor="update-password">Password</InputLabel>
             <OutlinedInput
-              id="register-password"
+              id="update-password"
               type={showPassword ? "text" : "password"}
               endAdornment={
                 <InputAdornment position="end">
@@ -150,26 +148,8 @@ const Register = ({loggedIn}) => {
               label="Password"
             />
           </FormControl>
-          <TextField
-            id="register-email"
-            label="Email"
-            variant="outlined"
-            fullWidth={true}
-            margin="normal"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <TextField
-            id="register-code"
-            label="Invite code"
-            variant="outlined"
-            fullWidth={true}
-            margin="normal"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-          />
           <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-            onClick={register}
+            onClick={() => update(username)}
           >Submit</Button>
           {message &&
            <Typography sx={{m:1}} variant="string">{message}</Typography>}
@@ -179,4 +159,4 @@ const Register = ({loggedIn}) => {
   )
 }
 
-export default Register
+export default UpdatePassword

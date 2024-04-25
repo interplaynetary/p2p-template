@@ -1,9 +1,9 @@
 const express = require("express")
 const path = require("path")
 const bodyParser = require("body-parser")
+const nodemailer = require("nodemailer")
 const Gun = require("gun")
 require("gun/sea")
-require("gun/lib/unset.js")
 
 const app = express()
 const gun = Gun({
@@ -17,12 +17,16 @@ const alias = process.env.GUN_USER_ALIAS ?? "alias"
 const pass = process.env.GUN_USER_PASS ?? "passphrase"
 
 // hostPublicKey is requested by the browser, so that it knows where to get
-// data from in gun (since all data must be stored under a user's account).
+// data from in gun (all data is stored under user accounts when using secure).
 var hostPublicKey = ""
 
 // lastSaved is the timestamp of the last time save was called. This allows
 // slowing calls to save so that the timestamp can be used as a unique key.
 var lastSaved = 0
+
+// inviteCodes is a map of invite codes and their gun keys, stored in memory
+// to avoid decrypting them in each of the endpoints they're required in.
+const inviteCodes = new Map()
 
 console.log("Trying auth credentials for " + alias)
 user.auth(alias, pass, auth)
@@ -30,6 +34,15 @@ user.auth(alias, pass, auth)
 app.use(Gun.serve)
 app.use(bodyParser.json())
 app.use(express.static(path.join(__dirname, "../browser/build")))
+app.use("/private", (req, res, next) => {
+  const auth = (req.headers.authorization || "").split(" ")[1] || ""
+  const [username, password] = Buffer.from(auth, "base64").toString().split(":")
+  if (username === alias && password === pass) {
+    next()
+  } else {
+    res.status(401).end()
+  }
+})
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../browser/build", "index.html"))
@@ -43,70 +56,206 @@ app.get("/host-public-key", (req, res) => {
   }
 })
 
+app.get("/login", (req, res) => {
+  res.redirect("/?redirect=login")
+})
+
+app.get("/register", (req, res) => {
+  res.redirect("/?redirect=register")
+})
+
+app.get("/reset-password", (req, res) => {
+  res.redirect("/?redirect=reset-password")
+})
+
+app.get("/update-password", (req, res) => {
+  res.redirect(`/?redirect=update-password&username=${req.query.username}&code=${req.query.code}&reset=${req.query.reset}`)
+})
+
 app.post("/check-invite-code", (req, res) => {
-  var found = false
-  var code = req.body.code || "admin"
-  user.get("public").get("invite_codes").get(code).once(used => {
+  const code = req.body.code || "admin"
+  if (inviteCodes.has(code)) {
+    res.end()
+    return
+  }
+
+  user.get("accounts").get(code).once(used => {
     if (used) {
       res.status(400).send("Invite code already used")
+    } else {
+      res.status(404).send("Invite code not found")
+    }
+  }, {wait: 0})
+})
+
+app.post("/claim-invite-code", async (req, res) => {
+  const code = req.body.code || "admin"
+  const key = inviteCodes.get(code)
+  if (!key) {
+    res.status(404).send("Invite code not found")
+    return
+  }
+  if (!req.body.pub) {
+    res.status(400).send("Public key required")
+    return
+  }
+  if (!req.body.alias) {
+    res.status(400).send("Username required")
+    return
+  }
+  if (/\.\d$/.test(req.body.alias)) {
+    res.status(400).send("Username must not end in . and a number")
+    return
+  }
+  if (!req.body.email) {
+    res.status(400).send("Email required")
+    return
+  }
+
+  let enc = await Gun.SEA.encrypt(req.body.email, user._.sea)
+  user.get("accounts").get(code).put({
+    pub: req.body.pub,
+    alias: req.body.alias,
+    name: req.body.alias,
+    email: enc,
+  })
+  user.get("available").get("invite_codes").get(key).put(null)
+  inviteCodes.delete(code)
+  res.end()
+})
+
+app.post("/reset-password", (req, res) => {
+  if (!req.body.email) {
+    res.status(400).send("Email required")
+    return
+  }
+
+  const code = req.body.code || "admin"
+  user.get("accounts").get(code).once(async account => {
+    if (!account) {
+      res.status(404).send("Invite code not found")
       return
     }
 
-    user.get("private").get("invite_codes").map().once(enc => {
-      if (!found) {
-        Gun.SEA.decrypt(enc, user._.sea, check => {
-          if (check === code) {
-            found = true
-            res.end()
-          }
-        })
-      }
+    let increment = 0
+    let match = account.alias.match(/\.(\d)$/)
+    if (match) {
+      increment = Number(match[1])
+    }
+    if (increment === 9) {
+      res.status(400).send("Too many password resets")
+      return
+    }
+
+    let email = await Gun.SEA.decrypt(account.email, user._.sea)
+    if (email !== req.body.email) {
+      res.status(400).send("Email does not match invite code")
+      return
+    }
+
+    resetPassword(account.name, increment, email, code)
+    res.send("Reset password email sent")
+  }, {wait: 0})
+})
+
+app.post("/update-password", (req, res) => {
+  if (!req.body.code) {
+    res.status(400).send("Invite code required")
+    return
+  }
+  if (!req.body.reset) {
+    res.status(400).send("Reset code required")
+    return
+  }
+  if (!req.body.pub) {
+    res.status(400).send("Public key required")
+    return
+  }
+  if (!req.body.alias) {
+    res.status(400).send("Username required")
+    return
+  }
+  if (!req.body.name) {
+    res.status(400).send("Display Name required")
+    return
+  }
+
+  user.get("accounts").get(req.body.code).once(async account => {
+    if (!account) {
+      res.status(404).send("Invite code not found")
+      return
+    }
+    if (!account.reset) {
+      res.status(404).send("Reset code not found")
+      return
+    }
+    if (!account.expiry || account.expiry < Date.now()) {
+      res.status(400).send("Reset code has expired")
+      return
+    }
+
+    let reset = await Gun.SEA.decrypt(account.reset, user._.sea)
+    if (reset !== req.body.reset) {
+      res.status(400).send("Reset code does not match")
+      return
+    }
+
+    user.get("accounts").get(req.body.code).put({
+      pub: req.body.pub,
+      alias: req.body.alias,
+      name: req.body.name,
+      prev: account.pub,
+      email: account.email,
     })
-  })
-  setTimeout(() => {
-    if (!found) {
-      res.status(404).send("Invite code not found")
-    }
-  }, 10000)
+    res.send(account.pub)
+  }, {wait: 0})
 })
 
-app.post("/claim-invite-code", (req, res) => {
-  var found = false
-  var code = req.body.code || "admin"
-  user.get("private").get("invite_codes").map().once(enc => {
-    if (!found) {
-      Gun.SEA.decrypt(enc, user._.sea, check => {
-        if (check === code) {
-          found = true
-          user.get("public").get("invite_codes").get(code).put(req.body.pub)
-          user.get("private").get("invite_codes").unset(enc)
-          res.end()
-        }
-      })
+app.post("/private/create-invite-codes", (req, res) => {
+  const pub = req.body.pub
+  if (!pub) {
+    res.status(400).send("Public key required")
+    return
+  }
+
+  gun.user(pub).get("epub").once(async epub => {
+    if (!epub) {
+      res.status(404).send("User not found for public key")
+      return
     }
-  })
-  setTimeout(() => {
-    if (!found) {
-      res.status(404).send("Invite code not found")
+
+    const count = req.body.count || 1
+    const secret = await Gun.SEA.secret(epub, user._.sea)
+    let i = 0
+    while (i < count) {
+      let code = newCode()
+      if (!inviteCodes.has(code)) {
+        i++
+        let enc = await Gun.SEA.encrypt(code, user._.sea)
+        user.get("available").get("invite_codes").set(enc)
+        let shared = await Gun.SEA.encrypt(code, secret)
+        user.get("shared").get("invite_codes").get(pub).set(shared)
+      }
     }
-  }, 10000)
+    res.end()
+  }, {wait: 0})
 })
 
-app.post("/feed", (req, res) => {
+app.post("/private/feed", (req, res) => {
   saveFeed(req.body)
   res.end()
 })
 
-app.post("/item", (req, res) => {
+app.post("/private/item", (req, res) => {
   // limit and wait times are in milliseconds.
-  var limit = 10
+  const limit = 10
   var wait = 0
 
   if (lastSaved !== 0) {
     let elapsed = Date.now() - lastSaved
     if (elapsed < limit) {
       wait = limit - elapsed
-      console.log("Waiting ", wait, "ms before save")
+      console.log("Waiting " + wait + " ms before save")
     }
   }
   setTimeout(() => {
@@ -117,10 +266,21 @@ app.post("/item", (req, res) => {
 
 app.listen(3000)
 
+function newCode() {
+  const chars = "bcdfghjkmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ123456789"
+
+  var code = ""
+  while (code.length < 8) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return code
+}
+
 function auth(ack) {
   if (!ack.err) {
     hostPublicKey = ack.get
     console.log(alias + " logged in")
+    mapInviteCodes()
     return
   }
 
@@ -131,7 +291,7 @@ function auth(ack) {
       return
     }
 
-    user.auth(alias, pass, ack => {
+    user.auth(alias, pass, async ack => {
       if (ack.err) {
         console.log(ack.err)
         return
@@ -139,15 +299,66 @@ function auth(ack) {
 
       hostPublicKey = ack.get
       console.log("Creating admin invite code")
-      Gun.SEA.encrypt("admin", user._.sea, enc => {
-        user.get("private").get("invite_codes").set(enc)
-      })
+      const enc = await Gun.SEA.encrypt("admin", user._.sea)
+      user.get("available").get("invite_codes").set(enc)
+      mapInviteCodes()
     })
   })
 }
 
+function mapInviteCodes() {
+  // map subscribes to invite_codes, so this will also be called when new
+  // invite codes are created.
+  user.get("available").get("invite_codes").map().once(async (enc, key) => {
+    if (enc) {
+      let code = await Gun.SEA.decrypt(enc, user._.sea)
+      if (!inviteCodes.has(code)) {
+        inviteCodes.set(code, key)
+      }
+    }
+  })
+}
+
+async function resetPassword(name, increment, email, code) {
+  const host = process.env.APP_HOST ?? "http://localhost:3000"
+  const reset = newCode()
+  let enc = await Gun.SEA.encrypt(reset, user._.sea)
+  let remaining = 8 - increment
+  let message = `Hello ${name}
+You can now update your password at: ${host}/update-password?username=${name}&code=${code}&reset=${reset}
+
+This link will be valid to use for the next 24 hours.
+
+${remaining <= 5 ? `Note that you can only reset your password ${remaining} more time${remaining != 1 ? "s" : ""}.` : ""}
+`
+
+  user.get("accounts").get(code).put({
+    reset: enc,
+    expiry: Date.now() + 86400000,
+  })
+
+  if (!process.env.MAIL_FROM) {
+    console.log("Email to", email)
+    console.log(message)
+    return
+  }
+
+  nodemailer.createTransport({sendmail: true}).sendMail({
+    from: process.env.MAIL_FROM,
+    to: email,
+    subject: "Update Password",
+    text: message,
+  }, (err, info) => {
+    if (err) {
+      console.log(err)
+      return
+    }
+    console.log(info)
+  })
+}
+
 function saveFeed(data) {
-  user.get("public").get("feeds").get(data.xml_url).put({
+  user.get("feeds").get(data.xml_url).put({
     description: data.description ?? "",
     html_url: data.html_url ?? "",
     language: data.language ?? "",
@@ -160,7 +371,7 @@ function saveFeed(data) {
 
 function saveItem(data) {
   lastSaved = Date.now()
-  user.get("public").get("items").get(lastSaved).put({
+  user.get("items").get(lastSaved).put({
     title: data.title ?? "",
     content: data.content ?? "",
     author: data.author ?? "",

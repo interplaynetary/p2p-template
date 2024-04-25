@@ -13,14 +13,44 @@ import Typography from "@mui/material/Typography"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 
-const Login = ({user, host}) => {
+const Login = ({user}) => {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showAuthError, setShowAuthError] = useState(false)
   const [disabledButton, setDisabledButton] = useState(false)
+
+  function login(alias) {
+    setDisabledButton(true)
+    setShowAuthError(false)
+    user.auth(alias, password, ack => {
+      if (ack.err) {
+        if (ack.err === "Wrong user or password.") {
+          let match = alias.match(/(.*)\.(\d)$/)
+          if (match) {
+            let increment = Number(match[2]) + 1
+            if (increment === 10) {
+              setDisabledButton(false)
+              setShowAuthError(true)
+              return
+            }
+            login(`${match[1]}.${increment}`)
+            return
+          }
+          login(`${alias}.1`)
+          return
+        }
+        setDisabledButton(false)
+        setShowAuthError(true)
+      } else {
+        setDisabledButton(false)
+        window.location = "/"
+      }
+    })
+  }
+
   return (
-      <Grid item xs={12}>
+    <Grid item xs={12}>
       <Card sx={{mt:2}}>
         <CardContent>
           <Typography variant="h5">Login</Typography>
@@ -58,18 +88,7 @@ const Login = ({user, host}) => {
             />
           </FormControl>
           <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-            onClick={() => {
-              setDisabledButton(true)
-              setShowAuthError(false)
-              user.auth(username, password, (ack) => {
-                setDisabledButton(false)
-                if (ack.err) {
-                  setShowAuthError(true)
-                } else {
-                  window.location = host
-                }
-              })
-            }}
+            onClick={() => login(username)}
           >Submit</Button>
           {showAuthError &&
            <Typography sx={{m:1}} variant="string">
