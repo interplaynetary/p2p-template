@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -13,39 +13,76 @@ import Typography from "@mui/material/Typography"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 
-const Login = ({user}) => {
+const Login = ({host, user}) => {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [showAuthError, setShowAuthError] = useState(false)
-  const [disabledButton, setDisabledButton] = useState(false)
+  const [message, setMessage] = useState(user.is? "Already logged in" : "")
+  const [disabledButton, setDisabledButton] = useState(user.is)
+  const found = useRef(false)
 
   function login(alias) {
     setDisabledButton(true)
-    setShowAuthError(false)
     user.auth(alias, password, ack => {
-      if (ack.err) {
-        if (ack.err === "Wrong user or password.") {
-          let match = alias.match(/(.*)\.(\d)$/)
-          if (match) {
-            let increment = Number(match[2]) + 1
-            if (increment === 10) {
-              setDisabledButton(false)
-              setShowAuthError(true)
-              return
-            }
-            login(`${match[1]}.${increment}`)
-            return
-          }
-          login(`${alias}.1`)
+      if (!ack.err) {
+        if (!host) {
+          setDisabledButton(false)
+          setMessage("Host not available")
+          localStorage.removeItem("pub")
+          window.location.reload()
           return
         }
-        setDisabledButton(false)
-        setShowAuthError(true)
-      } else {
-        setDisabledButton(false)
-        window.location = "/"
+
+        setMessage("Checking account...")
+        host.get("accounts").once(all => {
+          for (const code of Object.keys(all)) {
+            if (found.current) break
+
+            host.get("accounts").get(code).once(account => {
+              if (!account || account.pub !== user.is.pub) return
+
+              found.current = true
+              sessionStorage.setItem("code", code)
+              sessionStorage.setItem("name", account.name)
+            }, {wait: 0})
+          }
+        }, {wait: 0})
+        let retry = 0
+        let interval = setInterval(() => {
+          if (found.current) {
+            setDisabledButton(false)
+            setMessage("Account found")
+            clearInterval(interval)
+            window.location = "/"
+          }
+          else if (retry > 9) {
+            setDisabledButton(false)
+            setMessage("Account not found")
+            clearInterval(interval)
+          }
+          retry++
+        }, 1000)
+        return
       }
+
+      if (ack.err === "Wrong user or password.") {
+        let match = alias.match(/(.*)\.(\d)$/)
+        if (match) {
+          let increment = Number(match[2]) + 1
+          if (increment === 10) {
+            setDisabledButton(false)
+            setMessage("Wrong username or password")
+            return
+          }
+          login(`${match[1]}.${increment}`)
+          return
+        }
+        login(`${alias}.1`)
+        return
+      }
+
+      setDisabledButton(false)
+      setMessage("Wrong username or password")
     })
   }
 
@@ -90,10 +127,8 @@ const Login = ({user}) => {
           <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
             onClick={() => login(username)}
           >Submit</Button>
-          {showAuthError &&
-           <Typography sx={{m:1}} variant="string">
-             Wrong username or password
-           </Typography>}
+          {message &&
+           <Typography sx={{m:1}} variant="string">{message}</Typography>}
         </CardContent>
       </Card>
     </Grid>

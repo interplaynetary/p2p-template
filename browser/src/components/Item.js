@@ -5,7 +5,7 @@ import Typography from "@mui/material/Typography"
 
 const Item = ({item}) => {
   return (
-      <Grid item xs={12}>
+    <Grid item xs={12}>
       <Card>
         <Box>
           <Typography variant="h4">{item.title}</Typography>

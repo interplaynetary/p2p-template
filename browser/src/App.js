@@ -1,15 +1,17 @@
-import { useEffect, useState, useReducer } from "react"
+import { useEffect, useState } from "react"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
-import Gun from "gun"
-import "./App.css"
-import Login from "./components/Login"
-import Register from "./components/Register"
-import ResetPassword from "./components/ResetPassword"
-import UpdatePassword from "./components/UpdatePassword"
-import Display from "./components/Display"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
+import Display from "./components/Display"
+import Register from "./components/Register"
+import Login from "./components/Login"
+import Settings from "./components/Settings"
+import ValidateEmail from "./components/ValidateEmail"
+import ResetPassword from "./components/ResetPassword"
+import UpdatePassword from "./components/UpdatePassword"
+import "./App.css"
 
+import Gun from "gun"
 require("gun/lib/radix.js")
 require("gun/lib/radisk.js")
 require("gun/lib/store.js")
@@ -26,69 +28,71 @@ const gun = Gun({
 
 const user = gun.user().recall({sessionStorage: true})
 const params = new URLSearchParams(window.location.search)
-const pages = ["login", "register", "reset-password", "update-password"]
+const pages = ["register", "login", "settings", "validate-email",
+               "reset-password", "update-password"]
 const redirect = params.get("redirect")
 const to = redirect ? (pages.includes(redirect) ? `/${redirect}` : "/") : ""
 
-function reducer(current, add) {
-  return {
-    items: current.keys.includes(add.key) ? current.items : [add, ...current.items],
-    keys: [add.key, ...current.keys],
-  }
-}
-
-function App() {
-  const [display, updateDisplay] = useReducer(reducer, {items:[], keys:[]})
-  const [hostPublicKey, setHostPublicKey] = useState(() => {
-    // Get initial state from local storage.
-    return localStorage.getItem("hostPublicKey") || ""
+const App = () => {
+  const [host, setHost] = useState(null)
+  const [pub, setPub] = useState(() => {
+    return localStorage.getItem("pub") || ""
   })
-
   useEffect(() => {
-    // Update local storage whenever the host public key changes.
-    localStorage.setItem("hostPublicKey", hostPublicKey)
-
-    // Fetch host public key when not set.
-    if (hostPublicKey === "") {
+    if (!pub) {
       fetch(`${window.location.origin}/host-public-key`)
         .then(res => res.text())
-        .then(res => setHostPublicKey(res))
-        .catch(err => console.log(err))
-    } else {
-      // Display items when host public key is set.
-
-      // TODO: items should be paginated and categorised here. To do that need
-      // to pass in more dependencies and use them to decide which items to
-      // get using a date filter first and then filtering that subset by
-      // categories the user has selected.
-      const items = gun.get(hostPublicKey).get("public").get("items")
-      items.map().once((data, key) => {
-        updateDisplay({
-          key: key,
-          title: data.title,
-          content: data.content,
-          author: data.author,
-          category: data.category,
-          enclosure: data.enclosure,
-          permalink: data.permalink,
-          guid: data.guid,
-          timestamp: data.timestamp,
-          xml_url: data.xml_url,
-        })
-      })
+        .then(key => setPub(key))
+      return
     }
-  }, [hostPublicKey])
+
+    setHost(gun.user(pub))
+    localStorage.setItem("pub", pub)
+    gun.user(pub).get("accounts").map().on((account, code) => {
+      if (!account) return
+
+      // TODO: If an account code is in users list of known accounts then check
+      // if their pub has changed and re-share encrypted data with them.
+      console.log("account", code)
+    })
+  }, [pub])
 
   return (
     <Container maxWidth="sm">
       <Grid container spacing={5}>
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<Login user={user}/>}/>
-            <Route path="/register" element={<Register loggedIn={user.is}/>}/>
-            <Route path="/reset-password" element={<ResetPassword loggedIn={user.is}/>}/>
-            <Route path="/update-password" element={<UpdatePassword loggedIn={user.is}/>}/>
-            <Route path="/" element={to ? <Navigate to={to}/> : <Display items={display.items}/>}/>
+            <Route path="/register" element={
+              <Register loggedIn={user.is}/>
+            }/>
+            <Route path="/login" element={
+              <Login host={host} user={user}/>
+            }/>
+            <Route path="/validate-email" element={
+              <ValidateEmail
+                code={params.get("code")}
+                validate={params.get("validate")}
+              />
+            }/>
+            <Route path="/reset-password" element={
+              <ResetPassword loggedIn={user.is}/>
+            }/>
+            <Route path="/update-password" element={
+              <UpdatePassword
+                loggedIn={user.is}
+                current={params.get("username")}
+                code={params.get("code")}
+                reset={params.get("reset")}
+              />
+            }/>
+            <Route path="/settings" element={
+              user.is ? <Settings host={host} user={user}/> :
+                <Navigate to="/login"/>
+            }/>
+            <Route path="/" element={
+              to ? <Navigate to={to}/> :
+                <Display user={user} gun={gun} host={host}/>
+            }/>
           </Routes>
         </BrowserRouter>
       </Grid>

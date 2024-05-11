@@ -1,5 +1,4 @@
 import { useState } from "react"
-import Gun from "gun"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -14,6 +13,7 @@ import Typography from "@mui/material/Typography"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 
+import Gun from "gun"
 require("gun/lib/radix.js")
 require("gun/lib/radisk.js")
 require("gun/lib/store.js")
@@ -28,10 +28,8 @@ const gun = Gun({
   store: window.RindexedDB(),
 })
 
-const params = new URLSearchParams(window.location.search)
-
-const UpdatePassword = ({loggedIn}) => {
-  const [username, setUsername] = useState(params.get("username") ?? "")
+const UpdatePassword = ({loggedIn, current, code, reset}) => {
+  const [username, setUsername] = useState(current ?? "")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState(loggedIn? "Already logged in" : "")
@@ -82,14 +80,14 @@ const UpdatePassword = ({loggedIn}) => {
             "Content-Type": "application/json;charset=utf-8"
           },
           body: JSON.stringify({
-            code: params.get("code"),
-            reset: params.get("reset"),
-            pub: ack.get,
+            code: code ?? null,
+            reset: reset ?? null,
+            pub: user.is.pub,
             alias: alias,
             name: username,
           }),
         })
-        .then(res => res.text().then(t => ({ok: res.ok, text: t})))
+        .then(res => res.text().then(text => ({ok: res.ok, text: text})))
         .then(res => {
           if (!res.ok) {
             setDisabledButton(false)
@@ -99,12 +97,16 @@ const UpdatePassword = ({loggedIn}) => {
           }
 
           // The previous public key is returned to copy over public user data.
-          gun.get(res.text).get("public").once(data => user.get("public").put(data), {wait: 2})
-          setTimeout(() => {
-            setDisabledButton(false)
+          gun.user(res.text).get("public").once(data => {
+            if (data) {
+              user.get("public").put(data)
+            }
             setMessage("Password updated")
-            window.location = "/login"
-          }, 5000)
+            setTimeout(() => {
+              setDisabledButton(false)
+              window.location = "/login"
+            }, 2000)
+          }, {wait: 0})
         })
       })
     })

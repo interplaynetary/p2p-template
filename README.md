@@ -24,11 +24,11 @@ You can export `GUN_USER_ALIAS` and `GUN_USER_PASS` to change the default
 log in credentials for the server. These values are also used to access private
 endpoints, for example to allocate invite codes to an account you can run:
 
-`curl -H 'Content-Type: application/json' -u GUN_USER_ALIAS:GUN_USER_PASS -d '{"pub": "<account-public-key>"}' localhost:3000/private/create-invite-codes`
+`curl -i -H 'Content-Type: application/json' -u <GUN_USER_ALIAS>:<GUN_USER_PASS> -d '{"code": "<code>"}' localhost:3000/private/create-invite-codes`
 
-The value `<account-public-key>` can be found on the settings page once a user
-has created their account and logged in. You can also set the number of invite
-codes to create for an account by adding `"count": <number>` to the request.
+The value `<code>` is the invite code belonging to an account. You can set the
+number of invite codes to create for an account by adding `"count": <number>`
+to the request, otherwise one code will be created.
 
 If you have sendmail available on your server you can export `MAIL_FROM` to
 send password reset emails to your users. If this value is not set then password

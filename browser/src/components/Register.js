@@ -1,5 +1,4 @@
 import { useState } from "react"
-import Gun from "gun"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -14,6 +13,7 @@ import Typography from "@mui/material/Typography"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 
+import Gun from "gun"
 require("gun/lib/radix.js")
 require("gun/lib/radisk.js")
 require("gun/lib/store.js")
@@ -60,7 +60,7 @@ const Register = ({loggedIn}) => {
       },
       body: JSON.stringify({code: code}),
     })
-    .then(res => res.text().then(t => ({ok: res.ok, text: t})))
+    .then(res => res.text().then(text => ({ok: res.ok, text: text})))
     .then(res => {
       if (!res.ok) {
         setDisabledButton(false)
@@ -90,12 +90,12 @@ const Register = ({loggedIn}) => {
             },
             body: JSON.stringify({
               code: code,
-              pub: ack.get,
+              pub: user.is.pub,
               alias: username,
               email: email,
             }),
           })
-          .then(res => res.text().then(t => ({ok: res.ok, text: t})))
+          .then(res => res.text().then(text => ({ok: res.ok, text: text})))
           .then(res => {
             setDisabledButton(false)
             if (!res.ok) {
