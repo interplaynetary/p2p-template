@@ -23,6 +23,8 @@ const Login = ({host, user}) => {
 
   function login(alias) {
     setDisabledButton(true)
+    setMessage("Checking account...")
+
     user.auth(alias, password, ack => {
       if (!ack.err) {
         if (!host) {
@@ -33,7 +35,6 @@ const Login = ({host, user}) => {
           return
         }
 
-        setMessage("Checking account...")
         host.get("accounts").once(all => {
           for (const code of Object.keys(all)) {
             if (found.current) break

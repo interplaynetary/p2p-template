@@ -15,6 +15,7 @@ const gun = Gun({
 const user = gun.user()
 const alias = process.env.GUN_USER_ALIAS ?? "alias"
 const pass = process.env.GUN_USER_PASS ?? "passphrase"
+const host = process.env.APP_HOST ?? "http://localhost:3000"
 
 // lastSaved is the timestamp of the last time save was called. This allows
 // slowing calls to save so that the timestamp can be used as a unique key.
@@ -124,14 +125,16 @@ app.post("/claim-invite-code", async (req, res) => {
   }
 
   const validate = newCode()
-  let encValidate = await Gun.SEA.encrypt(validate, user._.sea)
-  let encEmail = await Gun.SEA.encrypt(req.body.email, user._.sea)
+  const encValidate = await Gun.SEA.encrypt(validate, user._.sea)
+  const encEmail = await Gun.SEA.encrypt(req.body.email, user._.sea)
   user.get("accounts").get(code).put({
     pub: req.body.pub,
     alias: req.body.alias,
     name: req.body.alias,
     email: encEmail,
     validate: encValidate,
+    ref: invite.owner,
+    host: host,
   })
   validateEmail(req.body.alias, req.body.email, code, validate)
 
@@ -160,7 +163,7 @@ app.post("/claim-invite-code", async (req, res) => {
       const owner = user.get("shared").get("invite_codes").get(invite.owner)
       owner.once(async codes => {
         const secret = await Gun.SEA.secret(epub, user._.sea)
-        for (const [key, enc] of Object.entries(codes)) {
+        for (let [key, enc] of Object.entries(codes)) {
           if (!enc) continue
 
           let shared = await Gun.SEA.decrypt(enc, secret)
@@ -196,7 +199,7 @@ app.post("/validate-email", (req, res) => {
       return
     }
 
-    let validate = await Gun.SEA.decrypt(account.validate, user._.sea)
+    const validate = await Gun.SEA.decrypt(account.validate, user._.sea)
     if (validate !== req.body.validate) {
       res.status(400).send("Validation code does not match")
       return
@@ -221,7 +224,7 @@ app.post("/reset-password", (req, res) => {
     }
 
     let increment = 0
-    let match = account.alias.match(/\.(\d)$/)
+    const match = account.alias.match(/\.(\d)$/)
     if (match) {
       increment = Number(match[1])
     }
@@ -230,7 +233,7 @@ app.post("/reset-password", (req, res) => {
       return
     }
 
-    let email = await Gun.SEA.decrypt(account.email, user._.sea)
+    const email = await Gun.SEA.decrypt(account.email, user._.sea)
     if (email !== req.body.email) {
       res.status(400).send("Email does not match invite code")
       return
@@ -241,7 +244,7 @@ app.post("/reset-password", (req, res) => {
     }
 
     const reset = newCode()
-    let remaining = 8 - increment
+    const remaining = 8 - increment
     user.get("accounts").get(code).put({
       reset: await Gun.SEA.encrypt(reset, user._.sea),
       expiry: Date.now() + 86400000,
@@ -289,7 +292,7 @@ app.post("/update-password", (req, res) => {
       return
     }
 
-    let reset = await Gun.SEA.decrypt(account.reset, user._.sea)
+    const reset = await Gun.SEA.decrypt(account.reset, user._.sea)
     if (reset !== req.body.reset) {
       res.status(400).send("Reset code does not match")
       return
@@ -300,7 +303,6 @@ app.post("/update-password", (req, res) => {
       alias: req.body.alias,
       name: req.body.name,
       prev: account.pub,
-      email: account.email,
     })
     res.send(account.pub)
   }, {wait: 0})
@@ -346,7 +348,7 @@ app.post("/private/item", (req, res) => {
   var wait = 0
 
   if (lastSaved !== 0) {
-    let elapsed = Date.now() - lastSaved
+    const elapsed = Date.now() - lastSaved
     if (elapsed < limit) {
       wait = limit - elapsed
       console.log("Waiting " + wait + " ms before save")
@@ -391,7 +393,8 @@ function auth(ack) {
       }
 
       console.log("Creating admin invite code")
-      const enc = await Gun.SEA.encrypt({code: "admin"}, user._.sea)
+      const invite = {code: "admin", owner: "admin"}
+      const enc = await Gun.SEA.encrypt(invite, user._.sea)
       user.get("available").get("invite_codes").set(enc)
       mapInviteCodes()
     })
@@ -402,12 +405,12 @@ function mapInviteCodes() {
   // map subscribes to invite_codes, so this will also be called when new
   // invite codes are created.
   user.get("available").get("invite_codes").map().once(async (enc, key) => {
-    if (enc) {
-      let invite = await Gun.SEA.decrypt(enc, user._.sea)
-      if (!inviteCodes.has(invite.code)) {
-        invite.key = key
-        inviteCodes.set(invite.code, invite)
-      }
+    if (!enc) return
+
+    const invite = await Gun.SEA.decrypt(enc, user._.sea)
+    if (!inviteCodes.has(invite.code)) {
+      invite.key = key
+      inviteCodes.set(invite.code, invite)
     }
   })
 }
@@ -416,8 +419,20 @@ function mapInviteCodes() {
 function checkCodes() {
   // This function should post the list of new codes to all federated hosts
   // to make sure there are no duplicates between them. Put each of the
-  // requests in a promise, and once all have been resolved tell each of them
-  // that they should store the new codes and the associated owner's code.
+  // requests in a promise, and return once all have been resolved. Note that
+  // the other servers don't need to store the codes, they just each need to
+  // check that the list they create doesn't contain duplicates when they also
+  // want to store new codes.
+
+  // Other hosts can decide if they want to allow logins from federated user
+  // accounts by listening to get("accounts").map().on() for each of the known
+  // federated hosts and adding them to their own list of accounts. "host" is
+  // provided in the account data to point users to their host server, but the
+  // user could provide their email to another host to allow password resets
+  // their too... it would just be stored on the other host account data the
+  // same as it's stored here, without sharing between servers. That server
+  // can clear the "host" field in their account data in that case, as it's
+  // no longer rerequired, and can store their own validation code.
   return true
 }
 
@@ -448,7 +463,6 @@ async function createInviteCodes(count, owner, epub) {
 }
 
 function resetPassword(name, remaining, email, code, reset) {
-  const host = process.env.APP_HOST ?? "http://localhost:3000"
   const message = `Hello ${name}
 You can now update your password at ${host}/update-password?username=${name}&code=${code}&reset=${reset}
 
@@ -460,7 +474,6 @@ ${remaining <= 5 ? `Note that you can only reset your password ${remaining} more
 }
 
 function validateEmail(name, email, code, validate) {
-  const host = process.env.APP_HOST ?? "http://localhost:3000"
   const message = `Hello ${name}
 Thanks for creating an account at ${host}
 

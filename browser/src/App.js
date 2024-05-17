@@ -38,6 +38,9 @@ const App = () => {
   const [pub, setPub] = useState(() => {
     return localStorage.getItem("pub") || ""
   })
+  const [code] = useState(() => {
+    return sessionStorage.getItem("code") || ""
+  })
   useEffect(() => {
     if (!pub) {
       fetch(`${window.location.origin}/host-public-key`)
@@ -48,14 +51,60 @@ const App = () => {
 
     setHost(gun.user(pub))
     localStorage.setItem("pub", pub)
-    gun.user(pub).get("accounts").map().on((account, code) => {
+    if (!user.is) return
+
+    gun.user(pub).get("accounts").map().on((account, accountCode) => {
       if (!account) return
 
-      // TODO: If an account code is in users list of known accounts then check
-      // if their pub has changed and re-share encrypted data with them.
-      console.log("account", code)
+      // Check this account against the users list of contacts.
+      user.get("public").get("contacts").once(contacts => {
+        let found = false
+        for (let [contactCode, contact] of Object.entries(contacts ?? {})) {
+          if (contactCode !== accountCode) continue
+
+          // If the public key has changed for this contact then store their
+          // new account details and re-share encrypted data with them to help
+          // restore their account.
+          if (contact.pub !== account.pub) {
+            user.get("public").get("contacts").get(contactCode).put(account)
+            gun.user(contact.pub).get("epub").once(oldEPub => {
+              if (!oldEPub) {
+                console.error("User not found for old public key")
+                return
+              }
+
+              gun.user(account.pub).get("epub").once(epub => {
+                if (!epub) {
+                  console.error("User not found for new public key")
+                  return
+                }
+
+                user.get("shared").get(contactCode).once(async shared => {
+                  if (!shared) return
+
+                  const oldSecret = await Gun.SEA.secret(oldEPub, user._.sea)
+                  const secret = await Gun.SEA.secret(epub, user._.sea)
+                  for (let [key, oldEnc] of Object.entries(shared)) {
+                    if (!oldEnc) continue
+
+                    let data = await Gun.SEA.decrypt(oldEnc, oldSecret)
+                    let enc = await Gun.SEA.encrypt(data, secret)
+                    user.get("shared").get(contactCode).get(key).put(enc)
+                  }
+                }, {wait: 0})
+              }, {wait: 0})
+            }, {wait: 0})
+          }
+          found = true
+          break
+        }
+        // Add the new contact if we referred them.
+        if (!found && account.ref === code) {
+          user.get("public").get("contacts").get(accountCode).put(account)
+        }
+      }, {wait: 0})
     })
-  }, [pub])
+  }, [pub, code])
 
   return (
     <Container maxWidth="sm">
@@ -86,7 +135,7 @@ const App = () => {
               />
             }/>
             <Route path="/settings" element={
-              user.is ? <Settings host={host} user={user}/> :
+              user.is ? <Settings host={host} user={user} code={code}/> :
                 <Navigate to="/login"/>
             }/>
             <Route path="/" element={
