@@ -67,6 +67,10 @@ app.get("/settings", (req, res) => {
   res.redirect("/?redirect=settings")
 })
 
+app.get("/help", (req, res) => {
+  res.redirect("/?redirect=help")
+})
+
 app.get("/validate-email", (req, res) => {
   res.redirect(`/?redirect=validate-email&code=${req.query.code}&validate=${req.query.validate}`)
 })
@@ -358,6 +362,11 @@ app.post("/private/item", (req, res) => {
     saveItem(req.body)
     res.end()
   }, wait)
+})
+
+app.post("/private/update-help", (req, res) => {
+  user.get("help").put(req.body)
+  res.end()
 })
 
 app.listen(3000)

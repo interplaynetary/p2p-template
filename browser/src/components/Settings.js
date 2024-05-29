@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
+import Container from "@mui/material/Container"
 import FilledInput from "@mui/material/FilledInput"
 import FormControl from "@mui/material/FormControl"
 import Grid from "@mui/material/Grid"
@@ -15,6 +16,7 @@ import Typography from "@mui/material/Typography"
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
+import SearchAppBar from "./SearchAppBar"
 
 import Gun from "gun"
 require("gun/lib/radix.js")
@@ -23,7 +25,7 @@ require("gun/lib/store.js")
 require("gun/lib/rindexed.js")
 require("gun/sea")
 
-const Settings = ({host, user, code}) => {
+const Settings = ({host, user, code, mode, setMode}) => {
   const [name] = useState(() => {
     return sessionStorage.getItem("name") || ""
   })
@@ -74,103 +76,112 @@ const Settings = ({host, user, code}) => {
     }
   }
 
+  const changePassword = () => {
+    if (!password) {
+      setMessage("Please provide a new password")
+      return
+    }
+
+    setDisabledButton(true)
+    setMessage("Updating password...")
+    user.auth(user._.sea, ack => {
+      setDisabledButton(false)
+      if (ack.err) {
+        setMessage(ack.err)
+      } else {
+        setMessage("Password updated")
+      }
+    }, {change: password})
+  }
+
   return (
-    <Grid item xs={12}>
-      <Card sx={{mt:2}}>
-        <CardContent>
-          <Typography sx={{m:1}}>{name ?
-            "Hello " + name : "Account not found. Please try logging in again."}
-          </Typography>
-          {invites.length !== 0 &&
-          <Typography sx={{m:1}}>
-            You have {invites.length} invite code{invites.length > 1 && "s"} you can share
-          </Typography>}
-            <List dense={true}>
-            {invites.map(invite =>
-              <ListItem key={invite.key}>
-                <FilledInput
-                  defaultValue={invite.code}
-                  readOnly={true}
+    <>
+    {user.is && <SearchAppBar mode={mode} setMode={setMode}/>}
+    <Container maxWidth="sm">
+      <Grid container spacing={5}>
+        <Grid item xs={12}>
+          <Card sx={{mt:2}}>
+            <CardContent>
+              <Typography sx={{m:1}}>{name ?
+                "Hello " + name : "Account not found. Please try logging in again."}
+              </Typography>
+              {invites.length !== 0 &&
+              <Typography sx={{m:1}}>
+                You have {invites.length} invite code{invites.length > 1 && "s"} you can share
+              </Typography>}
+              <List dense={true} sx={{maxHeight: 300, overflow: "auto"}}>
+                {invites.map(invite =>
+                  <ListItem key={invite.key}>
+                    <FilledInput
+                      defaultValue={invite.code}
+                      readOnly={true}
+                      endAdornment={
+                        <InputAdornment position="end">
+                          <IconButton
+                            edge="end"
+                            aria-label="copy invite code"
+                            onClick={(event) => {select(event.target)}}
+                          >
+                            <ContentCopy/>
+                          </IconButton>
+                        </InputAdornment>
+                      }
+                    />
+                  </ListItem>
+                )}
+              </List>
+            </CardContent>
+          </Card>
+          <Card sx={{mt:2}}>
+            <CardContent>
+              <Typography sx={{m:1}}>Use this form to change your password</Typography>
+              <FormControl variant="outlined"
+                fullWidth={true}
+                margin="normal"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              >
+                <InputLabel htmlFor="settings-password">New Password</InputLabel>
+                <OutlinedInput
+                  id="settings-password"
+                  autoComplete="new-password"
+                  type={showPassword ? "text" : "password"}
                   endAdornment={
                     <InputAdornment position="end">
                       <IconButton
+                        aria-label="toggle password visibility"
+                        onClick={() => setShowPassword(show => !show)}
                         edge="end"
-                        aria-label="copy invite code"
-                        onClick={(event) => {select(event.target)}}
                       >
-                        <ContentCopy/>
+                        {showPassword ? <VisibilityOff/> : <Visibility/>}
                       </IconButton>
                     </InputAdornment>
                   }
+                  label="Password"
                 />
-              </ListItem>
-            )}
-          </List>
-        </CardContent>
-      </Card>
-      <Card sx={{mt:2}}>
-        <CardContent>
-          <Typography sx={{m:1}}>Change your password</Typography>
-          <FormControl variant="outlined"
-            fullWidth={true}
-            margin="normal"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          >
-            <InputLabel htmlFor="settings-password">New Password</InputLabel>
-            <OutlinedInput
-              id="settings-password"
-              autoComplete="new-password"
-              type={showPassword ? "text" : "password"}
-              endAdornment={
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="toggle password visibility"
-                    onClick={() => setShowPassword(show => !show)}
-                    edge="end"
-                  >
-                    {showPassword ? <VisibilityOff/> : <Visibility/>}
-                  </IconButton>
-                </InputAdornment>
-              }
-              label="Password"
-            />
-          </FormControl>
-          <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-            onClick={() => {
-              if (!password) {
-                setMessage("Please provide a new password")
-                return
-              }
-
-              setDisabledButton(true)
-              setMessage("Updating password...")
-              user.auth(user._.sea, ack => {
-                setDisabledButton(false)
-                if (ack.err) {
-                  setMessage(ack.err)
-                } else {
-                  setMessage("Password updated")
-                }
-              }, {change: password})
-            }}
-          >Submit</Button>
-          {message &&
-           <Typography sx={{m:1}} variant="string">{message}</Typography>}
-        </CardContent>
-      </Card>
-      <Card sx={{mt:2}}>
-        <CardContent>
-          <Typography sx={{m:1}}>Log out of your account</Typography>
-          <Button sx={{mt:1}} variant="contained" onClick={() => {
-            user.leave()
-            sessionStorage.removeItem("name")
-            sessionStorage.removeItem("code")
-            window.location = "/login"
-          }}>Logout</Button>
-        </CardContent>
-      </Card>
-    </Grid>
+              </FormControl>
+              <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
+                onClick={changePassword}
+              >Submit</Button>
+              {message &&
+               <Typography sx={{m:1}} variant="string">{message}</Typography>}
+            </CardContent>
+          </Card>
+          <Card sx={{mt:2}}>
+            <CardContent>
+              <Typography sx={{m:1}}>Log out of your account</Typography>
+              <Button sx={{mt:1}} variant="contained" onClick={() => {
+                user.leave()
+                sessionStorage.removeItem("name")
+                sessionStorage.removeItem("code")
+                window.location = "/login"
+              }}>Logout</Button>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
+    </>
   )
 }
 

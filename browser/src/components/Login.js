@@ -2,6 +2,7 @@ import { useState, useRef } from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
+import Container from "@mui/material/Container"
 import FormControl from "@mui/material/FormControl"
 import Grid from "@mui/material/Grid"
 import IconButton from "@mui/material/IconButton"
@@ -12,8 +13,9 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
+import SearchAppBar from "./SearchAppBar"
 
-const Login = ({host, user}) => {
+const Login = ({host, user, mode, setMode}) => {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -21,7 +23,7 @@ const Login = ({host, user}) => {
   const [disabledButton, setDisabledButton] = useState(user.is)
   const found = useRef(false)
 
-  function login(alias) {
+  const login = (alias) => {
     setDisabledButton(true)
     setMessage("Checking account...")
 
@@ -88,51 +90,58 @@ const Login = ({host, user}) => {
   }
 
   return (
-    <Grid item xs={12}>
-      <Card sx={{mt:2}}>
-        <CardContent>
-          <Typography variant="h5">Login</Typography>
-          <TextField
-            id="login-username"
-            label="Username"
-            variant="outlined"
-            fullWidth={true}
-            margin="normal"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
-          <FormControl variant="outlined"
-            fullWidth={true}
-            margin="normal"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          >
-            <InputLabel htmlFor="login-password">Password</InputLabel>
-            <OutlinedInput
-              id="login-password"
-              type={showPassword ? "text" : "password"}
-              endAdornment={
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="toggle password visibility"
-                    onClick={() => setShowPassword(show => !show)}
-                    edge="end"
-                  >
-                    {showPassword ? <VisibilityOff/> : <Visibility/>}
-                  </IconButton>
-                </InputAdornment>
-              }
-              label="Password"
-            />
-          </FormControl>
-          <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-            onClick={() => login(username)}
-          >Submit</Button>
-          {message &&
-           <Typography sx={{m:1}} variant="string">{message}</Typography>}
-        </CardContent>
-      </Card>
-    </Grid>
+    <>
+    {user.is && <SearchAppBar mode={mode} setMode={setMode}/>}
+    <Container maxWidth="sm">
+      <Grid container spacing={5}>
+        <Grid item xs={12}>
+          <Card sx={{mt:2}}>
+            <CardContent>
+              <Typography variant="h5">Login</Typography>
+              <TextField
+                id="login-username"
+                label="Username"
+                variant="outlined"
+                fullWidth={true}
+                margin="normal"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+              <FormControl variant="outlined"
+                fullWidth={true}
+                margin="normal"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              >
+                <InputLabel htmlFor="login-password">Password</InputLabel>
+                <OutlinedInput
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  endAdornment={
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="toggle password visibility"
+                        onClick={() => setShowPassword(show => !show)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff/> : <Visibility/>}
+                      </IconButton>
+                    </InputAdornment>
+                  }
+                  label="Password"
+                />
+              </FormControl>
+              <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
+                onClick={() => login(username)}
+              >Submit</Button>
+              {message &&
+               <Typography sx={{m:1}} variant="string">{message}</Typography>}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
+    </>
   )
 }
 

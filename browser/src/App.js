@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
-import Container from "@mui/material/Container"
-import Grid from "@mui/material/Grid"
+import { red } from "@mui/material/colors"
+import { ThemeProvider, createTheme } from "@mui/material/styles"
+import CssBaseline from "@mui/material/CssBaseline";
 import Display from "./components/Display"
+import Help from "./components/Help"
 import Register from "./components/Register"
 import Login from "./components/Login"
 import Settings from "./components/Settings"
@@ -28,7 +30,7 @@ const gun = Gun({
 
 const user = gun.user().recall({sessionStorage: true})
 const params = new URLSearchParams(window.location.search)
-const pages = ["register", "login", "settings", "validate-email",
+const pages = ["register", "login", "settings", "help", "validate-email",
                "reset-password", "update-password"]
 const redirect = params.get("redirect")
 const to = redirect ? (pages.includes(redirect) ? `/${redirect}` : "/") : ""
@@ -41,6 +43,23 @@ const App = () => {
   const [code] = useState(() => {
     return sessionStorage.getItem("code") || ""
   })
+  const [mode, setMode] = useState(() => {
+    return sessionStorage.getItem("mode") || "light"
+  })
+  const theme = useMemo(() =>
+    createTheme({
+      palette: {
+        mode,
+        primary: {
+          main: red[900],
+        },
+        secondary: {
+          main: red[500],
+        },
+      },
+    }), [mode],
+  )
+
   useEffect(() => {
     if (!pub) {
       fetch(`${window.location.origin}/host-public-key`)
@@ -107,45 +126,62 @@ const App = () => {
   }, [pub, code])
 
   return (
-    <Container maxWidth="sm">
-      <Grid container spacing={5}>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/register" element={
-              <Register loggedIn={user.is}/>
-            }/>
-            <Route path="/login" element={
-              <Login host={host} user={user}/>
-            }/>
-            <Route path="/validate-email" element={
-              <ValidateEmail
-                code={params.get("code")}
-                validate={params.get("validate")}
+    <ThemeProvider theme={theme}>
+      <CssBaseline/>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/register" element={
+            <Register loggedIn={user.is} mode={mode} setMode={setMode}/>
+          }/>
+          <Route path="/login" element={
+            <Login host={host} user={user} mode={mode} setMode={setMode}/>
+          }/>
+          <Route path="/validate-email" element={
+            <ValidateEmail
+              code={params.get("code")}
+              validate={params.get("validate")}
+            />
+          }/>
+          <Route path="/reset-password" element={
+            <ResetPassword loggedIn={user.is} mode={mode} setMode={setMode}/>
+          }/>
+          <Route path="/update-password" element={
+            <UpdatePassword
+              loggedIn={user.is}
+              current={params.get("username")}
+              code={params.get("code")}
+              reset={params.get("reset")}
+              mode={mode}
+              setMode={setMode}
+            />
+          }/>
+          <Route path="/settings" element={
+            user.is ?
+              <Settings
+                host={host}
+                user={user}
+                code={code}
+                mode={mode}
+                setMode={setMode}
+              /> :
+              <Navigate to="/login"/>
+          }/>
+          <Route path="/help" element={
+              <Help loggedIn={user.is} host={host} mode={mode} setMode={setMode}/>
+          }/>
+          <Route path="/" element={
+            to ? <Navigate to={to}/> :
+              <Display
+                user={user}
+                gun={gun}
+                host={host}
+                mode={mode}
+                setMode={setMode}
               />
-            }/>
-            <Route path="/reset-password" element={
-              <ResetPassword loggedIn={user.is}/>
-            }/>
-            <Route path="/update-password" element={
-              <UpdatePassword
-                loggedIn={user.is}
-                current={params.get("username")}
-                code={params.get("code")}
-                reset={params.get("reset")}
-              />
-            }/>
-            <Route path="/settings" element={
-              user.is ? <Settings host={host} user={user} code={code}/> :
-                <Navigate to="/login"/>
-            }/>
-            <Route path="/" element={
-              to ? <Navigate to={to}/> :
-                <Display user={user} gun={gun} host={host}/>
-            }/>
-          </Routes>
-        </BrowserRouter>
-      </Grid>
-    </Container>
+          }/>
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

@@ -2,6 +2,7 @@ import { useState } from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
+import Container from "@mui/material/Container"
 import FormControl from "@mui/material/FormControl"
 import Grid from "@mui/material/Grid"
 import IconButton from "@mui/material/IconButton"
@@ -12,6 +13,7 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
+import SearchAppBar from "./SearchAppBar"
 
 import Gun from "gun"
 require("gun/lib/radix.js")
@@ -28,14 +30,14 @@ const gun = Gun({
   store: window.RindexedDB(),
 })
 
-const UpdatePassword = ({loggedIn, current, code, reset}) => {
+const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
   const [username, setUsername] = useState(current ?? "")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState(loggedIn? "Already logged in" : "")
   const [disabledButton, setDisabledButton] = useState(loggedIn)
 
-  function update(alias) {
+  const update = (alias) => {
     if (!alias) {
       setMessage("Please choose a username")
       return
@@ -113,51 +115,58 @@ const UpdatePassword = ({loggedIn, current, code, reset}) => {
   }
 
   return (
-    <Grid item xs={12}>
-      <Card sx={{mt:2}}>
-        <CardContent>
-          <Typography variant="h5">Update Password</Typography>
-          <TextField
-            id="update-username"
-            label="Username"
-            variant="outlined"
-            fullWidth={true}
-            margin="normal"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
-          <FormControl variant="outlined"
-            fullWidth={true}
-            margin="normal"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          >
-            <InputLabel htmlFor="update-password">Password</InputLabel>
-            <OutlinedInput
-              id="update-password"
-              type={showPassword ? "text" : "password"}
-              endAdornment={
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="toggle password visibility"
-                    onClick={() => setShowPassword(show => !show)}
-                    edge="end"
-                  >
-                    {showPassword ? <VisibilityOff/> : <Visibility/>}
-                  </IconButton>
-                </InputAdornment>
-              }
-              label="Password"
-            />
-          </FormControl>
-          <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-            onClick={() => update(username)}
-          >Submit</Button>
-          {message &&
-           <Typography sx={{m:1}} variant="string">{message}</Typography>}
-        </CardContent>
-      </Card>
-    </Grid>
+    <>
+    {loggedIn && <SearchAppBar mode={mode} setMode={setMode}/>}
+    <Container maxWidth="sm">
+      <Grid container spacing={5}>
+        <Grid item xs={12}>
+          <Card sx={{mt:2}}>
+            <CardContent>
+              <Typography variant="h5">Update Password</Typography>
+              <TextField
+                id="update-username"
+                label="Username"
+                variant="outlined"
+                fullWidth={true}
+                margin="normal"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+              <FormControl variant="outlined"
+                fullWidth={true}
+                margin="normal"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              >
+                <InputLabel htmlFor="update-password">Password</InputLabel>
+                <OutlinedInput
+                  id="update-password"
+                  type={showPassword ? "text" : "password"}
+                  endAdornment={
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="toggle password visibility"
+                        onClick={() => setShowPassword(show => !show)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff/> : <Visibility/>}
+                      </IconButton>
+                    </InputAdornment>
+                  }
+                  label="Password"
+                />
+              </FormControl>
+              <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
+                onClick={() => update(username)}
+              >Submit</Button>
+              {message &&
+               <Typography sx={{m:1}} variant="string">{message}</Typography>}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
+    </>
   )
 }
 

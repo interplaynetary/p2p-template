@@ -1,5 +1,6 @@
 import { useState } from "react"
 import Button from "@mui/material/Button"
+import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 import Typography from "@mui/material/Typography"
 
@@ -7,7 +8,7 @@ const ValidateEmail = ({code, validate}) => {
   const [message, setMessage] = useState("Validate your email address:")
   const [disabledButton, setDisabledButton] = useState(false)
 
-  function validateEmail() {
+  const validateEmail = () => {
     setMessage("Validating email...")
     setDisabledButton(true)
 
@@ -34,12 +35,16 @@ const ValidateEmail = ({code, validate}) => {
   }
 
   return (
-    <Grid item xs={12}>
-      <Typography sx={{m:1}}>{message}</Typography>
-      <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-        onClick={validateEmail}
-      >Validate</Button>
-    </Grid>
+    <Container maxWidth="sm">
+      <Grid container spacing={5}>
+        <Grid item xs={12}>
+          <Typography sx={{m:1}}>{message}</Typography>
+          <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
+            onClick={validateEmail}
+          >Validate</Button>
+        </Grid>
+      </Grid>
+    </Container>
   )
 }
 

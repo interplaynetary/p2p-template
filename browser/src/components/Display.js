@@ -1,6 +1,8 @@
 import { useReducer } from "react"
+import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 import Item from "./Item"
+import SearchAppBar from "./SearchAppBar"
 
 const init = {all:[], keys:[]}
 const reducer = (current, add) => {
@@ -11,7 +13,7 @@ const reducer = (current, add) => {
   }
 }
 
-const Display = ({user, gun, host}) => {
+const Display = ({user, gun, host, mode, setMode}) => {
   const [items, updateItem] = useReducer(reducer, init)
 
   // TODO: pull the user's config and apply it to the list of items.
@@ -46,9 +48,14 @@ const Display = ({user, gun, host}) => {
   }, {wait: 0})
 
   return (
-    <Grid item xs={12}>
-      {items.all.map(item => <Item key={item.key} item={item}/>)}
-    </Grid>
+    <>
+    {user.is && <SearchAppBar mode={mode} setMode={setMode}/>}
+    <Container maxWidth="sm">
+      <Grid container spacing={5}>
+        {items.all.map(item => <Item key={item.key} item={item}/>)}
+      </Grid>
+    </Container>
+    </>
   )
 }
 
