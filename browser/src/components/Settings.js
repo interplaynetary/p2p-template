@@ -65,7 +65,7 @@ const Settings = ({host, user, code, mode, setMode}) => {
     }, {wait: 0})
   }, [host, user, code])
 
-  const select = (target) => {
+  const select = target => {
     const li = target.closest("li")
     if (li && li.childNodes[0].childNodes[0].nodeName === "INPUT") {
       li.childNodes[0].childNodes[0].select()
@@ -98,7 +98,7 @@ const Settings = ({host, user, code, mode, setMode}) => {
     <>
     {user.is && <SearchAppBar mode={mode} setMode={setMode}/>}
     <Container maxWidth="sm">
-      <Grid container spacing={5}>
+      <Grid container>
         <Grid item xs={12}>
           <Card sx={{mt:2}}>
             <CardContent>
@@ -120,7 +120,7 @@ const Settings = ({host, user, code, mode, setMode}) => {
                           <IconButton
                             edge="end"
                             aria-label="copy invite code"
-                            onClick={(event) => {select(event.target)}}
+                            onClick={event => select(event.target)}
                           >
                             <ContentCopy/>
                           </IconButton>
@@ -139,7 +139,7 @@ const Settings = ({host, user, code, mode, setMode}) => {
                 fullWidth={true}
                 margin="normal"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={event => setPassword(event.target.value)}
               >
                 <InputLabel htmlFor="settings-password">New Password</InputLabel>
                 <OutlinedInput

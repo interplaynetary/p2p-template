@@ -13,8 +13,8 @@ const gun = Gun({
   secure: true,
 })
 const user = gun.user()
-const alias = process.env.GUN_USER_ALIAS ?? "alias"
-const pass = process.env.GUN_USER_PASS ?? "passphrase"
+const alias = process.env.GUN_USER_ALIAS ?? "host"
+const pass = process.env.GUN_USER_PASS ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
 
 // lastSaved is the timestamp of the last time save was called. This allows
@@ -342,11 +342,21 @@ app.post("/private/create-invite-codes", (req, res) => {
 })
 
 app.post("/private/feed", (req, res) => {
+  if (!req.body.xml_url) {
+    res.status(400).send("xml_url required")
+    return
+  }
+
   saveFeed(req.body)
   res.end()
 })
 
 app.post("/private/item", (req, res) => {
+  if (!req.body.xml_url) {
+    res.status(400).send("xml_url required")
+    return
+  }
+
   // limit and wait times are in milliseconds.
   const limit = 10
   var wait = 0
@@ -362,11 +372,6 @@ app.post("/private/item", (req, res) => {
     saveItem(req.body)
     res.end()
   }, wait)
-})
-
-app.post("/private/update-help", (req, res) => {
-  user.get("help").put(req.body)
-  res.end()
 })
 
 app.listen(3000)
@@ -515,13 +520,11 @@ function mail(email, subject, message) {
 
 function saveFeed(data) {
   user.get("feeds").get(data.xml_url).put({
+    title: data.title ?? "",
     description: data.description ?? "",
     html_url: data.html_url ?? "",
     language: data.language ?? "",
-    title: data.title ?? "",
-    image_url: data.image_url ?? "",
-    image_title: data.image_title ?? "",
-    image_link: data.image_link ?? "",
+    image: data.image ?? "",
   })
 }
 

@@ -36,7 +36,7 @@ const ValidateEmail = ({code, validate}) => {
 
   return (
     <Container maxWidth="sm">
-      <Grid container spacing={5}>
+      <Grid container>
         <Grid item xs={12}>
           <Typography sx={{m:1}}>{message}</Typography>
           <Button sx={{mt:1}} variant="contained" disabled={disabledButton}

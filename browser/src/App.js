@@ -131,10 +131,19 @@ const App = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/register" element={
-            <Register loggedIn={user.is} mode={mode} setMode={setMode}/>
+            <Register
+              loggedIn={user.is}
+              mode={mode}
+              setMode={setMode}
+            />
           }/>
           <Route path="/login" element={
-            <Login host={host} user={user} mode={mode} setMode={setMode}/>
+            <Login
+              host={host}
+              user={user}
+              mode={mode}
+              setMode={setMode}
+            />
           }/>
           <Route path="/validate-email" element={
             <ValidateEmail
@@ -143,7 +152,11 @@ const App = () => {
             />
           }/>
           <Route path="/reset-password" element={
-            <ResetPassword loggedIn={user.is} mode={mode} setMode={setMode}/>
+            <ResetPassword
+              loggedIn={user.is}
+              mode={mode}
+              setMode={setMode}
+            />
           }/>
           <Route path="/update-password" element={
             <UpdatePassword
@@ -167,17 +180,22 @@ const App = () => {
               <Navigate to="/login"/>
           }/>
           <Route path="/help" element={
-              <Help loggedIn={user.is} host={host} mode={mode} setMode={setMode}/>
+            <Help
+              loggedIn={user.is}
+              mode={mode}
+              setMode={setMode}
+            />
           }/>
           <Route path="/" element={
             to ? <Navigate to={to}/> :
+            user.is ?
               <Display
-                user={user}
-                gun={gun}
                 host={host}
+                user={user}
                 mode={mode}
                 setMode={setMode}
-              />
+              /> :
+            <Help/>
           }/>
         </Routes>
       </BrowserRouter>

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import {useRef, useState} from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -47,14 +47,13 @@ const Login = ({host, user, mode, setMode}) => {
               found.current = true
               sessionStorage.setItem("code", code)
               sessionStorage.setItem("name", account.name)
-            }, {wait: 0})
+            }, {wait: 1000})
           }
-        }, {wait: 0})
+        }, {wait: 1000})
         let retry = 0
         let interval = setInterval(() => {
           if (found.current) {
             setDisabledButton(false)
-            setMessage("Account found")
             clearInterval(interval)
             window.location = "/"
           }
@@ -93,7 +92,7 @@ const Login = ({host, user, mode, setMode}) => {
     <>
     {user.is && <SearchAppBar mode={mode} setMode={setMode}/>}
     <Container maxWidth="sm">
-      <Grid container spacing={5}>
+      <Grid container>
         <Grid item xs={12}>
           <Card sx={{mt:2}}>
             <CardContent>
@@ -105,13 +104,13 @@ const Login = ({host, user, mode, setMode}) => {
                 fullWidth={true}
                 margin="normal"
                 value={username}
-                onChange={(event) => setUsername(event.target.value)}
+                onChange={event => setUsername(event.target.value)}
               />
               <FormControl variant="outlined"
                 fullWidth={true}
                 margin="normal"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={event => setPassword(event.target.value)}
               >
                 <InputLabel htmlFor="login-password">Password</InputLabel>
                 <OutlinedInput

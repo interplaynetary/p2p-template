@@ -10,11 +10,11 @@ import Switch from "@mui/material/Switch"
 import Toolbar from "@mui/material/Toolbar"
 import Typography from "@mui/material/Typography"
 
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import DarkModeIcon from "@mui/icons-material/DarkMode";
-import LightModeIcon from "@mui/icons-material/LightMode";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle"
+import DarkModeIcon from "@mui/icons-material/DarkMode"
+import LightModeIcon from "@mui/icons-material/LightMode"
 import MoreIcon from "@mui/icons-material/MoreVert"
-import RssFeedIcon from "@mui/icons-material/RssFeed";
+import RssFeedIcon from "@mui/icons-material/RssFeed"
 import SearchIcon from "@mui/icons-material/Search"
 
 const Search = styled("div")(({ theme }) => ({
@@ -57,7 +57,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }))
 
-const SearchAppBar = ({mode, setMode}) => {
+const SearchAppBar = ({groupList = false, createGroup, mode, setMode}) => {
   const [anchorEl, setAnchorEl] = useState(null)
   const [mobileMoreAnchorEl, setMobileMoreAnchorEl] = useState(null)
 
@@ -103,6 +103,10 @@ const SearchAppBar = ({mode, setMode}) => {
       open={isMenuOpen}
       onClose={handleMenuClose}
     >
+      {groupList && <MenuItem onClick={() => {
+        handleMenuClose()
+        createGroup(true)
+      }}>New group</MenuItem>}
       <MenuItem onClick={() => {
         handleMenuClose()
         window.location = "/settings"

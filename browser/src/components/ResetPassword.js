@@ -40,7 +40,7 @@ const ResetPassword = ({loggedIn, mode, setMode}) => {
     <>
     {loggedIn && <SearchAppBar mode={mode} setMode={setMode}/>}
     <Container maxWidth="sm">
-      <Grid container spacing={5}>
+      <Grid container>
         <Grid item xs={12}>
           <Card sx={{mt:2}}>
             <CardContent>
