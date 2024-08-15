@@ -20,6 +20,12 @@ const Help = ({loggedIn, mode, setMode}) => {
                 Thanks for checking out <b>rsstream</b>!
               </Typography>
               <Typography paragraph={true}>
+                This web app aims to provide a great reading experience for
+                content from all over the web. It's designed around grouping
+                related feeds together so they can be read in a Really Simple
+                Stream.
+              </Typography>
+              <Typography paragraph={true}>
                 You can <Link href="/login">login here</Link> if you have an
                 account, otherwise you will need an invite code
                 to <Link href="/register">register</Link>.
@@ -33,7 +39,7 @@ const Help = ({loggedIn, mode, setMode}) => {
               <Typography variant="h6">Why invite codes?</Typography>
               <Typography paragraph={true}>
                 Accounts are created in rsstream using a distributed database
-                called <Link href="https://gun.eco">GUN</Link>. Invite codes
+                called <Link href="https://gun.eco">GunDB</Link>. Invite codes
                 provide a way to control the sign up process, by letting
                 existing users decide who can create accounts.
               </Typography>
@@ -55,7 +61,7 @@ const Help = ({loggedIn, mode, setMode}) => {
                 invite codes. Confirming your account is done via email, which
                 is provided during registration. Personal details such as your
                 email address and confirmation codes are encrypted when stored
-                in GUN.
+                in GunDB.
               </Typography>
               <Typography paragraph={true}>
                 Having an email address associated with your account means you
@@ -76,10 +82,13 @@ const Help = ({loggedIn, mode, setMode}) => {
             <CardContent>
               <Typography variant="h6">Get involved</Typography>
               <Typography paragraph={true}>
-                <b>rsstream</b> is an open source project written in Javascript
+                rsstream is an open source project written in JavaScript
                 using <Link href="https://expressjs.com">Express
-                </Link> and <Link href="https://react.dev">React</Link>. You can
-                contribute at <Link href="https://github.com/mblaney/rsstream">
+                </Link> and <Link href="https://react.dev">React</Link>. It
+                uses IndexedDB via GunDB, to create an offline first web
+                application that syncs between browsers. You can contribute and
+                find out more
+                at <Link href="https://github.com/mblaney/rsstream">
                 github.com/mblaney/rsstream</Link>.
               </Typography>
             </CardContent>

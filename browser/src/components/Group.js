@@ -7,7 +7,7 @@ import PersonIcon from "@mui/icons-material/Person"
 import GroupIcon from "@mui/icons-material/Group"
 
 const Group = ({group, setGroup}) => {
-  console.log(group)
+  // TODO: Display group.updated timestamp
   return (
     <ListItem
       key={group.key}

@@ -342,8 +342,8 @@ app.post("/private/create-invite-codes", (req, res) => {
 })
 
 app.post("/private/feed", (req, res) => {
-  if (!req.body.xml_url) {
-    res.status(400).send("xml_url required")
+  if (!req.body.url) {
+    res.status(400).send("url required")
     return
   }
 
@@ -352,8 +352,8 @@ app.post("/private/feed", (req, res) => {
 })
 
 app.post("/private/item", (req, res) => {
-  if (!req.body.xml_url) {
-    res.status(400).send("xml_url required")
+  if (!req.body.url) {
+    res.status(400).send("url required")
     return
   }
 
@@ -519,7 +519,7 @@ function mail(email, subject, message) {
 }
 
 function saveFeed(data) {
-  user.get("feeds").get(data.xml_url).put({
+  user.get("feeds").get(data.url).put({
     title: data.title ?? "",
     description: data.description ?? "",
     html_url: data.html_url ?? "",
@@ -528,6 +528,10 @@ function saveFeed(data) {
   })
 }
 
+// TODO: If the item timestamp is outside of +/- 60 seconds of lastSaved, then
+// get all items around the given timestamp, filter by url and see if
+// there's a matching guid. If there is then update the item rather than
+// creating a new one.
 function saveItem(data) {
   lastSaved = Date.now()
   user.get("items").get(lastSaved).put({
@@ -538,7 +542,7 @@ function saveItem(data) {
     enclosure: data.enclosure ?? "",
     permalink: data.permalink ?? "",
     guid: data.guid ?? "",
-    timestamp: data.timestamp ?? "",
-    xml_url: data.xml_url ?? "",
+    timestamp: data.timestamp ?? lastSaved,
+    url: data.url,
   })
 }

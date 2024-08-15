@@ -26,8 +26,14 @@ const FeedList = ({host, user, done}) => {
 
   useEffect(() => {
     if (!host) return
+
+    updateFeed({reset: true})
+    // TODO: Filter by user.get("public").get("feeds"), which should be a
+    // list of feeds the user has subscribed to so that they don't need to
+    // see everyone else's...
     host.get("feeds").map().on((data, key) => {
       if (!data) return
+
       updateFeed({key, ...data})
     })
   }, [host])
@@ -44,11 +50,14 @@ const FeedList = ({host, user, done}) => {
     user.get("public").get("groups").set({
       name: groupName,
       feeds: selected.reduce((acc, feed) => {
-        // Convert selected feeds to an object to store in gun.
+        // This function converts selected feeds to an object to store in gun.
         // see GroupList useEffect which converts back to an array.
         return {...acc, [feed]: ""}
       }, {}),
-      updated: Date.now(),
+      // Track the scroll back position.
+      start: Date.now() - 60000,
+      // Show the timestamp of the last update.
+      updated: 0,
     })
     done()
   }
@@ -84,12 +93,11 @@ const FeedList = ({host, user, done}) => {
         </Grid>
         <Grid item xs={12}>
           <List>
-            {feeds &&
-             feeds.all.map(feed => <Feed
-                                     feed={feed}
-                                     selected={selected.includes(feed.key)}
-                                     selectItem={selectItem}
-                                   />)}
+            {feeds && feeds.all.map(f => <Feed
+                                           feed={f}
+                                           selected={selected.includes(f.key)}
+                                           selectItem={selectItem}
+                                         />)}
           </List>
         </Grid>
       </Grid>

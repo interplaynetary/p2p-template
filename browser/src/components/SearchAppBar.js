@@ -57,7 +57,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }))
 
-const SearchAppBar = ({groupList = false, createGroup, mode, setMode}) => {
+const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) => {
   const [anchorEl, setAnchorEl] = useState(null)
   const [mobileMoreAnchorEl, setMobileMoreAnchorEl] = useState(null)
 
@@ -105,7 +105,7 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode}) => {
     >
       {groupList && <MenuItem onClick={() => {
         handleMenuClose()
-        createGroup(true)
+        createGroup()
       }}>New group</MenuItem>}
       <MenuItem onClick={() => {
         handleMenuClose()
@@ -179,7 +179,7 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode}) => {
             component="div"
             sx={{ display: { xs: "none", sm: "block" } }}
           >
-            rsstream
+            {title === "" ? "rsstream" : title}
           </Typography>
           <Search>
             <SearchIconWrapper>

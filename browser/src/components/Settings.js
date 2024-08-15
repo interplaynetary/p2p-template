@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import {useEffect, useRef, useState} from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -34,18 +34,19 @@ const Settings = ({host, user, code, mode, setMode}) => {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState("")
   const [disabledButton, setDisabledButton] = useState(false)
+  const interval = useRef(0)
 
   useEffect(() => {
     if (!host || !user || !code) return
 
+    let set = false
+    const updated = new Map()
     host.get("epub").once(async epub => {
       if (!epub) {
         console.error("No epub for host!")
         return
       }
 
-      let set = false
-      const updated = new Map()
       const secret = await Gun.SEA.secret(epub, user._.sea)
       const shared = host.get("shared").get("invite_codes").get(code)
       shared.map().on(async (enc, key) => {
@@ -56,13 +57,15 @@ const Settings = ({host, user, code, mode, setMode}) => {
         }
         set = true
       }, {wait: 0})
-      // Batch the update otherwise there are too many calls to setInvites.
-      setInterval(() => {
-        if (!set) return
-        setInvites([...updated.values()])
-        set = false
-      }, 1000)
     }, {wait: 0})
+    // Batch the update otherwise there are too many calls to setInvites.
+    clearInterval(interval.current)
+    interval.current = setInterval(() => {
+      if (!set) return
+
+      setInvites([...updated.values()])
+      set = false
+    }, 1000)
   }, [host, user, code])
 
   const select = target => {

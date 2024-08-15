@@ -37,33 +37,38 @@ const Login = ({host, user, mode, setMode}) => {
           return
         }
 
-        host.get("accounts").once(all => {
-          for (const code of Object.keys(all)) {
-            if (found.current) break
-
-            host.get("accounts").get(code).once(account => {
-              if (!account || account.pub !== user.is.pub) return
-
-              found.current = true
-              sessionStorage.setItem("code", code)
-              sessionStorage.setItem("name", account.name)
-            }, {wait: 1000})
-          }
-        }, {wait: 1000})
         let retry = 0
-        let interval = setInterval(() => {
+        const checkAccounts = () => {
+          host.get("accounts").once(all => {
+            for (const code of Object.keys(all)) {
+              if (found.current) break
+
+              host.get("accounts").get(code).once(account => {
+                if (!account || account.pub !== user.is.pub) return
+
+                found.current = true
+                sessionStorage.setItem("code", code)
+                sessionStorage.setItem("name", account.name)
+              }, {wait: 0})
+            }
+          }, {wait: 1000})
+        }
+        checkAccounts()
+        const interval = setInterval(() => {
           if (found.current) {
-            setDisabledButton(false)
             clearInterval(interval)
             window.location = "/"
           }
-          else if (retry > 9) {
+          else if (retry > 5) {
             setDisabledButton(false)
-            setMessage("Account not found")
+            setMessage("Account not found. Please try logging in again.")
             clearInterval(interval)
+            user.leave()
+          } else {
+            checkAccounts()
+            retry++
           }
-          retry++
-        }, 1000)
+        }, 2000)
         return
       }
 
