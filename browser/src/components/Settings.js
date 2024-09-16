@@ -9,11 +9,11 @@ import Grid from "@mui/material/Grid"
 import IconButton from "@mui/material/IconButton"
 import InputAdornment from "@mui/material/InputAdornment"
 import InputLabel from "@mui/material/InputLabel"
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
+import List from "@mui/material/List"
+import ListItem from "@mui/material/ListItem"
 import OutlinedInput from "@mui/material/OutlinedInput"
 import Typography from "@mui/material/Typography"
-import ContentCopy from '@mui/icons-material/ContentCopy';
+import ContentCopy from '@mui/icons-material/ContentCopy'
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import SearchAppBar from "./SearchAppBar"
@@ -56,8 +56,8 @@ const Settings = ({host, user, code, mode, setMode}) => {
           updated.delete(key)
         }
         set = true
-      }, {wait: 0})
-    }, {wait: 0})
+      })
+    })
     // Batch the update otherwise there are too many calls to setInvites.
     clearInterval(interval.current)
     interval.current = setInterval(() => {

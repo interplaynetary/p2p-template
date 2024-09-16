@@ -50,7 +50,7 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
     user.create(alias, password, ack => {
       if (ack.err) {
         if (ack.err === "User already created!") {
-          let match = alias.match(/(.*)\.(\d)$/)
+          let match = alias.match(/^(\w+)\.(\d)$/)
           if (match) {
             let increment = Number(match[2]) + 1
             if (increment === 10) {
@@ -99,16 +99,48 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
           }
 
           // The previous public key is returned to copy over public user data.
-          gun.user(res.text).get("public").once(data => {
-            if (data) {
-              user.get("public").put(data)
+          // Need to go through all items that should be copied and create new
+          // plain objects since the old data references the previous account.
+          let oldUser = gun.user(res.text).get("public")
+          oldUser.get("contacts").map().once((contact, contactCode) => {
+            let update = {
+              pub: contact.pub,
+              alias: contact.alias,
+              name: contact.name,
+              ref: contact.ref,
+              host: contact.host,
             }
-            setMessage("Password updated")
-            setTimeout(() => {
-              setDisabledButton(false)
-              window.location = "/login"
-            }, 2000)
-          }, {wait: 0})
+            user.get("public").get("contacts").get(contactCode).put(update, ack => {
+              if (ack.err) {
+                console.error(ack.err)
+              }
+            })
+          })
+          // Nested objects need to be dereferenced and gun data removed before
+          // it can be copied to the new user.
+          oldUser.get("groups").map().once((group, groupName) => {
+            oldUser.get("groups").get(groupName).get("feeds").once(feeds => {
+              if (!feeds) return
+
+              delete feeds._
+              let update = {
+                feeds: feeds,
+                updated: group.updated,
+              }
+              user.get("public").get("groups").get(groupName).put(update, ack => {
+                if (ack.err) {
+                  console.error(ack.err)
+                }
+              })
+            })
+          })
+          // Note: Any new public data needs to also be copied over here.
+
+          setMessage("Password updated")
+          setTimeout(() => {
+            setDisabledButton(false)
+            window.location = "/login"
+          }, 2000)
         })
       })
     })

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import {useState} from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -44,8 +44,8 @@ const Register = ({loggedIn, mode, setMode}) => {
       setMessage("Please choose a username")
       return
     }
-    if (/\.\d$/.test(username)) {
-      setMessage("Username must not end in . and a number")
+    if (!/^\w+$/.test(username)) {
+      setMessage("Username must contain only numbers, letters and underscore")
       return
     }
     if (!email) {

@@ -13,11 +13,14 @@ const reducer = (current, add) => {
   }
 }
 
+const dec = t => t ? new TextDecoder().decode(Uint8Array.from(atob(t), e => e.codePointAt(0))) : ""
+
 const Display = ({host, user, mode, setMode}) => {
   const [groups, updateGroup] = useReducer(reducer, init)
   const [groupList, setGroupList] = useState(true)
   const [feedList, setFeedList] = useState(false)
   const [group, setGroup] = useState(null)
+  const [keys, setKeys] = useState([])
 
   const createGroup = () => {
     setGroupList(false)
@@ -31,27 +34,37 @@ const Display = ({host, user, mode, setMode}) => {
   }
 
   useEffect(() => {
+    if (!host) return
+
+    host.get("items").once(items => {
+      if (!items) return
+
+      delete items._
+      // Existing keys are set for all groups to use.
+      setKeys(Object.keys(items).sort((a, b) => b - a))
+    })
+  }, [host])
+
+  useEffect(() => {
     if (!user) return
 
     updateGroup({reset: true})
-    user.get("public").get("groups").map().on((group, key) => {
+    user.get("public").get("groups").map().on((group, name) => {
       if (!group) return
 
-      user.get("public").get("groups").get(key).get("feeds").once(feeds => {
+      user.get("public").get("groups").get(name).get("feeds").once(feeds => {
         if (!feeds) return
 
         // Convert feeds object to an array, removing data added by gun.
         // See FeedList createGroup which converts the array to an object.
         delete feeds._
         updateGroup({
-          key,
-          name: group.name,
-          feeds: Object.keys(feeds),
-          start: group.start,
+          key: dec(name),
+          feeds: Object.keys(feeds).map(f => dec(f)),
           updated: group.updated,
         })
-      }, {wait: 0})
-    }, {wait: 0})
+      })
+    })
   }, [user])
 
   return (
@@ -62,7 +75,7 @@ const Display = ({host, user, mode, setMode}) => {
        createGroup={createGroup}
        mode={mode}
        setMode={setMode}
-       title={group ? group.name : ""}
+       title={group ? group.key : ""}
      />}
     {groupList && !group &&
      <GroupList
@@ -79,8 +92,8 @@ const Display = ({host, user, mode, setMode}) => {
     {group &&
      <ItemList
        host={host}
-       user={user}
        group={group}
+       keys={keys}
      />}
     </>
   )

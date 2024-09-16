@@ -1,4 +1,4 @@
-import { useState } from "react"
+import {useState} from "react"
 import { styled, alpha } from "@mui/material/styles"
 import AppBar from "@mui/material/AppBar"
 import Box from "@mui/material/Box"
@@ -143,7 +143,7 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
           aria-haspopup="true"
           color="inherit"
         >
-          <AccountCircleIcon />
+          <AccountCircleIcon/>
         </IconButton>
         <p>Account</p>
       </MenuItem>
@@ -161,7 +161,7 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
+      <AppBar position="fixed">
         <Toolbar>
           <IconButton
             size="large"
@@ -183,14 +183,14 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
           </Typography>
           <Search>
             <SearchIconWrapper>
-              <SearchIcon />
+              <SearchIcon/>
             </SearchIconWrapper>
             <StyledInputBase
               placeholder="Search…"
               inputProps={{ "aria-label": "search" }}
             />
           </Search>
-          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ flexGrow: 1 }}/>
           <Box sx={{ display: { xs: "none", md: "flex" } }}>
             <Switch checked={mode === "dark"} onChange={changeMode}/>
           </Box>
@@ -204,7 +204,7 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
               onClick={handleProfileMenuOpen}
               color="inherit"
             >
-              <AccountCircleIcon />
+              <AccountCircleIcon/>
             </IconButton>
           </Box>
           <Box sx={{ display: { xs: "flex", md: "none" } }}>
@@ -216,11 +216,12 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
               onClick={handleMobileMenuOpen}
               color="inherit"
             >
-              <MoreIcon />
+              <MoreIcon/>
             </IconButton>
           </Box>
         </Toolbar>
       </AppBar>
+      <Toolbar/>
       {renderMobileMenu}
       {renderMenu}
     </Box>

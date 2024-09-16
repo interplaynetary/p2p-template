@@ -17,6 +17,13 @@ const alias = process.env.GUN_USER_ALIAS ?? "host"
 const pass = process.env.GUN_USER_PASS ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
 
+// These two functions are used to encode and decode user data which can contain
+// the structural JSON tokens: ":,{}[] which are not escaped when stored in Gun.
+// They are modified versions of the code found at:
+// https://developer.mozilla.org/en-US/docs/Glossary/Base64#converting_arbitrary_binary_data
+const enc = t => btoa(Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(""))
+const dec = t => t ? new TextDecoder().decode(Uint8Array.from(atob(t), e => e.codePointAt(0))) : ""
+
 // lastSaved is the timestamp of the last time save was called. This allows
 // slowing calls to save so that the timestamp can be used as a unique key.
 var lastSaved = 0
@@ -101,7 +108,7 @@ app.post("/check-invite-code", (req, res) => {
       return
     }
     res.status(404).send("Invite code not found")
-  }, {wait: 0})
+  })
 })
 
 app.post("/claim-invite-code", async (req, res) => {
@@ -119,8 +126,8 @@ app.post("/claim-invite-code", async (req, res) => {
     res.status(400).send("Username required")
     return
   }
-  if (/\.\d$/.test(req.body.alias)) {
-    res.status(400).send("Username must not end in . and a number")
+  if (!/^\w+$/.test(req.body.alias)) {
+    res.status(400).send("Username must contain only numbers, letters and underscore")
     return
   }
   if (!req.body.email) {
@@ -138,7 +145,7 @@ app.post("/claim-invite-code", async (req, res) => {
     email: encEmail,
     validate: encValidate,
     ref: invite.owner,
-    host: host,
+    host: enc(host),
   })
   validateEmail(req.body.alias, req.body.email, code, validate)
 
@@ -176,9 +183,9 @@ app.post("/claim-invite-code", async (req, res) => {
             break
           }
         }
-      }, {wait: 0})
-    }, {wait: 0})
-  }, {wait: 0})
+      })
+    })
+  })
   res.end()
 })
 
@@ -211,7 +218,7 @@ app.post("/validate-email", (req, res) => {
 
     user.get("accounts").get(code).put({validate: null})
     res.send("Email validated")
-  }, {wait: 0})
+  })
 })
 
 app.post("/reset-password", (req, res) => {
@@ -256,7 +263,7 @@ app.post("/reset-password", (req, res) => {
 
     resetPassword(account.name, remaining, email, code, reset)
     res.send("Reset password email sent")
-  }, {wait: 0})
+  })
 })
 
 app.post("/update-password", (req, res) => {
@@ -309,7 +316,7 @@ app.post("/update-password", (req, res) => {
       prev: account.pub,
     })
     res.send(account.pub)
-  }, {wait: 0})
+  })
 })
 
 app.post("/private/create-invite-codes", (req, res) => {
@@ -337,8 +344,8 @@ app.post("/private/create-invite-codes", (req, res) => {
 
       createInviteCodes(req.body.count || 1, code, epub)
       res.end()
-    }, {wait: 0})
-  }, {wait: 0})
+    })
+  })
 })
 
 app.post("/private/feed", (req, res) => {
@@ -347,8 +354,21 @@ app.post("/private/feed", (req, res) => {
     return
   }
 
-  saveFeed(req.body)
-  res.end()
+  user.get("feeds").get(enc(req.body.url)).put({
+    title: enc(req.body.title) ?? "",
+    description: enc(req.body.description) ?? "",
+    html_url: enc(req.body.html_url) ?? "",
+    language: enc(req.body.language) ?? "",
+    image: enc(req.body.image) ?? "",
+  }, ack => {
+    if (!ack.err) {
+      res.end()
+      return
+    }
+
+    console.log(ack.err)
+    res.status(500).send("error saving feed")
+  })
 })
 
 app.post("/private/item", (req, res) => {
@@ -369,8 +389,31 @@ app.post("/private/item", (req, res) => {
     }
   }
   setTimeout(() => {
-    saveItem(req.body)
-    res.end()
+    lastSaved = Date.now()
+    // TODO: If the item timestamp is outside of +/- 60 seconds of lastSaved,
+    // then get all items around the given timestamp, filter by url and see if
+    // there's a matching guid. If there is then update the item rather than
+    // creating a new one.
+    console.log("lastSaved", lastSaved)
+    user.get("items").get(lastSaved).put({
+      title: enc(req.body.title) ?? "",
+      content: enc(req.body.content) ?? "",
+      author: enc(req.body.author) ?? "",
+      category: enc(req.body.category) ?? "",
+      enclosure: enc(req.body.enclosure) ?? "",
+      permalink: enc(req.body.permalink) ?? "",
+      guid: enc(req.body.guid) ?? "",
+      timestamp: enc(req.body.timestamp) ?? enc(lastSaved),
+      url: enc(req.body.url),
+    }, ack => {
+      if (!ack.err) {
+        res.end()
+        return
+      }
+
+      console.log(ack.err)
+      res.status(500).send("error saving item")
+    })
   }, wait)
 })
 
@@ -406,9 +449,11 @@ function auth(ack) {
         return
       }
 
+      // Note that the admin invite code doesn't have an account associated
+      // with it, but once it's been claimed all invite codes that get created
+      // will have an owner code that get stored as the referring account.
       console.log("Creating admin invite code")
-      const invite = {code: "admin", owner: "admin"}
-      const enc = await Gun.SEA.encrypt(invite, user._.sea)
+      const enc = await Gun.SEA.encrypt({code: "admin", owner: ""}, user._.sea)
       user.get("available").get("invite_codes").set(enc)
       mapInviteCodes()
     })
@@ -430,7 +475,12 @@ function mapInviteCodes() {
 }
 
 
-function checkCodes() {
+function checkCodes(newCodes) {
+  // TODO: Check user.get("shared").get("invite_codes") and return false if
+  // any of newCodes are found. Add this as a function and then call the
+  // function from an endpoint. For now just call the function, but once
+  // there's a list call all the endpoints too but skip our host in the list.
+
   // This function should post the list of new codes to all federated hosts
   // to make sure there are no duplicates between them. Put each of the
   // requests in a promise, and return once all have been resolved. Note that
@@ -515,34 +565,5 @@ function mail(email, subject, message) {
       return
     }
     console.log(info)
-  })
-}
-
-function saveFeed(data) {
-  user.get("feeds").get(data.url).put({
-    title: data.title ?? "",
-    description: data.description ?? "",
-    html_url: data.html_url ?? "",
-    language: data.language ?? "",
-    image: data.image ?? "",
-  })
-}
-
-// TODO: If the item timestamp is outside of +/- 60 seconds of lastSaved, then
-// get all items around the given timestamp, filter by url and see if
-// there's a matching guid. If there is then update the item rather than
-// creating a new one.
-function saveItem(data) {
-  lastSaved = Date.now()
-  user.get("items").get(lastSaved).put({
-    title: data.title ?? "",
-    content: data.content ?? "",
-    author: data.author ?? "",
-    category: data.category ?? "",
-    enclosure: data.enclosure ?? "",
-    permalink: data.permalink ?? "",
-    guid: data.guid ?? "",
-    timestamp: data.timestamp ?? lastSaved,
-    url: data.url,
   })
 }

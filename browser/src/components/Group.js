@@ -7,7 +7,7 @@ import PersonIcon from "@mui/icons-material/Person"
 import GroupIcon from "@mui/icons-material/Group"
 
 const Group = ({group, setGroup}) => {
-  // TODO: Display group.updated timestamp
+  // TODO: Display group.updated timestamp. Also add an unread count?
   return (
     <ListItem
       key={group.key}
@@ -27,7 +27,7 @@ const Group = ({group, setGroup}) => {
               <GroupIcon/> : <PersonIcon/>}
            </Avatar>}
         </ListItemAvatar>
-        <ListItemText primary={group.name}/>
+        <ListItemText primary={group.key}/>
       </ListItemButton>
     </ListItem>
   )

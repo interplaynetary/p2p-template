@@ -18,10 +18,15 @@ const reducer = (current, add) => {
   }
 }
 
+const enc = t => btoa(Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(""))
+const dec = t => t ? new TextDecoder().decode(Uint8Array.from(atob(t), e => e.codePointAt(0))) : ""
+
 // TODO: Display a filtered list using the search bar.
 const FeedList = ({host, user, done}) => {
   const [groupName, setGroupName] = useState("")
   const [selected, setSelected] = useState([])
+  const [message, setMessage] = useState("")
+  const [disabledButton, setDisabledButton] = useState(false)
   const [feeds, updateFeed] = useReducer(reducer, init)
 
   useEffect(() => {
@@ -34,7 +39,14 @@ const FeedList = ({host, user, done}) => {
     host.get("feeds").map().on((data, key) => {
       if (!data) return
 
-      updateFeed({key, ...data})
+      updateFeed({
+        key: dec(key),
+        title: dec(data.title),
+        description: dec(data.description),
+        html_url: dec(data.html_url),
+        language: dec(data.language),
+        image: dec(data.image),
+      })
     })
   }, [host])
 
@@ -47,19 +59,39 @@ const FeedList = ({host, user, done}) => {
   }
 
   const createGroup = () => {
-    user.get("public").get("groups").set({
-      name: groupName,
+    setDisabledButton(true)
+    setMessage("Creating group...")
+
+    let group = {
       feeds: selected.reduce((acc, feed) => {
         // This function converts selected feeds to an object to store in gun.
-        // see GroupList useEffect which converts back to an array.
-        return {...acc, [feed]: ""}
+        // see Display useEffect which converts back to an array.
+        return {...acc, [enc(feed)]: ""}
       }, {}),
-      // Track the scroll back position.
-      start: Date.now() - 60000,
       // Show the timestamp of the last update.
       updated: 0,
-    })
-    done()
+    }
+    let retry = 0
+    const interval = setInterval(() => {
+      user.get("public").get("groups").get(enc(groupName)).put(group, ack => {
+        if (ack.err) {
+          setDisabledButton(false)
+          setMessage("Could not create group")
+          console.error(ack.err)
+          clearInterval(interval)
+          return
+        }
+
+        clearInterval(interval)
+        done()
+      })
+      if (retry > 5) {
+        setDisabledButton(false)
+        setMessage("Could not create group")
+        clearInterval(interval)
+      }
+      retry++
+    }, 1000)
   }
 
   return (
@@ -81,13 +113,15 @@ const FeedList = ({host, user, done}) => {
               <Button
                 sx={{mt:1}}
                 variant="contained"
-                disabled={selected.length === 0 || groupName === ""}
+                disabled={selected.length === 0 || groupName === "" || disabledButton}
                 onClick={createGroup}
               >Submit</Button>
-              {selected.length > 0 &&
+              {selected.length > 0 && !message &&
                <Typography sx={{m:1}} variant="string">
                  {`${selected.length} feed${selected.length > 1 ? "s" : ""} selected`}
                </Typography>}
+              {message &&
+               <Typography sx={{m:1}} variant="string">{message}</Typography>}
             </CardContent>
           </Card>
         </Grid>

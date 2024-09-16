@@ -40,6 +40,8 @@ const Login = ({host, user, mode, setMode}) => {
         let retry = 0
         const checkAccounts = () => {
           host.get("accounts").once(all => {
+            if (!all) return
+
             for (const code of Object.keys(all)) {
               if (found.current) break
 
@@ -49,7 +51,7 @@ const Login = ({host, user, mode, setMode}) => {
                 found.current = true
                 sessionStorage.setItem("code", code)
                 sessionStorage.setItem("name", account.name)
-              }, {wait: 0})
+              })
             }
           }, {wait: 1000})
         }

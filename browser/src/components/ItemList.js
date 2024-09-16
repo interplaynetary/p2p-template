@@ -1,4 +1,4 @@
-import {useEffect, useReducer, useState} from "react"
+import {useCallback, useEffect, useReducer, useRef, useState} from "react"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
 import Item from "./Item"
@@ -7,111 +7,172 @@ const init = {all:[], keys:[]}
 const reducer = (current, add) => {
   if (add.reset) return init
   return {
-    all: current.keys.includes(add.key) ? current.all : [add, ...current.all],
+    all: current.keys.includes(add.key) ?
+      current.all : [add, ...current.all].sort((a, b) => a.key - b.key),
     keys: [add.key, ...current.keys],
   }
 }
 
-const ItemList = ({host, user, group}) => {
+const dec = t => t ? new TextDecoder().decode(Uint8Array.from(atob(t), e => e.codePointAt(0))) : ""
+
+const ItemList = ({host, user, group, keys}) => {
   const [items, updateItem] = useReducer(reducer, init)
-  const [itemUrls, setItemUrls] = useState(new Map())
-  const [keys, setKeys] = useState([])
-  const [first, setFirst] = useState(0)
-  const [last, setLast] = useState(Date.now())
-  const [newest, setNewest] = useState(0)
-  const [newAfter, setNewAfter] = useState(0)
-  const closest = (a, n) => a.reduce((prv, cur) => Math.abs(cur-n) < Math.abs(prv-n) ? cur : prv)
+  const [newFrom, setNewFrom] = useState(0)
+  const [groupKey, setGroupKey] = useState("")
+  const [loadTime] = useState(Date.now())
+  const itemListRef = useRef()
+  const itemRefs = useRef(new Map())
+  const last = useRef(Date.now())
+  const loadMore = useRef(0)
+  const watchStart = useRef()
+  const watchEnd = useRef()
 
-  useEffect(() => {
-    if (!host) return
-
-    let set = false
-    const updatedUrls = new Map()
-    host.get("items").map().on((item, key) => {
-      if (item) {
-        updatedUrls.set(key, item.url)
-      } else {
-        updatedUrls.delete(key)
-      }
-      set = true
-    })
-    // Batch item updates.
-    setInterval(() => {
-      if (!set) return
-
-      setItemUrls(updatedUrls)
-      const updatedKeys = Array.from(updatedUrls.keys())
-      // Sort keys into ascending order.
-      updatedKeys.sort()
-      setKeys(updatedKeys)
-      set = false
-    }, 1000)
-  }, [host])
-
-  useEffect(() => {
-    // If newest timestamp is greater than the last displayed item then mark
-    // the items as new from that point.
-    if (newest > last) {
-      setNewAfter(last)
-    }
-    if (newest > group.updated) {
-      user.get("public").get("groups").get(group.key).get("updated").put(newest)
-    }
-  }, [group, user, newest, last])
-
-  useEffect(() => {
-    if (!host || !user || !group || keys.length === 0) {
+  const updateStart = useCallback(async (k) => {
+    if (!host) {
       updateItem({reset: true})
       return
     }
 
-    const updateItemList = (start, end) => {
-      start = closest(keys, start)
-      let current = start
-      let i = keys.indexOf(start)
-      while (current < end) {
-        current = keys[i++]
-        if (!group.feeds.includes(itemUrls.get(current))) continue
+    if (!watchStart.current) {
+      watchStart.current = new IntersectionObserver(e => {
+        if (e[0].isIntersecting) {
+          updateStart(k)
+        }
+      })
+    }
+    // Stop watching the current loadMore key.
+    let target = itemRefs.current.get(loadMore.current)
+    if (target) watchStart.current.unobserve(target)
+    loadMore.current = 0
 
-        host.get("items").get(current).once((item, key) => {
-          if (!item) return
+    let updated = 0
+    let remove = 0
+    for (const key of k) {
+      if (updated === 10) break
 
-          delete item._
-          updateItem({key, ...item})
-        }, {wait: 0})
+      remove++
+      let item = await host.get("items").get(key).then()
+      if (!item) continue
+
+      // Group feeds are decoded in Display.js
+      if (!group.feeds.includes(dec(item.url))) continue
+
+      // Find a new key that is between the current scroll position and the
+      // last item to be loaded.
+      if (updated++ < 5) {
+        loadMore.current = key
       }
-      // current is the newest timestamp between start and end.
-      return current
+      updateItem({
+        key,
+        title: dec(item.title),
+        content: dec(item.content),
+        author: dec(item.author),
+        category: dec(item.category),
+        enclosure: dec(item.enclosure),
+        permalink: dec(item.permalink),
+        guid: dec(item.guid),
+        timestamp: dec(item.timestamp),
+        url: dec(item.url),
+      })
+    }
+    k.splice(0, remove)
+    // Wait for the ref to be added for the new loadMore item.
+    setTimeout(() => {
+      let target = itemRefs.current.get(loadMore.current)
+      if (target) {
+        watchStart.current.observe(target)
+      }
+    }, 100)
+    // Scroll to the end when the group is first displayed.
+    if (loadTime > Date.now() - 3000) {
+      itemListRef.current.scrollIntoView({block: "end"})
+    }
+  }, [host, group, loadTime])
+
+  const updateEnd = useCallback(async (newKeys) => {
+    if (!host) {
+      updateItem({reset: true})
+      return
     }
 
-    let retry = 1
-    let start = group.start
-    setNewest(updateItemList(start, Date.now()))
-    // Check if older items should be displayed. Get items before the first
-    // displayed item, using larger time spans with each retry.
-    while (start > first && start > 0) {
-      let end = start
-      start -= 60000 * retry
-      if (start < 0) start = 0
-      updateItemList(start, end)
-      retry *= 10
+    if (!watchEnd.current) {
+      watchEnd.current = new IntersectionObserver(e => {
+        if (e[0].isIntersecting) {
+          setNewFrom(0)
+        }
+      })
     }
-    if (start !== group.start) {
-      user.get("public").get("groups").get(group.key).get("start").put(start)
+    let earliest = 0
+    let latest = 0
+    for (const key of newKeys) {
+      if (key <= last.current) break
+
+      let item = await host.get("items").get(key).then()
+      if (!item) continue
+
+      // Group feeds are decoded in Display.js
+      if (!group.feeds.includes(dec(item.url))) continue
+
+      updateItem({
+        key,
+        title: dec(item.title),
+        content: dec(item.content),
+        author: dec(item.author),
+        category: dec(item.category),
+        enclosure: dec(item.enclosure),
+        permalink: dec(item.permalink),
+        guid: dec(item.guid),
+        timestamp: dec(item.timestamp),
+        url: dec(item.url),
+      })
+      if (key < earliest || earliest === 0) earliest = key
+      // newKeys is in descending order so can set latest from first key.
+      if (latest === 0) latest = key
     }
-  }, [host, user, group, itemUrls, keys, first])
+    if (earliest !== 0 && newFrom === 0) {
+      // If there is no current newFrom marker then mark as new from
+      // earliest, the marker will be removed when scrolled to the end.
+      setNewFrom(earliest)
+    }
+    if (latest !== 0) {
+      // Stop watching the current last key.
+      let target = itemRefs.current.get(last.current)
+      if (target) watchEnd.current.unobserve(target)
+      last.current = latest
+      if (user && latest > group.updated) {
+        user.get("public").get("groups").get(group.key).get("updated").put(latest)
+      }
+      // Wait for the ref to be added for the new last item.
+      setTimeout(() => {
+        let target = itemRefs.current.get(latest)
+        if (target) {
+          watchEnd.current.observe(target)
+        }
+      }, 100)
+    }
+  }, [host, user, group, newFrom])
+
+  useEffect(() => {
+    if (!host || !group || groupKey === group.key) return
+
+    setGroupKey(group.key)
+    updateStart(keys)
+    host.get("items").on(items => {
+      if (!items) return
+
+      delete items._
+      updateEnd(Object.keys(items).sort((a, b) => b - a))
+    })
+  }, [host, group, groupKey, keys, updateStart, updateEnd])
 
   return (
     <Container maxWidth="md">
-      <Grid container>
+      <Grid container ref={itemListRef}>
         {items && items.all.map(i => <Item
                                        key={i.key}
                                        item={i}
-                                       first={first}
-                                       setFirst={setFirst}
-                                       last={last}
-                                       setLast={setLast}
-                                       newAfter={newAfter}
+                                       itemRefs={itemRefs}
+                                       newFrom={newFrom}
                                      />)}
       </Grid>
     </Container>
