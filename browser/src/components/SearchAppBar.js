@@ -1,5 +1,6 @@
 import {useState} from "react"
-import { styled, alpha } from "@mui/material/styles"
+import {styled, alpha} from "@mui/material/styles"
+import {red} from "@mui/material/colors"
 import AppBar from "@mui/material/AppBar"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
@@ -171,7 +172,9 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
             sx={{ mr: 2 }}
             onClick={() => window.location = "/"}
           >
-            <RssFeedIcon/>
+            <RssFeedIcon sx={theme => ({
+              ...theme.applyStyles("dark", {color: red[900]})})}
+            />
           </IconButton>
           <Typography
             variant="h6"

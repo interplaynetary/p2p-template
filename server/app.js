@@ -17,12 +17,11 @@ const alias = process.env.GUN_USER_ALIAS ?? "host"
 const pass = process.env.GUN_USER_PASS ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
 
-// These two functions are used to encode and decode user data which can contain
-// the structural JSON tokens: ":,{}[] which are not escaped when stored in Gun.
-// They are modified versions of the code found at:
-// https://developer.mozilla.org/en-US/docs/Glossary/Base64#converting_arbitrary_binary_data
-const enc = t => btoa(Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(""))
-const dec = t => t ? new TextDecoder().decode(Uint8Array.from(atob(t), e => e.codePointAt(0))) : ""
+// See browser/src/utils/text.js.
+const a = t => {try {return atob(t)} catch {return ""}}
+const b = t => {try {return btoa(t)} catch {return ""}}
+const enc = t => b(Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(""))
+const dec = t => new TextDecoder().decode(Uint8Array.from(a(t), e => e.codePointAt(0)))
 
 // lastSaved is the timestamp of the last time save was called. This allows
 // slowing calls to save so that the timestamp can be used as a unique key.

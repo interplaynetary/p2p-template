@@ -1,13 +1,15 @@
+import {red} from "@mui/material/colors"
 import Avatar from "@mui/material/Avatar"
+import Box from "@mui/material/Box"
 import ListItem from "@mui/material/ListItem"
 import ListItemAvatar from "@mui/material/ListItemAvatar"
 import ListItemButton from "@mui/material/ListItemButton"
 import ListItemText from "@mui/material/ListItemText"
+import Typography from "@mui/material/Typography"
 import PersonIcon from "@mui/icons-material/Person"
 import GroupIcon from "@mui/icons-material/Group"
 
 const Group = ({group, setGroup}) => {
-  // TODO: Display group.updated timestamp. Also add an unread count?
   return (
     <ListItem
       key={group.key}
@@ -27,7 +29,23 @@ const Group = ({group, setGroup}) => {
               <GroupIcon/> : <PersonIcon/>}
            </Avatar>}
         </ListItemAvatar>
-        <ListItemText primary={group.key}/>
+        <ListItemText primary={
+          <Box sx={{display: "flex"}}>
+            <Typography sx={{flexGrow: 1}}>
+              {group.key}
+            </Typography>
+            <Typography variant="body2" sx={{color: "text.secondary"}}>
+              {group.latest}
+            </Typography>
+          </Box>}
+          secondary={`${group.author && `${group.author}: `}${group.text}`}/>
+        {group.count > 0 &&
+         <Avatar sx={theme => ({
+           width: 30, height: 30, fontSize: "1rem", bgcolor: red[900],
+           ...theme.applyStyles("dark", {bgcolor: red[500]}),
+           })}>
+           {group.count}
+         </Avatar>}
       </ListItemButton>
     </ListItem>
   )

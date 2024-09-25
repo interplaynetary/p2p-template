@@ -1,26 +1,21 @@
-import {useEffect, useReducer, useState} from "react"
+import {useCallback, useEffect, useReducer, useRef, useState} from "react"
+import {enc, dec} from "../utils/text.js"
+import {init, reducer} from "../utils/reducer.js"
 import FeedList from "./FeedList"
 import GroupList from "./GroupList"
 import ItemList from "./ItemList"
 import SearchAppBar from "./SearchAppBar"
 
-const init = {all:[], keys:[]}
-const reducer = (current, add) => {
-  if (add.reset) return init
-  return {
-    all: current.keys.includes(add.key) ? current.all : [add, ...current.all],
-    keys: [add.key, ...current.keys],
-  }
-}
-
-const dec = t => t ? new TextDecoder().decode(Uint8Array.from(atob(t), e => e.codePointAt(0))) : ""
-
 const Display = ({host, user, mode, setMode}) => {
-  const [groups, updateGroup] = useReducer(reducer, init)
+  const sortByLatest = (a, b) => b.latest - a.latest
+  const [groups, updateGroup] = useReducer(reducer(sortByLatest), init)
   const [groupList, setGroupList] = useState(true)
   const [feedList, setFeedList] = useState(false)
   const [group, setGroup] = useState(null)
-  const [keys, setKeys] = useState([])
+  const [currentKeys, setCurrentKeys] = useState([])
+  const [newKeys, setNewKeys] = useState([])
+  const [updateKeys, setUpdateKeys] = useState([])
+  const lastCheck = useRef(Date.now())
 
   const createGroup = () => {
     setGroupList(false)
@@ -33,6 +28,70 @@ const Display = ({host, user, mode, setMode}) => {
     setFeedList(false)
   }
 
+  const resetGroup = useCallback(key => {
+    if (!user || group.count === 0) return
+
+    user.get("public").get("groups").get(enc(key)).get("count").put(0, ack => {
+      if (ack.err) console.error(ack.err)
+    })
+  }, [user, group])
+
+  const setGroupStats = useCallback(groupStats => {
+    if (!user) return
+
+    groupStats.forEach((stats, key) => {
+      if (stats.latest === 0) return
+
+      user.get("public").get("groups").get(enc(key)).put(stats, ack => {
+        if (ack.err) console.error(ack.err)
+      })
+    })
+  }, [user])
+
+  useEffect(() => {
+    // ItemList handles updates when group is set.
+    if (!host || group || newKeys.length === 0) return
+
+    const groupStats = new Map()
+    groups.all.forEach(g => groupStats.set(g.key, {
+      count: g.count,
+      latest: 0,
+      text: "",
+      author: "",
+    }))
+    newKeys.forEach(async key => {
+      const item = await host.get("items").get(key).then()
+      if (!item) return
+
+      const url = dec(item.url)
+      groups.all.forEach(g => {
+        if (!g.feeds.includes(url)) return
+
+        let stats = groupStats.get(g.key)
+        if (stats.latest === 0) {
+          stats.latest = key
+          stats.text = item.content
+          stats.author = item.author
+        }
+        stats.count++
+        groupStats.set(g.key, stats)
+      })
+    })
+    setTimeout(() => setGroupStats(groupStats), 1000)
+  }, [host, group, groups, newKeys, setGroupStats])
+
+  useEffect(() => {
+    const keys = []
+    updateKeys.forEach(async key => {
+      if (key <= lastCheck.current) return
+
+      keys.push(key)
+    })
+    lastCheck.current = Date.now()
+    setCurrentKeys(current => [...keys, ...current])
+    setNewKeys(keys)
+  }, [updateKeys])
+
   useEffect(() => {
     if (!host) return
 
@@ -40,8 +99,14 @@ const Display = ({host, user, mode, setMode}) => {
       if (!items) return
 
       delete items._
-      // Existing keys are set for all groups to use.
-      setKeys(Object.keys(items).sort((a, b) => b - a))
+      setCurrentKeys(Object.keys(items).sort((a, b) => b - a))
+    })
+
+    host.get("items").on(items => {
+      if (!items) return
+
+      delete items._
+      setUpdateKeys(Object.keys(items).sort((a, b) => b - a))
     })
   }, [host])
 
@@ -61,7 +126,10 @@ const Display = ({host, user, mode, setMode}) => {
         updateGroup({
           key: dec(name),
           feeds: Object.keys(feeds).map(f => dec(f)),
-          updated: group.updated,
+          count: group.count,
+          latest: group.latest,
+          text: dec(group.text),
+          author: dec(group.author),
         })
       })
     })
@@ -93,7 +161,11 @@ const Display = ({host, user, mode, setMode}) => {
      <ItemList
        host={host}
        group={group}
-       keys={keys}
+       groups={groups}
+       setGroupStats={setGroupStats}
+       resetGroup={resetGroup}
+       currentKeys={currentKeys}
+       newKeys={newKeys}
      />}
     </>
   )

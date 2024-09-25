@@ -7,19 +7,9 @@ import Grid from "@mui/material/Grid"
 import List from "@mui/material/List"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
+import {enc, dec} from "../utils/text.js"
+import {init, reducer} from "../utils/reducer.js"
 import Feed from "./Feed"
-
-const init = {all:[], keys:[]}
-const reducer = (current, add) => {
-  if (add.reset) return init
-  return {
-    all: current.keys.includes(add.key) ? current.all : [add, ...current.all],
-    keys: [add.key, ...current.keys],
-  }
-}
-
-const enc = t => btoa(Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(""))
-const dec = t => t ? new TextDecoder().decode(Uint8Array.from(atob(t), e => e.codePointAt(0))) : ""
 
 // TODO: Display a filtered list using the search bar.
 const FeedList = ({host, user, done}) => {
@@ -27,7 +17,7 @@ const FeedList = ({host, user, done}) => {
   const [selected, setSelected] = useState([])
   const [message, setMessage] = useState("")
   const [disabledButton, setDisabledButton] = useState(false)
-  const [feeds, updateFeed] = useReducer(reducer, init)
+  const [feeds, updateFeed] = useReducer(reducer(), init)
 
   useEffect(() => {
     if (!host) return
@@ -68,8 +58,12 @@ const FeedList = ({host, user, done}) => {
         // see Display useEffect which converts back to an array.
         return {...acc, [enc(feed)]: ""}
       }, {}),
-      // Show the timestamp of the last update.
-      updated: 0,
+      // Show an unread count for the group and display the author, text and
+      // timestamp of the latest item.
+      count: 0,
+      latest: Date.now(),
+      text: "",
+      author: "",
     }
     let retry = 0
     const interval = setInterval(() => {
