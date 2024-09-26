@@ -77,6 +77,7 @@ const Display = ({host, user, mode, setMode}) => {
         groupStats.set(g.key, stats)
       })
     })
+    // The above forEach is async so wait for it to finish.
     setTimeout(() => setGroupStats(groupStats), 1000)
   }, [host, group, groups, newKeys, setGroupStats])
 

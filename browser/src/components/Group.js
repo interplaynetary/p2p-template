@@ -29,23 +29,31 @@ const Group = ({group, setGroup}) => {
               <GroupIcon/> : <PersonIcon/>}
            </Avatar>}
         </ListItemAvatar>
-        <ListItemText primary={
-          <Box sx={{display: "flex"}}>
-            <Typography sx={{flexGrow: 1}}>
-              {group.key}
-            </Typography>
-            <Typography variant="body2" sx={{color: "text.secondary"}}>
-              {group.latest}
-            </Typography>
-          </Box>}
-          secondary={`${group.author && `${group.author}: `}${group.text}`}/>
-        {group.count > 0 &&
-         <Avatar sx={theme => ({
-           width: 30, height: 30, fontSize: "1rem", bgcolor: red[900],
-           ...theme.applyStyles("dark", {bgcolor: red[500]}),
-           })}>
-           {group.count}
-         </Avatar>}
+        <ListItemText
+          primary={
+            <Box sx={{display: "flex"}}>
+              <Typography sx={{flexGrow: 1}}>
+                {group.key}
+              </Typography>
+              <Typography variant="body2" sx={{color: "text.secondary"}}>
+                {group.latest}
+              </Typography>
+            </Box>}
+          secondary={
+            <Box sx={{display: "flex"}}>
+              <Typography sx={{flexGrow: 1}}>
+                `${group.author && `${group.author}: `}${group.text}`
+              </Typography>
+              {group.count > 0 &&
+               <Avatar sx={theme => ({
+                 width:30, height:30, m:1, fontSize:"1rem", bgcolor:red[900],
+                 ...theme.applyStyles("dark", {bgcolor: red[500]}),
+               })}>
+                 {group.count}
+               </Avatar>}
+            </Box>
+          }
+        />
       </ListItemButton>
     </ListItem>
   )

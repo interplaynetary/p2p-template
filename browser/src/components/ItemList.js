@@ -73,12 +73,24 @@ const ItemList = ({host, group, groups, setGroupStats, resetGroup, currentKeys, 
     }
   }, [host, group])
 
-  const updateEnd = useCallback(async (keys) => {
-    if (keys.length === 0) return
+  useEffect(() => {
+    if (!host || !group) {
+      updateItem({reset: true})
+      return
+    }
 
-    let earliest = 0
-    let latest = 0
-    // Update stats for all groups.
+    // Only update here when the group changes.
+    if (groupKey === group.key) return
+
+    setGroupKey(group.key)
+    updateStart(currentKeys)
+    resetGroup(group.key)
+  }, [host, group, groupKey, currentKeys, updateStart, resetGroup])
+
+  useEffect(() => {
+    // Display handles updates when group is not set.
+    if (!host || !group || newKeys.length === 0) return
+
     const groupStats = new Map()
     groups.all.forEach(g => groupStats.set(g.key, {
       count: g.key !== group.key ? g.count : 0,
@@ -93,9 +105,11 @@ const ItemList = ({host, group, groups, setGroupStats, resetGroup, currentKeys, 
         }
       })
     }
-    for (const key of keys) {
+    let earliest = 0
+    let latest = 0
+    newKeys.forEach(async key => {
       const item = await host.get("items").get(key).then()
-      if (!item) continue
+      if (!item) return
 
       // Group feeds are decoded in Display.js
       const url = dec(item.url)
@@ -111,7 +125,7 @@ const ItemList = ({host, group, groups, setGroupStats, resetGroup, currentKeys, 
         if (g.key !== group.key) stats.count++
         groupStats.set(g.key, stats)
       })
-      if (!group.feeds.includes(url)) continue
+      if (!group.feeds.includes(url)) return
 
       updateItem({
         key,
@@ -128,50 +142,27 @@ const ItemList = ({host, group, groups, setGroupStats, resetGroup, currentKeys, 
       if (key < earliest || earliest === 0) earliest = key
       // keys are in descending order so can set latest from first key.
       if (latest === 0) latest = key
-    }
-    if (earliest !== 0 && newFrom === 0) {
-      // If there is no current newFrom marker then mark as new from
-      // earliest, the marker will be removed when scrolled to the end.
-      setNewFrom(earliest)
-    }
-    if (latest !== 0) {
-      // Stop watching the current last key.
-      const target = itemRefs.current.get(lastKey.current)
-      if (target) watchEnd.current.unobserve(target)
-      lastKey.current = latest
-      // Wait for the ref to be added for the new last item.
-      setTimeout(() => {
-        const target = itemRefs.current.get(latest)
-        if (target) {
-          watchEnd.current.observe(target)
+    })
+    // The above forEach is async so wait for it to finish.
+    setTimeout(() => {
+      if (earliest !== 0 && newFrom === 0) {
+        // If there is no current newFrom marker then mark as new from
+        // earliest, the marker will be removed when scrolled to the end.
+        setNewFrom(earliest)
+      }
+      if (latest !== 0) {
+        // Stop watching the current last key.
+        const currentTarget = itemRefs.current.get(lastKey.current)
+        if (currentTarget) watchEnd.current.unobserve(currentTarget)
+        lastKey.current = latest
+        const newTarget = itemRefs.current.get(latest)
+        if (newTarget) {
+          watchEnd.current.observe(newTarget)
         }
-      }, 100)
-    }
-    setGroupStats(groupStats)
-  }, [host, group, groups, setGroupStats, newFrom])
-
-  useEffect(() => {
-    if (!host || !group) {
-      updateItem({reset: true})
-      return
-    }
-
-    // Only update here when the group changes.
-    if (groupKey === group.key) return
-
-    setGroupKey(group.key)
-    updateStart(currentKeys)
-    resetGroup(group.key)
-  }, [host, group, groupKey, currentKeys, updateStart, resetGroup])
-
-  useEffect(() => {
-    if (!host || !group) {
-      updateItem({reset: true})
-      return
-    }
-
-    updateEnd(newKeys)
-  }, [host, group, newKeys, updateEnd])
+      }
+      setGroupStats(groupStats)
+    }, 1000)
+  }, [host, group, groups, newKeys, setGroupStats, newFrom])
 
   return (
     <Container maxWidth="md">
