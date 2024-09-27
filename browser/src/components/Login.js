@@ -19,11 +19,11 @@ const Login = ({host, user, mode, setMode}) => {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [message, setMessage] = useState(user.is? "Already logged in" : "")
+  const [message, setMessage] = useState(user.is ? "Already logged in" : "")
   const [disabledButton, setDisabledButton] = useState(user.is)
   const found = useRef(false)
 
-  const login = (alias) => {
+  const login = alias => {
     setDisabledButton(true)
     setMessage("Checking account...")
 
@@ -39,29 +39,34 @@ const Login = ({host, user, mode, setMode}) => {
 
         let retry = 0
         const checkAccounts = () => {
-          host.get("accounts").once(all => {
-            if (!all) return
+          host.get("accounts").once(
+            all => {
+              if (!all) return
 
-            for (const code of Object.keys(all)) {
-              if (found.current) break
+              for (const code of Object.keys(all)) {
+                if (found.current) break
 
-              host.get("accounts").get(code).once(account => {
-                if (!account || account.pub !== user.is.pub) return
+                host
+                  .get("accounts")
+                  .get(code)
+                  .once(account => {
+                    if (!account || account.pub !== user.is.pub) return
 
-                found.current = true
-                sessionStorage.setItem("code", code)
-                sessionStorage.setItem("name", account.name)
-              })
-            }
-          }, {wait: 1000})
+                    found.current = true
+                    sessionStorage.setItem("code", code)
+                    sessionStorage.setItem("name", account.name)
+                  })
+              }
+            },
+            {wait: 1000},
+          )
         }
         checkAccounts()
         const interval = setInterval(() => {
           if (found.current) {
             clearInterval(interval)
             window.location = "/"
-          }
-          else if (retry > 5) {
+          } else if (retry > 5) {
             setDisabledButton(false)
             setMessage("Account not found. Please try logging in again.")
             clearInterval(interval)
@@ -97,56 +102,65 @@ const Login = ({host, user, mode, setMode}) => {
 
   return (
     <>
-    {user.is && <SearchAppBar mode={mode} setMode={setMode}/>}
-    <Container maxWidth="sm">
-      <Grid container>
-        <Grid item xs={12}>
-          <Card sx={{mt:2}}>
-            <CardContent>
-              <Typography variant="h5">Login</Typography>
-              <TextField
-                id="login-username"
-                label="Username"
-                variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={username}
-                onChange={event => setUsername(event.target.value)}
-              />
-              <FormControl variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={password}
-                onChange={event => setPassword(event.target.value)}
-              >
-                <InputLabel htmlFor="login-password">Password</InputLabel>
-                <OutlinedInput
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  endAdornment={
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowPassword(show => !show)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff/> : <Visibility/>}
-                      </IconButton>
-                    </InputAdornment>
-                  }
-                  label="Password"
+      {user.is && <SearchAppBar mode={mode} setMode={setMode} />}
+      <Container maxWidth="sm">
+        <Grid container>
+          <Grid item xs={12}>
+            <Card sx={{mt: 2}}>
+              <CardContent>
+                <Typography variant="h5">Login</Typography>
+                <TextField
+                  id="login-username"
+                  label="Username"
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={username}
+                  onChange={event => setUsername(event.target.value)}
                 />
-              </FormControl>
-              <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-                onClick={() => login(username)}
-              >Submit</Button>
-              {message &&
-               <Typography sx={{m:1}} variant="string">{message}</Typography>}
-            </CardContent>
-          </Card>
+                <FormControl
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                >
+                  <InputLabel htmlFor="login-password">Password</InputLabel>
+                  <OutlinedInput
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label="toggle password visibility"
+                          onClick={() => setShowPassword(show => !show)}
+                          edge="end"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                    label="Password"
+                  />
+                </FormControl>
+                <Button
+                  sx={{mt: 1}}
+                  variant="contained"
+                  disabled={disabledButton}
+                  onClick={() => login(username)}
+                >
+                  Submit
+                </Button>
+                {message && (
+                  <Typography sx={{m: 1}} variant="string">
+                    {message}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
-    </Container>
+      </Container>
     </>
   )
 }

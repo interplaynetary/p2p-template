@@ -18,10 +18,28 @@ const pass = process.env.GUN_USER_PASS ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
 
 // See browser/src/utils/text.js.
-const a = t => {try {return atob(t)} catch {return ""}}
-const b = t => {try {return btoa(t)} catch {return ""}}
-const enc = t => b(Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(""))
-const dec = t => new TextDecoder().decode(Uint8Array.from(a(t), e => e.codePointAt(0)))
+const a = t => {
+  try {
+    return atob(t)
+  } catch {
+    return ""
+  }
+}
+const b = t => {
+  try {
+    return btoa(t)
+  } catch {
+    return ""
+  }
+}
+const enc = t =>
+  b(
+    Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(
+      "",
+    ),
+  )
+const dec = t =>
+  new TextDecoder().decode(Uint8Array.from(a(t), e => e.codePointAt(0)))
 
 // lastSaved is the timestamp of the last time save was called. This allows
 // slowing calls to save so that the timestamp can be used as a unique key.
@@ -78,7 +96,9 @@ app.get("/help", (req, res) => {
 })
 
 app.get("/validate-email", (req, res) => {
-  res.redirect(`/?redirect=validate-email&code=${req.query.code}&validate=${req.query.validate}`)
+  res.redirect(
+    `/?redirect=validate-email&code=${req.query.code}&validate=${req.query.validate}`,
+  )
 })
 
 app.get("/reset-password", (req, res) => {
@@ -86,7 +106,9 @@ app.get("/reset-password", (req, res) => {
 })
 
 app.get("/update-password", (req, res) => {
-  res.redirect(`/?redirect=update-password&username=${req.query.username}&code=${req.query.code}&reset=${req.query.reset}`)
+  res.redirect(
+    `/?redirect=update-password&username=${req.query.username}&code=${req.query.code}&reset=${req.query.reset}`,
+  )
 })
 
 app.post("/check-invite-code", (req, res) => {
@@ -97,17 +119,20 @@ app.post("/check-invite-code", (req, res) => {
   }
 
   // This just provides relevant errors.
-  user.get("accounts").get(code).once(used => {
-    if (used) {
-      if (code === "admin") {
-        res.status(400).send("Please provide an invite code")
+  user
+    .get("accounts")
+    .get(code)
+    .once(used => {
+      if (used) {
+        if (code === "admin") {
+          res.status(400).send("Please provide an invite code")
+          return
+        }
+        res.status(400).send("Invite code already used")
         return
       }
-      res.status(400).send("Invite code already used")
-      return
-    }
-    res.status(404).send("Invite code not found")
-  })
+      res.status(404).send("Invite code not found")
+    })
 })
 
 app.post("/claim-invite-code", async (req, res) => {
@@ -126,7 +151,9 @@ app.post("/claim-invite-code", async (req, res) => {
     return
   }
   if (!/^\w+$/.test(req.body.alias)) {
-    res.status(400).send("Username must contain only numbers, letters and underscore")
+    res
+      .status(400)
+      .send("Username must contain only numbers, letters and underscore")
     return
   }
   if (!req.body.email) {
@@ -137,15 +164,18 @@ app.post("/claim-invite-code", async (req, res) => {
   const validate = newCode()
   const encValidate = await Gun.SEA.encrypt(validate, user._.sea)
   const encEmail = await Gun.SEA.encrypt(req.body.email, user._.sea)
-  user.get("accounts").get(code).put({
-    pub: req.body.pub,
-    alias: req.body.alias,
-    name: req.body.alias,
-    email: encEmail,
-    validate: encValidate,
-    ref: invite.owner,
-    host: enc(host),
-  })
+  user
+    .get("accounts")
+    .get(code)
+    .put({
+      pub: req.body.pub,
+      alias: req.body.alias,
+      name: req.body.alias,
+      email: encEmail,
+      validate: encValidate,
+      ref: invite.owner,
+      host: enc(host),
+    })
   validateEmail(req.body.alias, req.body.email, code, validate)
 
   // Remove invite code as it's no longer available.
@@ -158,33 +188,39 @@ app.post("/claim-invite-code", async (req, res) => {
   }
 
   // Also remove from shared codes of the invite owner.
-  user.get("accounts").get(invite.owner).once(account => {
-    if (!account) {
-      console.log("Account not found for invite.owner!")
-      return
-    }
-
-    gun.user(account.pub).get("epub").once(epub => {
-      if (!epub) {
-        res.status(404).send("User not found for public key")
+  user
+    .get("accounts")
+    .get(invite.owner)
+    .once(account => {
+      if (!account) {
+        console.log("Account not found for invite.owner!")
         return
       }
 
-      const owner = user.get("shared").get("invite_codes").get(invite.owner)
-      owner.once(async codes => {
-        const secret = await Gun.SEA.secret(epub, user._.sea)
-        for (let [key, enc] of Object.entries(codes)) {
-          if (!enc) continue
-
-          let shared = await Gun.SEA.decrypt(enc, secret)
-          if (code === shared) {
-            owner.get(key).put(null)
-            break
+      gun
+        .user(account.pub)
+        .get("epub")
+        .once(epub => {
+          if (!epub) {
+            res.status(404).send("User not found for public key")
+            return
           }
-        }
-      })
+
+          const owner = user.get("shared").get("invite_codes").get(invite.owner)
+          owner.once(async codes => {
+            const secret = await Gun.SEA.secret(epub, user._.sea)
+            for (let [key, enc] of Object.entries(codes)) {
+              if (!enc) continue
+
+              let shared = await Gun.SEA.decrypt(enc, secret)
+              if (code === shared) {
+                owner.get(key).put(null)
+                break
+              }
+            }
+          })
+        })
     })
-  })
   res.end()
 })
 
@@ -199,25 +235,28 @@ app.post("/validate-email", (req, res) => {
     return
   }
 
-  user.get("accounts").get(code).once(async account => {
-    if (!account) {
-      res.status(404).send("Account not found")
-      return
-    }
-    if (!account.validate) {
-      res.send("Email already validated")
-      return
-    }
+  user
+    .get("accounts")
+    .get(code)
+    .once(async account => {
+      if (!account) {
+        res.status(404).send("Account not found")
+        return
+      }
+      if (!account.validate) {
+        res.send("Email already validated")
+        return
+      }
 
-    const validate = await Gun.SEA.decrypt(account.validate, user._.sea)
-    if (validate !== req.body.validate) {
-      res.status(400).send("Validation code does not match")
-      return
-    }
+      const validate = await Gun.SEA.decrypt(account.validate, user._.sea)
+      if (validate !== req.body.validate) {
+        res.status(400).send("Validation code does not match")
+        return
+      }
 
-    user.get("accounts").get(code).put({validate: null})
-    res.send("Email validated")
-  })
+      user.get("accounts").get(code).put({validate: null})
+      res.send("Email validated")
+    })
 })
 
 app.post("/reset-password", (req, res) => {
@@ -227,42 +266,48 @@ app.post("/reset-password", (req, res) => {
   }
 
   const code = req.body.code || "admin"
-  user.get("accounts").get(code).once(async account => {
-    if (!account) {
-      res.status(404).send("Account not found")
-      return
-    }
+  user
+    .get("accounts")
+    .get(code)
+    .once(async account => {
+      if (!account) {
+        res.status(404).send("Account not found")
+        return
+      }
 
-    let increment = 0
-    const match = account.alias.match(/\.(\d)$/)
-    if (match) {
-      increment = Number(match[1])
-    }
-    if (increment === 9) {
-      res.status(400).send("Too many password resets")
-      return
-    }
+      let increment = 0
+      const match = account.alias.match(/\.(\d)$/)
+      if (match) {
+        increment = Number(match[1])
+      }
+      if (increment === 9) {
+        res.status(400).send("Too many password resets")
+        return
+      }
 
-    const email = await Gun.SEA.decrypt(account.email, user._.sea)
-    if (email !== req.body.email) {
-      res.status(400).send("Email does not match invite code")
-      return
-    }
-    if (account.validate) {
-      res.status(400).send("Please validate your email first")
-      return
-    }
+      const email = await Gun.SEA.decrypt(account.email, user._.sea)
+      if (email !== req.body.email) {
+        res.status(400).send("Email does not match invite code")
+        return
+      }
+      if (account.validate) {
+        res.status(400).send("Please validate your email first")
+        return
+      }
 
-    const reset = newCode()
-    const remaining = 8 - increment
-    user.get("accounts").get(code).put({
-      reset: await Gun.SEA.encrypt(reset, user._.sea),
-      expiry: Date.now() + 86400000,
+      const reset = newCode()
+      const remaining = 8 - increment
+      user
+        .get("accounts")
+        .get(code)
+        .put({
+          reset: await Gun.SEA.encrypt(reset, user._.sea),
+          expiry: Date.now() + 86400000,
+        })
+
+      resetPassword(account.name, remaining, email, code, reset)
+      res.send("Reset password email sent")
     })
-
-    resetPassword(account.name, remaining, email, code, reset)
-    res.send("Reset password email sent")
-  })
 })
 
 app.post("/update-password", (req, res) => {
@@ -288,34 +333,37 @@ app.post("/update-password", (req, res) => {
     return
   }
 
-  user.get("accounts").get(code).once(async account => {
-    if (!account) {
-      res.status(404).send("Account not found")
-      return
-    }
-    if (!account.reset) {
-      res.status(404).send("Reset code not found")
-      return
-    }
-    if (!account.expiry || account.expiry < Date.now()) {
-      res.status(400).send("Reset code has expired")
-      return
-    }
+  user
+    .get("accounts")
+    .get(code)
+    .once(async account => {
+      if (!account) {
+        res.status(404).send("Account not found")
+        return
+      }
+      if (!account.reset) {
+        res.status(404).send("Reset code not found")
+        return
+      }
+      if (!account.expiry || account.expiry < Date.now()) {
+        res.status(400).send("Reset code has expired")
+        return
+      }
 
-    const reset = await Gun.SEA.decrypt(account.reset, user._.sea)
-    if (reset !== req.body.reset) {
-      res.status(400).send("Reset code does not match")
-      return
-    }
+      const reset = await Gun.SEA.decrypt(account.reset, user._.sea)
+      if (reset !== req.body.reset) {
+        res.status(400).send("Reset code does not match")
+        return
+      }
 
-    user.get("accounts").get(code).put({
-      pub: req.body.pub,
-      alias: req.body.alias,
-      name: req.body.name,
-      prev: account.pub,
+      user.get("accounts").get(code).put({
+        pub: req.body.pub,
+        alias: req.body.alias,
+        name: req.body.name,
+        prev: account.pub,
+      })
+      res.send(account.pub)
     })
-    res.send(account.pub)
-  })
 })
 
 app.post("/private/create-invite-codes", (req, res) => {
@@ -325,26 +373,32 @@ app.post("/private/create-invite-codes", (req, res) => {
     return
   }
 
-  user.get("accounts").get(code).once(account => {
-    if (!account) {
-      res.status(404).send("Account not found")
-      return
-    }
-    if (account.validate) {
-      res.status(400).send("Email not validated")
-      return
-    }
-
-    gun.user(account.pub).get("epub").once(epub => {
-      if (!epub) {
-        res.status(404).send("User not found for public key")
+  user
+    .get("accounts")
+    .get(code)
+    .once(account => {
+      if (!account) {
+        res.status(404).send("Account not found")
+        return
+      }
+      if (account.validate) {
+        res.status(400).send("Email not validated")
         return
       }
 
-      createInviteCodes(req.body.count || 1, code, epub)
-      res.end()
+      gun
+        .user(account.pub)
+        .get("epub")
+        .once(epub => {
+          if (!epub) {
+            res.status(404).send("User not found for public key")
+            return
+          }
+
+          createInviteCodes(req.body.count || 1, code, epub)
+          res.end()
+        })
     })
-  })
 })
 
 app.post("/private/feed", (req, res) => {
@@ -353,21 +407,27 @@ app.post("/private/feed", (req, res) => {
     return
   }
 
-  user.get("feeds").get(enc(req.body.url)).put({
-    title: enc(req.body.title) ?? "",
-    description: enc(req.body.description) ?? "",
-    html_url: enc(req.body.html_url) ?? "",
-    language: enc(req.body.language) ?? "",
-    image: enc(req.body.image) ?? "",
-  }, ack => {
-    if (!ack.err) {
-      res.end()
-      return
-    }
+  user
+    .get("feeds")
+    .get(enc(req.body.url))
+    .put(
+      {
+        title: enc(req.body.title) ?? "",
+        description: enc(req.body.description) ?? "",
+        html_url: enc(req.body.html_url) ?? "",
+        language: enc(req.body.language) ?? "",
+        image: enc(req.body.image) ?? "",
+      },
+      ack => {
+        if (!ack.err) {
+          res.end()
+          return
+        }
 
-    console.log(ack.err)
-    res.status(500).send("error saving feed")
-  })
+        console.log(ack.err)
+        res.status(500).send("error saving feed")
+      },
+    )
 })
 
 app.post("/private/item", (req, res) => {
@@ -394,25 +454,31 @@ app.post("/private/item", (req, res) => {
     // there's a matching guid. If there is then update the item rather than
     // creating a new one.
     console.log("lastSaved", lastSaved)
-    user.get("items").get(lastSaved).put({
-      title: enc(req.body.title) ?? "",
-      content: enc(req.body.content) ?? "",
-      author: enc(req.body.author) ?? "",
-      category: enc(req.body.category) ?? "",
-      enclosure: enc(req.body.enclosure) ?? "",
-      permalink: enc(req.body.permalink) ?? "",
-      guid: enc(req.body.guid) ?? "",
-      timestamp: enc(req.body.timestamp) ?? enc(lastSaved),
-      url: enc(req.body.url),
-    }, ack => {
-      if (!ack.err) {
-        res.end()
-        return
-      }
+    user
+      .get("items")
+      .get(lastSaved)
+      .put(
+        {
+          title: enc(req.body.title) ?? "",
+          content: enc(req.body.content) ?? "",
+          author: enc(req.body.author) ?? "",
+          category: enc(req.body.category) ?? "",
+          enclosure: enc(req.body.enclosure) ?? "",
+          permalink: enc(req.body.permalink) ?? "",
+          guid: enc(req.body.guid) ?? "",
+          timestamp: enc(req.body.timestamp) ?? enc(lastSaved),
+          url: enc(req.body.url),
+        },
+        ack => {
+          if (!ack.err) {
+            res.end()
+            return
+          }
 
-      console.log(ack.err)
-      res.status(500).send("error saving item")
-    })
+          console.log(ack.err)
+          res.status(500).send("error saving item")
+        },
+      )
   }, wait)
 })
 
@@ -462,17 +528,20 @@ function auth(ack) {
 function mapInviteCodes() {
   // map subscribes to invite_codes, so this will also be called when new
   // invite codes are created.
-  user.get("available").get("invite_codes").map().once(async (enc, key) => {
-    if (!enc) return
+  user
+    .get("available")
+    .get("invite_codes")
+    .map()
+    .once(async (enc, key) => {
+      if (!enc) return
 
-    const invite = await Gun.SEA.decrypt(enc, user._.sea)
-    if (!inviteCodes.has(invite.code)) {
-      invite.key = key
-      inviteCodes.set(invite.code, invite)
-    }
-  })
+      const invite = await Gun.SEA.decrypt(enc, user._.sea)
+      if (!inviteCodes.has(invite.code)) {
+        invite.key = key
+        inviteCodes.set(invite.code, invite)
+      }
+    })
 }
-
 
 function checkCodes(newCodes) {
   // TODO: Check user.get("shared").get("invite_codes") and return false if
@@ -553,16 +622,19 @@ function mail(email, subject, message) {
     return
   }
 
-  nodemailer.createTransport({sendmail: true}).sendMail({
-    from: process.env.MAIL_FROM,
-    to: email,
-    subject: subject,
-    text: message,
-  }, (err, info) => {
-    if (err) {
-      console.log(err)
-      return
-    }
-    console.log(info)
-  })
+  nodemailer.createTransport({sendmail: true}).sendMail(
+    {
+      from: process.env.MAIL_FROM,
+      to: email,
+      subject: subject,
+      text: message,
+    },
+    (err, info) => {
+      if (err) {
+        console.log(err)
+        return
+      }
+      console.log(info)
+    },
+  )
 }

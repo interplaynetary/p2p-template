@@ -1,4 +1,4 @@
-import { useState } from "react"
+import {useState} from "react"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -34,10 +34,10 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
   const [username, setUsername] = useState(current ?? "")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [message, setMessage] = useState(loggedIn? "Already logged in" : "")
+  const [message, setMessage] = useState(loggedIn ? "Already logged in" : "")
   const [disabledButton, setDisabledButton] = useState(loggedIn)
 
-  const update = (alias) => {
+  const update = alias => {
     if (!alias) {
       setMessage("Please choose a username")
       return
@@ -79,7 +79,7 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
         fetch(`${window.location.origin}/update-password`, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json;charset=utf-8"
+            "Content-Type": "application/json;charset=utf-8",
           },
           body: JSON.stringify({
             code: code ?? null,
@@ -89,115 +89,142 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
             name: username,
           }),
         })
-        .then(res => res.text().then(text => ({ok: res.ok, text: text})))
-        .then(res => {
-          if (!res.ok) {
-            setDisabledButton(false)
-            user.delete(alias, password)
-            setMessage(res.text)
-            return
-          }
-
-          // The previous public key is returned to copy over public user data.
-          // Need to go through all items that should be copied and create new
-          // plain objects since the old data references the previous account.
-          let oldUser = gun.user(res.text).get("public")
-          oldUser.get("contacts").map().once((contact, contactCode) => {
-            let update = {
-              pub: contact.pub,
-              alias: contact.alias,
-              name: contact.name,
-              ref: contact.ref,
-              host: contact.host,
+          .then(res => res.text().then(text => ({ok: res.ok, text: text})))
+          .then(res => {
+            if (!res.ok) {
+              setDisabledButton(false)
+              user.delete(alias, password)
+              setMessage(res.text)
+              return
             }
-            user.get("public").get("contacts").get(contactCode).put(update, ack => {
-              if (ack.err) {
-                console.error(ack.err)
-              }
-            })
-          })
-          // Nested objects need to be dereferenced and gun data removed before
-          // it can be copied to the new user.
-          oldUser.get("groups").map().once((group, groupName) => {
-            oldUser.get("groups").get(groupName).get("feeds").once(feeds => {
-              if (!feeds) return
 
-              delete feeds._
-              let update = {
-                feeds: feeds,
-                updated: group.updated,
-              }
-              user.get("public").get("groups").get(groupName).put(update, ack => {
-                if (ack.err) {
-                  console.error(ack.err)
+            // The previous public key is returned to copy over public user data.
+            // Need to go through all items that should be copied and create new
+            // plain objects since the old data references the previous account.
+            let oldUser = gun.user(res.text).get("public")
+            oldUser
+              .get("contacts")
+              .map()
+              .once((contact, contactCode) => {
+                let update = {
+                  pub: contact.pub,
+                  alias: contact.alias,
+                  name: contact.name,
+                  ref: contact.ref,
+                  host: contact.host,
                 }
+                user
+                  .get("public")
+                  .get("contacts")
+                  .get(contactCode)
+                  .put(update, ack => {
+                    if (ack.err) {
+                      console.error(ack.err)
+                    }
+                  })
               })
-            })
-          })
-          // Note: Any new public data needs to also be copied over here.
+            // Nested objects need to be dereferenced and gun data removed before
+            // it can be copied to the new user.
+            oldUser
+              .get("groups")
+              .map()
+              .once((group, groupName) => {
+                oldUser
+                  .get("groups")
+                  .get(groupName)
+                  .get("feeds")
+                  .once(feeds => {
+                    if (!feeds) return
 
-          setMessage("Password updated")
-          setTimeout(() => {
-            setDisabledButton(false)
-            window.location = "/login"
-          }, 2000)
-        })
+                    delete feeds._
+                    let update = {
+                      feeds: feeds,
+                      updated: group.updated,
+                    }
+                    user
+                      .get("public")
+                      .get("groups")
+                      .get(groupName)
+                      .put(update, ack => {
+                        if (ack.err) {
+                          console.error(ack.err)
+                        }
+                      })
+                  })
+              })
+            // Note: Any new public data needs to also be copied over here.
+
+            setMessage("Password updated")
+            setTimeout(() => {
+              setDisabledButton(false)
+              window.location = "/login"
+            }, 2000)
+          })
       })
     })
   }
 
   return (
     <>
-    {loggedIn && <SearchAppBar mode={mode} setMode={setMode}/>}
-    <Container maxWidth="sm">
-      <Grid container>
-        <Grid item xs={12}>
-          <Card sx={{mt:2}}>
-            <CardContent>
-              <Typography variant="h5">Update Password</Typography>
-              <TextField
-                id="update-username"
-                label="Username"
-                variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-              />
-              <FormControl variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              >
-                <InputLabel htmlFor="update-password">Password</InputLabel>
-                <OutlinedInput
-                  id="update-password"
-                  type={showPassword ? "text" : "password"}
-                  endAdornment={
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowPassword(show => !show)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff/> : <Visibility/>}
-                      </IconButton>
-                    </InputAdornment>
-                  }
-                  label="Password"
+      {loggedIn && <SearchAppBar mode={mode} setMode={setMode} />}
+      <Container maxWidth="sm">
+        <Grid container>
+          <Grid item xs={12}>
+            <Card sx={{mt: 2}}>
+              <CardContent>
+                <Typography variant="h5">Update Password</Typography>
+                <TextField
+                  id="update-username"
+                  label="Username"
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={username}
+                  onChange={event => setUsername(event.target.value)}
                 />
-              </FormControl>
-              <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-                onClick={() => update(username)}
-              >Submit</Button>
-              {message &&
-               <Typography sx={{m:1}} variant="string">{message}</Typography>}
-            </CardContent>
-          </Card>
+                <FormControl
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                >
+                  <InputLabel htmlFor="update-password">Password</InputLabel>
+                  <OutlinedInput
+                    id="update-password"
+                    type={showPassword ? "text" : "password"}
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label="toggle password visibility"
+                          onClick={() => setShowPassword(show => !show)}
+                          edge="end"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                    label="Password"
+                  />
+                </FormControl>
+                <Button
+                  sx={{mt: 1}}
+                  variant="contained"
+                  disabled={disabledButton}
+                  onClick={() => update(username)}
+                >
+                  Submit
+                </Button>
+                {message && (
+                  <Typography sx={{m: 1}} variant="string">
+                    {message}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
-    </Container>
+      </Container>
     </>
   )
 }

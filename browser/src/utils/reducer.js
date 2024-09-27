@@ -1,4 +1,4 @@
-export const init = {all:[], keys:[]}
+export const init = {all: [], keys: []}
 
 // Returns a reducer with a custom sort function that is passed to useReducer.
 export const reducer = sort => {
@@ -7,7 +7,7 @@ export const reducer = sort => {
 
     if (current.keys.includes(add.key)) {
       return {
-        all: current.all.map(value => value.key === add.key ? add : value),
+        all: current.all.map(value => (value.key === add.key ? add : value)),
         keys: current.keys,
       }
     }

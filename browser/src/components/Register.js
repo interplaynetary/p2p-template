@@ -36,7 +36,7 @@ const Register = ({loggedIn, mode, setMode}) => {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
-  const [message, setMessage] = useState(loggedIn? "Already logged in" : "")
+  const [message, setMessage] = useState(loggedIn ? "Already logged in" : "")
   const [disabledButton, setDisabledButton] = useState(loggedIn)
 
   const register = () => {
@@ -58,132 +58,141 @@ const Register = ({loggedIn, mode, setMode}) => {
     fetch(`${window.location.origin}/check-invite-code`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json;charset=utf-8"
+        "Content-Type": "application/json;charset=utf-8",
       },
       body: JSON.stringify({code: code}),
     })
-    .then(res => res.text().then(text => ({ok: res.ok, text: text})))
-    .then(res => {
-      if (!res.ok) {
-        setDisabledButton(false)
-        setMessage(res.text)
-        return
-      }
-
-      const user = gun.user()
-      user.create(username, password, ack => {
-        if (ack.err) {
+      .then(res => res.text().then(text => ({ok: res.ok, text: text})))
+      .then(res => {
+        if (!res.ok) {
           setDisabledButton(false)
-          setMessage(ack.err)
+          setMessage(res.text)
           return
         }
 
-        user.auth(username, password, ack => {
+        const user = gun.user()
+        user.create(username, password, ack => {
           if (ack.err) {
             setDisabledButton(false)
             setMessage(ack.err)
             return
           }
 
-          fetch(`${window.location.origin}/claim-invite-code`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json;charset=utf-8"
-            },
-            body: JSON.stringify({
-              code: code,
-              pub: user.is.pub,
-              alias: username,
-              email: email,
-            }),
-          })
-          .then(res => res.text().then(text => ({ok: res.ok, text: text})))
-          .then(res => {
-            setDisabledButton(false)
-            if (!res.ok) {
-              user.delete(username, password)
-              setMessage(res.text)
+          user.auth(username, password, ack => {
+            if (ack.err) {
+              setDisabledButton(false)
+              setMessage(ack.err)
               return
             }
 
-            setMessage("Account created")
-            window.location = "/login"
+            fetch(`${window.location.origin}/claim-invite-code`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json;charset=utf-8",
+              },
+              body: JSON.stringify({
+                code: code,
+                pub: user.is.pub,
+                alias: username,
+                email: email,
+              }),
+            })
+              .then(res => res.text().then(text => ({ok: res.ok, text: text})))
+              .then(res => {
+                setDisabledButton(false)
+                if (!res.ok) {
+                  user.delete(username, password)
+                  setMessage(res.text)
+                  return
+                }
+
+                setMessage("Account created")
+                window.location = "/login"
+              })
           })
         })
       })
-    })
   }
 
   return (
     <>
-    {loggedIn && <SearchAppBar mode={mode} setMode={setMode}/>}
-    <Container maxWidth="sm">
-      <Grid container>
-        <Grid item xs={12}>
-          <Card sx={{mt:2}}>
-            <CardContent>
-              <Typography variant="h5">Register</Typography>
-              <TextField
-                id="register-username"
-                label="Username"
-                variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-              />
-              <FormControl variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              >
-                <InputLabel htmlFor="register-password">Password</InputLabel>
-                <OutlinedInput
-                  id="register-password"
-                  type={showPassword ? "text" : "password"}
-                  endAdornment={
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowPassword(show => !show)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff/> : <Visibility/>}
-                      </IconButton>
-                    </InputAdornment>
-                  }
-                  label="Password"
+      {loggedIn && <SearchAppBar mode={mode} setMode={setMode} />}
+      <Container maxWidth="sm">
+        <Grid container>
+          <Grid item xs={12}>
+            <Card sx={{mt: 2}}>
+              <CardContent>
+                <Typography variant="h5">Register</Typography>
+                <TextField
+                  id="register-username"
+                  label="Username"
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={username}
+                  onChange={event => setUsername(event.target.value)}
                 />
-              </FormControl>
-              <TextField
-                id="register-email"
-                label="Email"
-                variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-              <TextField
-                id="register-code"
-                label="Invite code"
-                variant="outlined"
-                fullWidth={true}
-                margin="normal"
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-              />
-              <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
-                onClick={register}
-              >Submit</Button>
-              {message &&
-               <Typography sx={{m:1}} variant="string">{message}</Typography>}
-            </CardContent>
-          </Card>
+                <FormControl
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                >
+                  <InputLabel htmlFor="register-password">Password</InputLabel>
+                  <OutlinedInput
+                    id="register-password"
+                    type={showPassword ? "text" : "password"}
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label="toggle password visibility"
+                          onClick={() => setShowPassword(show => !show)}
+                          edge="end"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                    label="Password"
+                  />
+                </FormControl>
+                <TextField
+                  id="register-email"
+                  label="Email"
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={email}
+                  onChange={event => setEmail(event.target.value)}
+                />
+                <TextField
+                  id="register-code"
+                  label="Invite code"
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={code}
+                  onChange={event => setCode(event.target.value)}
+                />
+                <Button
+                  sx={{mt: 1}}
+                  variant="contained"
+                  disabled={disabledButton}
+                  onClick={register}
+                >
+                  Submit
+                </Button>
+                {message && (
+                  <Typography sx={{m: 1}} variant="string">
+                    {message}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
-    </Container>
+      </Container>
     </>
   )
 }

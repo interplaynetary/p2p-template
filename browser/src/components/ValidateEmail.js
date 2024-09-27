@@ -1,4 +1,4 @@
-import { useState } from "react"
+import {useState} from "react"
 import Button from "@mui/material/Button"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
@@ -15,33 +15,38 @@ const ValidateEmail = ({code, validate}) => {
     fetch(`${window.location.origin}/validate-email`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json;charset=utf-8"
+        "Content-Type": "application/json;charset=utf-8",
       },
       body: JSON.stringify({
         code: code ?? null,
         validate: validate ?? null,
       }),
     })
-    .then(res => res.text().then(text => ({ok: res.ok, text: text})))
-    .then(res => {
-      setDisabledButton(false)
-      setMessage(res.text)
-      if (res.ok) {
-        setTimeout(() => {
-          window.location = "/"
-        }, 1000)
-      }
-    })
+      .then(res => res.text().then(text => ({ok: res.ok, text: text})))
+      .then(res => {
+        setDisabledButton(false)
+        setMessage(res.text)
+        if (res.ok) {
+          setTimeout(() => {
+            window.location = "/"
+          }, 1000)
+        }
+      })
   }
 
   return (
     <Container maxWidth="sm">
       <Grid container>
         <Grid item xs={12}>
-          <Typography sx={{m:1}}>{message}</Typography>
-          <Button sx={{mt:1}} variant="contained" disabled={disabledButton}
+          <Typography sx={{m: 1}}>{message}</Typography>
+          <Button
+            sx={{mt: 1}}
+            variant="contained"
+            disabled={disabledButton}
             onClick={validateEmail}
-          >Validate</Button>
+          >
+            Validate
+          </Button>
         </Grid>
       </Grid>
     </Container>

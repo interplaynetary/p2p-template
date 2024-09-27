@@ -28,37 +28,54 @@ const Display = ({host, user, mode, setMode}) => {
     setFeedList(false)
   }
 
-  const resetGroup = useCallback(key => {
-    if (!user || group.count === 0) return
+  const resetGroup = useCallback(
+    key => {
+      if (!user || group.count === 0) return
 
-    user.get("public").get("groups").get(enc(key)).get("count").put(0, ack => {
-      if (ack.err) console.error(ack.err)
-    })
-  }, [user, group])
+      user
+        .get("public")
+        .get("groups")
+        .get(enc(key))
+        .get("count")
+        .put(0, ack => {
+          if (ack.err) console.error(ack.err)
+        })
+    },
+    [user, group],
+  )
 
-  const setGroupStats = useCallback(groupStats => {
-    if (!user) return
+  const setGroupStats = useCallback(
+    groupStats => {
+      if (!user) return
 
-    groupStats.forEach((stats, key) => {
-      if (stats.latest === 0) return
+      groupStats.forEach((stats, key) => {
+        if (stats.latest === 0) return
 
-      user.get("public").get("groups").get(enc(key)).put(stats, ack => {
-        if (ack.err) console.error(ack.err)
+        user
+          .get("public")
+          .get("groups")
+          .get(enc(key))
+          .put(stats, ack => {
+            if (ack.err) console.error(ack.err)
+          })
       })
-    })
-  }, [user])
+    },
+    [user],
+  )
 
   useEffect(() => {
     // ItemList handles updates when group is set.
     if (!host || group || newKeys.length === 0) return
 
     const groupStats = new Map()
-    groups.all.forEach(g => groupStats.set(g.key, {
-      count: g.count,
-      latest: 0,
-      text: "",
-      author: "",
-    }))
+    groups.all.forEach(g =>
+      groupStats.set(g.key, {
+        count: g.count,
+        latest: 0,
+        text: "",
+        author: "",
+      }),
+    )
     newKeys.forEach(async key => {
       const item = await host.get("items").get(key).then()
       if (!item) return
@@ -115,59 +132,64 @@ const Display = ({host, user, mode, setMode}) => {
     if (!user) return
 
     updateGroup({reset: true})
-    user.get("public").get("groups").map().on((group, name) => {
-      if (!group) return
+    user
+      .get("public")
+      .get("groups")
+      .map()
+      .on((group, name) => {
+        if (!group) return
 
-      user.get("public").get("groups").get(name).get("feeds").once(feeds => {
-        if (!feeds) return
+        user
+          .get("public")
+          .get("groups")
+          .get(name)
+          .get("feeds")
+          .once(feeds => {
+            if (!feeds) return
 
-        // Convert feeds object to an array, removing data added by gun.
-        // See FeedList createGroup which converts the array to an object.
-        delete feeds._
-        updateGroup({
-          key: dec(name),
-          feeds: Object.keys(feeds).map(f => dec(f)),
-          count: group.count,
-          latest: group.latest,
-          text: dec(group.text),
-          author: dec(group.author),
-        })
+            // Convert feeds object to an array, removing data added by gun.
+            // See FeedList createGroup which converts the array to an object.
+            delete feeds._
+            updateGroup({
+              key: dec(name),
+              feeds: Object.keys(feeds).map(f => dec(f)),
+              count: group.count,
+              latest: group.latest,
+              text: dec(group.text),
+              author: dec(group.author),
+            })
+          })
       })
-    })
   }, [user])
 
   return (
     <>
-    {user.is &&
-     <SearchAppBar
-       groupList={groupList}
-       createGroup={createGroup}
-       mode={mode}
-       setMode={setMode}
-       title={group ? group.key : ""}
-     />}
-    {groupList && !group &&
-     <GroupList
-       user={user}
-       groups={groups}
-       setGroup={setGroup}
-     />}
-    {feedList && !group &&
-     <FeedList
-       host={host}
-       user={user}
-       done={createGroupDone}
-     />}
-    {group &&
-     <ItemList
-       host={host}
-       group={group}
-       groups={groups}
-       setGroupStats={setGroupStats}
-       resetGroup={resetGroup}
-       currentKeys={currentKeys}
-       newKeys={newKeys}
-     />}
+      {user.is && (
+        <SearchAppBar
+          groupList={groupList}
+          createGroup={createGroup}
+          mode={mode}
+          setMode={setMode}
+          title={group ? group.key : ""}
+        />
+      )}
+      {groupList && !group && (
+        <GroupList user={user} groups={groups} setGroup={setGroup} />
+      )}
+      {feedList && !group && (
+        <FeedList host={host} user={user} done={createGroupDone} />
+      )}
+      {group && (
+        <ItemList
+          host={host}
+          group={group}
+          groups={groups}
+          setGroupStats={setGroupStats}
+          resetGroup={resetGroup}
+          currentKeys={currentKeys}
+          newKeys={newKeys}
+        />
+      )}
     </>
   )
 }

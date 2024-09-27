@@ -18,7 +18,7 @@ import MoreIcon from "@mui/icons-material/MoreVert"
 import RssFeedIcon from "@mui/icons-material/RssFeed"
 import SearchIcon from "@mui/icons-material/Search"
 
-const Search = styled("div")(({ theme }) => ({
+const Search = styled("div")(({theme}) => ({
   position: "relative",
   borderRadius: theme.shape.borderRadius,
   backgroundColor: alpha(theme.palette.common.white, 0.15),
@@ -34,7 +34,7 @@ const Search = styled("div")(({ theme }) => ({
   },
 }))
 
-const SearchIconWrapper = styled("div")(({ theme }) => ({
+const SearchIconWrapper = styled("div")(({theme}) => ({
   padding: theme.spacing(0, 2),
   height: "100%",
   position: "absolute",
@@ -44,7 +44,7 @@ const SearchIconWrapper = styled("div")(({ theme }) => ({
   justifyContent: "center",
 }))
 
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
+const StyledInputBase = styled(InputBase)(({theme}) => ({
   color: "inherit",
   "& .MuiInputBase-input": {
     padding: theme.spacing(1, 1, 1, 0),
@@ -58,14 +58,20 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }))
 
-const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) => {
+const SearchAppBar = ({
+  groupList = false,
+  createGroup,
+  mode,
+  setMode,
+  title,
+}) => {
   const [anchorEl, setAnchorEl] = useState(null)
   const [mobileMoreAnchorEl, setMobileMoreAnchorEl] = useState(null)
 
   const isMenuOpen = Boolean(anchorEl)
   const isMobileMenuOpen = Boolean(mobileMoreAnchorEl)
 
-  const handleProfileMenuOpen = (event) => {
+  const handleProfileMenuOpen = event => {
     setAnchorEl(event.currentTarget)
   }
 
@@ -78,7 +84,7 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
     handleMobileMenuClose()
   }
 
-  const handleMobileMenuOpen = (event) => {
+  const handleMobileMenuOpen = event => {
     setMobileMoreAnchorEl(event.currentTarget)
   }
 
@@ -104,18 +110,32 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
       open={isMenuOpen}
       onClose={handleMenuClose}
     >
-      {groupList && <MenuItem onClick={() => {
-        handleMenuClose()
-        createGroup()
-      }}>New group</MenuItem>}
-      <MenuItem onClick={() => {
-        handleMenuClose()
-        window.location = "/settings"
-      }}>Settings</MenuItem>
-      <MenuItem onClick={() => {
-        handleMenuClose()
-        window.location = "/help"
-      }}>Help</MenuItem>
+      {groupList && (
+        <MenuItem
+          onClick={() => {
+            handleMenuClose()
+            createGroup()
+          }}
+        >
+          New group
+        </MenuItem>
+      )}
+      <MenuItem
+        onClick={() => {
+          handleMenuClose()
+          window.location = "/settings"
+        }}
+      >
+        Settings
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          handleMenuClose()
+          window.location = "/help"
+        }}
+      >
+        Help
+      </MenuItem>
     </Menu>
   )
 
@@ -144,16 +164,13 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
           aria-haspopup="true"
           color="inherit"
         >
-          <AccountCircleIcon/>
+          <AccountCircleIcon />
         </IconButton>
         <p>Account</p>
       </MenuItem>
       <MenuItem onClick={changeMode}>
-        <IconButton
-          size="large"
-          color="inherit"
-        >
-          {mode === "light" ? <DarkModeIcon/> : <LightModeIcon/>}
+        <IconButton size="large" color="inherit">
+          {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
         </IconButton>
         <p>{mode === "light" ? "Dark" : "Light"} mode</p>
       </MenuItem>
@@ -161,7 +178,7 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
   )
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
+    <Box sx={{flexGrow: 1}}>
       <AppBar position="fixed">
         <Toolbar>
           <IconButton
@@ -169,35 +186,37 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
             edge="start"
             color="inherit"
             aria-label="home"
-            sx={{ mr: 2 }}
-            onClick={() => window.location = "/"}
+            sx={{mr: 2}}
+            onClick={() => (window.location = "/")}
           >
-            <RssFeedIcon sx={theme => ({
-              ...theme.applyStyles("dark", {color: red[900]})})}
+            <RssFeedIcon
+              sx={theme => ({
+                ...theme.applyStyles("dark", {color: red[900]}),
+              })}
             />
           </IconButton>
           <Typography
             variant="h6"
             noWrap
             component="div"
-            sx={{ display: { xs: "none", sm: "block" } }}
+            sx={{display: {xs: "none", sm: "block"}}}
           >
             {title === "" ? "rsstream" : title}
           </Typography>
           <Search>
             <SearchIconWrapper>
-              <SearchIcon/>
+              <SearchIcon />
             </SearchIconWrapper>
             <StyledInputBase
               placeholder="Search…"
-              inputProps={{ "aria-label": "search" }}
+              inputProps={{"aria-label": "search"}}
             />
           </Search>
-          <Box sx={{ flexGrow: 1 }}/>
-          <Box sx={{ display: { xs: "none", md: "flex" } }}>
-            <Switch checked={mode === "dark"} onChange={changeMode}/>
+          <Box sx={{flexGrow: 1}} />
+          <Box sx={{display: {xs: "none", md: "flex"}}}>
+            <Switch checked={mode === "dark"} onChange={changeMode} />
           </Box>
-          <Box sx={{ display: { xs: "none", md: "flex" } }}>
+          <Box sx={{display: {xs: "none", md: "flex"}}}>
             <IconButton
               size="large"
               edge="end"
@@ -207,10 +226,10 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
               onClick={handleProfileMenuOpen}
               color="inherit"
             >
-              <AccountCircleIcon/>
+              <AccountCircleIcon />
             </IconButton>
           </Box>
-          <Box sx={{ display: { xs: "flex", md: "none" } }}>
+          <Box sx={{display: {xs: "flex", md: "none"}}}>
             <IconButton
               size="large"
               aria-label="show more"
@@ -219,12 +238,12 @@ const SearchAppBar = ({groupList = false, createGroup, mode, setMode, title}) =>
               onClick={handleMobileMenuOpen}
               color="inherit"
             >
-              <MoreIcon/>
+              <MoreIcon />
             </IconButton>
           </Box>
         </Toolbar>
       </AppBar>
-      <Toolbar/>
+      <Toolbar />
       {renderMobileMenu}
       {renderMenu}
     </Box>

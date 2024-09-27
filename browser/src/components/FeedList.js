@@ -26,18 +26,21 @@ const FeedList = ({host, user, done}) => {
     // TODO: Filter by user.get("public").get("feeds"), which should be a
     // list of feeds the user has subscribed to so that they don't need to
     // see everyone else's...
-    host.get("feeds").map().on((data, key) => {
-      if (!data) return
+    host
+      .get("feeds")
+      .map()
+      .on((data, key) => {
+        if (!data) return
 
-      updateFeed({
-        key: dec(key),
-        title: dec(data.title),
-        description: dec(data.description),
-        html_url: dec(data.html_url),
-        language: dec(data.language),
-        image: dec(data.image),
+        updateFeed({
+          key: dec(key),
+          title: dec(data.title),
+          description: dec(data.description),
+          html_url: dec(data.html_url),
+          language: dec(data.language),
+          image: dec(data.image),
+        })
       })
-    })
   }, [host])
 
   const selectItem = feed => {
@@ -67,18 +70,22 @@ const FeedList = ({host, user, done}) => {
     }
     let retry = 0
     const interval = setInterval(() => {
-      user.get("public").get("groups").get(enc(groupName)).put(group, ack => {
-        if (ack.err) {
-          setDisabledButton(false)
-          setMessage("Could not create group")
-          console.error(ack.err)
-          clearInterval(interval)
-          return
-        }
+      user
+        .get("public")
+        .get("groups")
+        .get(enc(groupName))
+        .put(group, ack => {
+          if (ack.err) {
+            setDisabledButton(false)
+            setMessage("Could not create group")
+            console.error(ack.err)
+            clearInterval(interval)
+            return
+          }
 
-        clearInterval(interval)
-        done()
-      })
+          clearInterval(interval)
+          done()
+        })
       if (retry > 5) {
         setDisabledButton(false)
         setMessage("Could not create group")
@@ -92,7 +99,7 @@ const FeedList = ({host, user, done}) => {
     <Container maxWidth="md">
       <Grid container>
         <Grid item xs={12}>
-          <Card sx={{mt:2}}>
+          <Card sx={{mt: 2}}>
             <CardContent>
               <Typography variant="h5">New group</Typography>
               <TextField
@@ -105,27 +112,38 @@ const FeedList = ({host, user, done}) => {
                 onChange={event => setGroupName(event.target.value)}
               />
               <Button
-                sx={{mt:1}}
+                sx={{mt: 1}}
                 variant="contained"
-                disabled={selected.length === 0 || groupName === "" || disabledButton}
+                disabled={
+                  selected.length === 0 || groupName === "" || disabledButton
+                }
                 onClick={createGroup}
-              >Submit</Button>
-              {selected.length > 0 && !message &&
-               <Typography sx={{m:1}} variant="string">
-                 {`${selected.length} feed${selected.length > 1 ? "s" : ""} selected`}
-               </Typography>}
-              {message &&
-               <Typography sx={{m:1}} variant="string">{message}</Typography>}
+              >
+                Submit
+              </Button>
+              {selected.length > 0 && !message && (
+                <Typography sx={{m: 1}} variant="string">
+                  {`${selected.length} feed${selected.length > 1 ? "s" : ""} selected`}
+                </Typography>
+              )}
+              {message && (
+                <Typography sx={{m: 1}} variant="string">
+                  {message}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12}>
           <List>
-            {feeds && feeds.all.map(f => <Feed
-                                           feed={f}
-                                           selected={selected.includes(f.key)}
-                                           selectItem={selectItem}
-                                         />)}
+            {feeds &&
+              feeds.all.map(f => (
+                <Feed
+                  feed={f}
+                  selected={selected.includes(f.key)}
+                  selectItem={selectItem}
+                />
+              ))}
           </List>
         </Grid>
       </Grid>

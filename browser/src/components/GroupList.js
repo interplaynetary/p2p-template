@@ -11,13 +11,14 @@ const GroupList = ({user, groups, setGroup}) => {
         <Grid item xs={12}>
           <List>
             {groups &&
-             groups.all.map(g => <Group group={g} setGroup={setGroup}/>)}
+              groups.all.map(g => <Group group={g} setGroup={setGroup} />)}
           </List>
-          {groups && groups.all.length === 0 &&
-           <Typography>
-             Welcome to your group list page! Select <b>New group</b> from the
-             account menu to create your first group.
-           </Typography>}
+          {groups && groups.all.length === 0 && (
+            <Typography>
+              Welcome to your group list page! Select <b>New group</b> from the
+              account menu to create your first group.
+            </Typography>
+          )}
         </Grid>
       </Grid>
     </Container>

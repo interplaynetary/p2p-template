@@ -19,38 +19,46 @@ const Group = ({group, setGroup}) => {
     >
       <ListItemButton>
         <ListItemAvatar>
-          {group.image ?
-           <Avatar
-             alt={`Avatar for ${group.name}`}
-             src={group.image}
-           /> :
-           <Avatar>
-             {group.feeds && group.feeds.length > 1 ?
-              <GroupIcon/> : <PersonIcon/>}
-           </Avatar>}
+          {group.image ? (
+            <Avatar alt={`Avatar for ${group.name}`} src={group.image} />
+          ) : (
+            <Avatar>
+              {group.feeds && group.feeds.length > 1 ? (
+                <GroupIcon />
+              ) : (
+                <PersonIcon />
+              )}
+            </Avatar>
+          )}
         </ListItemAvatar>
         <ListItemText
           primary={
             <Box sx={{display: "flex"}}>
-              <Typography sx={{flexGrow: 1}}>
-                {group.key}
-              </Typography>
+              <Typography sx={{flexGrow: 1}}>{group.key}</Typography>
               <Typography variant="body2" sx={{color: "text.secondary"}}>
                 {group.latest}
               </Typography>
-            </Box>}
+            </Box>
+          }
           secondary={
             <Box sx={{display: "flex"}}>
               <Typography sx={{flexGrow: 1}}>
                 `${group.author && `${group.author}: `}${group.text}`
               </Typography>
-              {group.count > 0 &&
-               <Avatar sx={theme => ({
-                 width:30, height:30, m:1, fontSize:"1rem", bgcolor:red[900],
-                 ...theme.applyStyles("dark", {bgcolor: red[500]}),
-               })}>
-                 {group.count}
-               </Avatar>}
+              {group.count > 0 && (
+                <Avatar
+                  sx={theme => ({
+                    width: 30,
+                    height: 30,
+                    m: 1,
+                    fontSize: "1rem",
+                    bgcolor: red[900],
+                    ...theme.applyStyles("dark", {bgcolor: red[500]}),
+                  })}
+                >
+                  {group.count}
+                </Avatar>
+              )}
             </Box>
           }
         />

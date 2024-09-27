@@ -17,23 +17,23 @@ const Feed = ({feed, selected, selectItem}) => {
     >
       <ListItemButton selected={selected}>
         <ListItemAvatar>
-          {feed.image ?
-           <Avatar
-             alt={`Avatar for ${feed.title}`}
-             src={feed.image}
-           /> :
-           <Avatar>
-             <PersonIcon/>
-           </Avatar>}
+          {feed.image ? (
+            <Avatar alt={`Avatar for ${feed.title}`} src={feed.image} />
+          ) : (
+            <Avatar>
+              <PersonIcon />
+            </Avatar>
+          )}
         </ListItemAvatar>
         <ListItemText
           primary={feed.title}
           secondary={feed.html_url !== "" ? feed.html_url : feed.key}
         />
-        {selected &&
-         <IconButton edge="end" aria-label="check">
-           <CheckIcon/>
-         </IconButton>}
+        {selected && (
+          <IconButton edge="end" aria-label="check">
+            <CheckIcon />
+          </IconButton>
+        )}
       </ListItemButton>
     </ListItem>
   )
