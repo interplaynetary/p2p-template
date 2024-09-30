@@ -28,7 +28,8 @@ const Help = ({loggedIn, mode, setMode}) => {
                 <Typography paragraph={true}>
                   You can <Link href="/login">login here</Link> if you have an
                   account, otherwise you will need an invite code to{" "}
-                  <Link href="/register">register</Link>.
+                  <Link href="/register">register</Link>. You can request an{" "}
+                  <Link href="/invite">invite code here</Link>.
                 </Typography>
               </CardContent>
             </Card>

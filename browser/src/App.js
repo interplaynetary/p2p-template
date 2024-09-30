@@ -6,6 +6,7 @@ import CssBaseline from "@mui/material/CssBaseline"
 import Display from "./components/Display"
 import Help from "./components/Help"
 import Register from "./components/Register"
+import Invite from "./components/Invite"
 import Login from "./components/Login"
 import Settings from "./components/Settings"
 import ValidateEmail from "./components/ValidateEmail"
@@ -32,6 +33,7 @@ const gun = Gun({
 const user = gun.user().recall({sessionStorage: true})
 const params = new URLSearchParams(window.location.search)
 const pages = [
+  "invite",
   "register",
   "login",
   "settings",
@@ -200,6 +202,12 @@ const App = () => {
       <BrowserRouter>
         <Routes>
           <Route
+            path="/invite"
+            element={
+              <Invite loggedIn={user.is} mode={mode} setMode={setMode} />
+            }
+          />
+          <Route
             path="/register"
             element={
               <Register loggedIn={user.is} mode={mode} setMode={setMode} />
@@ -215,6 +223,9 @@ const App = () => {
             path="/validate-email"
             element={
               <ValidateEmail
+                loggedIn={user.is}
+                mode={mode}
+                setMode={setMode}
                 code={params.get("code")}
                 validate={params.get("validate")}
               />

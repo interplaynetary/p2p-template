@@ -79,6 +79,10 @@ app.get("/host-public-key", (req, res) => {
   }
 })
 
+app.get("/invite", (req, res) => {
+  res.redirect("/?redirect=invite")
+})
+
 app.get("/register", (req, res) => {
   res.redirect("/?redirect=register")
 })
@@ -109,6 +113,16 @@ app.get("/update-password", (req, res) => {
   res.redirect(
     `/?redirect=update-password&username=${req.query.username}&code=${req.query.code}&reset=${req.query.reset}`,
   )
+})
+
+app.post("/request-invite-code", (req, res) => {
+  if (!req.body.email) {
+    res.status(400).send("Email required")
+    return
+  }
+
+  requestInvite(req.body.email)
+  res.send("Invite code requested")
 })
 
 app.post("/check-invite-code", (req, res) => {
@@ -449,7 +463,7 @@ app.post("/private/item", (req, res) => {
   }
   setTimeout(() => {
     lastSaved = Date.now()
-    // TODO: If the item timestamp is outside of +/- 60 seconds of lastSaved,
+    // TODO: If the item timestamp is *outside* of +/- 60 seconds of lastSaved,
     // then get all items around the given timestamp, filter by url and see if
     // there's a matching guid. If there is then update the item rather than
     // creating a new one.
@@ -594,15 +608,17 @@ async function createInviteCodes(count, owner, epub) {
   }
 }
 
-function resetPassword(name, remaining, email, code, reset) {
-  const message = `Hello ${name}
-You can now update your password at ${host}/update-password?username=${name}&code=${code}&reset=${reset}
+function requestInvite(email) {
+  const message = `Thanks for requesting an invite code at ${host}
 
-This link will be valid to use for the next 24 hours.
+There is a waiting list to create new accounts, so an invite code will be sent to your email address: ${email} when it becomes available.`
 
-${remaining <= 5 ? `Note that you can only reset your password ${remaining} more time${remaining != 1 ? "s" : ""}.` : ""}
-`
-  mail(email, "Update Password", message)
+  const bcc = process.env.MAIL_BCC
+  // If MAIL_FROM is not set then the message is already logged.
+  if (process.env.MAIL_FROM && !bcc) {
+    console.log("Request Invite", email)
+  }
+  mail(email, "Request Invite", message, bcc)
 }
 
 function validateEmail(name, email, code, validate) {
@@ -614,7 +630,18 @@ Please validate your email at ${host}/validate-email?code=${code}&validate=${val
   mail(email, "Validate Email", message)
 }
 
-function mail(email, subject, message) {
+function resetPassword(name, remaining, email, code, reset) {
+  const message = `Hello ${name}
+You can now update your password at ${host}/update-password?username=${name}&code=${code}&reset=${reset}
+
+This link will be valid to use for the next 24 hours.
+
+${remaining <= 5 ? `Note that you can only reset your password ${remaining} more time${remaining != 1 ? "s" : ""}.` : ""}
+`
+  mail(email, "Update Password", message)
+}
+
+function mail(email, subject, message, bcc) {
   if (!process.env.MAIL_FROM) {
     console.log("email", email)
     console.log("subject", subject)
@@ -622,19 +649,20 @@ function mail(email, subject, message) {
     return
   }
 
-  nodemailer.createTransport({sendmail: true}).sendMail(
-    {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: subject,
-      text: message,
-    },
-    (err, info) => {
-      if (err) {
-        console.log(err)
-        return
-      }
-      console.log(info)
-    },
-  )
+  let data = {
+    from: process.env.MAIL_FROM,
+    to: email,
+    subject: subject,
+    text: message,
+  }
+  if (bcc) {
+    data.bcc = bcc
+  }
+  nodemailer.createTransport({sendmail: true}).sendMail(data, (err, info) => {
+    if (err) {
+      console.log(err)
+      return
+    }
+    console.log(info)
+  })
 }

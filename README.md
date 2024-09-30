@@ -30,10 +30,10 @@ The value `<code>` is the invite code belonging to an account. You can set the
 number of invite codes to create for an account by adding `"count": <number>`
 to the request, otherwise one code will be created.
 
-If you have sendmail available on your server you can export `MAIL_FROM` to
-send password reset emails to your users. If this value is not set then password
-reset links will be logged to `~/.pm2/logs/app-out.log`. Also export `APP_HOST`
-to create reset links that point to a server other than localhost.
+If you have sendmail available on your server you can export `MAIL_FROM` and
+`MAIL_BCC` to send email to your users. If `MAIL_FROM` is not set then emails
+will be logged to `~/.pm2/logs/app-out.log`. Export `APP_HOST` to create links
+that point to a server other than localhost.
 
 ### Browser
 
