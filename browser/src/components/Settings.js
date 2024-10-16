@@ -105,7 +105,9 @@ const Settings = ({host, user, code, mode, setMode}) => {
 
   return (
     <>
-      {user.is && <SearchAppBar mode={mode} setMode={setMode} />}
+      {user.is && (
+        <SearchAppBar page="settings" mode={mode} setMode={setMode} />
+      )}
       <Container maxWidth="sm">
         <Grid container>
           <Grid item xs={12}>

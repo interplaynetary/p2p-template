@@ -68,7 +68,7 @@ const Login = ({host, user, mode, setMode}) => {
             window.location = "/"
           } else if (retry > 5) {
             setDisabledButton(false)
-            setMessage("Account not found. Please try logging in again.")
+            setMessage("Account not found. Please try logging in again")
             clearInterval(interval)
             user.leave()
           } else {

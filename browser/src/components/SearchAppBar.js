@@ -59,8 +59,9 @@ const StyledInputBase = styled(InputBase)(({theme}) => ({
 }))
 
 const SearchAppBar = ({
-  groupList = false,
   createGroup,
+  createFeed,
+  page,
   mode,
   setMode,
   title,
@@ -110,32 +111,56 @@ const SearchAppBar = ({
       open={isMenuOpen}
       onClose={handleMenuClose}
     >
-      {groupList && (
+      {page === "display" && (
+        <>
+          <MenuItem
+            onClick={() => {
+              handleMenuClose()
+              createGroup()
+            }}
+          >
+            Add group
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              handleMenuClose()
+              createFeed()
+            }}
+          >
+            Add feed
+          </MenuItem>
+        </>
+      )}
+      {page !== "display" && (
         <MenuItem
           onClick={() => {
             handleMenuClose()
-            createGroup()
+            window.location = "/"
           }}
         >
-          New group
+          Groups
         </MenuItem>
       )}
-      <MenuItem
-        onClick={() => {
-          handleMenuClose()
-          window.location = "/settings"
-        }}
-      >
-        Settings
-      </MenuItem>
-      <MenuItem
-        onClick={() => {
-          handleMenuClose()
-          window.location = "/help"
-        }}
-      >
-        Help
-      </MenuItem>
+      {page !== "settings" && (
+        <MenuItem
+          onClick={() => {
+            handleMenuClose()
+            window.location = "/settings"
+          }}
+        >
+          Settings
+        </MenuItem>
+      )}
+      {page !== "help" && (
+        <MenuItem
+          onClick={() => {
+            handleMenuClose()
+            window.location = "/help"
+          }}
+        >
+          Help
+        </MenuItem>
+      )}
     </Menu>
   )
 

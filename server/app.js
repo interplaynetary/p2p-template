@@ -17,7 +17,7 @@ const alias = process.env.GUN_USER_ALIAS ?? "host"
 const pass = process.env.GUN_USER_PASS ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
 
-// See browser/src/utils/text.js.
+// See ../browser/src/utils/text.js.
 const a = t => {
   try {
     return atob(t)
@@ -178,22 +178,36 @@ app.post("/claim-invite-code", async (req, res) => {
   const validate = newCode()
   const encValidate = await Gun.SEA.encrypt(validate, user._.sea)
   const encEmail = await Gun.SEA.encrypt(req.body.email, user._.sea)
+  const data = {
+    pub: req.body.pub,
+    alias: req.body.alias,
+    name: req.body.alias,
+    email: encEmail,
+    validate: encValidate,
+    ref: invite.owner,
+    host: enc(host),
+    feeds: 10,
+  }
   user
     .get("accounts")
     .get(code)
-    .put({
-      pub: req.body.pub,
-      alias: req.body.alias,
-      name: req.body.alias,
-      email: encEmail,
-      validate: encValidate,
-      ref: invite.owner,
-      host: enc(host),
+    .put(data, ack => {
+      if (ack.err) {
+        console.error(ack.err)
+      }
     })
   validateEmail(req.body.alias, req.body.email, code, validate)
 
   // Remove invite code as it's no longer available.
-  user.get("available").get("invite_codes").get(invite.key).put(null)
+  user
+    .get("available")
+    .get("invite_codes")
+    .get(invite.key)
+    .put(null, ack => {
+      if (ack.err) {
+        console.error(ack.err)
+      }
+    })
   inviteCodes.delete(code)
 
   if (code === "admin") {
@@ -208,6 +222,7 @@ app.post("/claim-invite-code", async (req, res) => {
     .once(account => {
       if (!account) {
         console.log("Account not found for invite.owner!")
+        res.end()
         return
       }
 
@@ -216,7 +231,8 @@ app.post("/claim-invite-code", async (req, res) => {
         .get("epub")
         .once(epub => {
           if (!epub) {
-            res.status(404).send("User not found for public key")
+            console.log("User not found for public key")
+            res.end()
             return
           }
 
@@ -228,14 +244,18 @@ app.post("/claim-invite-code", async (req, res) => {
 
               let shared = await Gun.SEA.decrypt(enc, secret)
               if (code === shared) {
-                owner.get(key).put(null)
+                owner.get(key).put(null, ack => {
+                  if (ack.err) {
+                    console.error(ack.err)
+                  }
+                })
                 break
               }
             }
           })
+          res.end()
         })
     })
-  res.end()
 })
 
 app.post("/validate-email", (req, res) => {
@@ -268,7 +288,14 @@ app.post("/validate-email", (req, res) => {
         return
       }
 
-      user.get("accounts").get(code).put({validate: null})
+      user
+        .get("accounts")
+        .get(code)
+        .put({validate: null}, ack => {
+          if (ack.err) {
+            console.error(ack.err)
+          }
+        })
       res.send("Email validated")
     })
 })
@@ -311,12 +338,17 @@ app.post("/reset-password", (req, res) => {
 
       const reset = newCode()
       const remaining = 8 - increment
+      const data = {
+        reset: await Gun.SEA.encrypt(reset, user._.sea),
+        expiry: Date.now() + 86400000,
+      }
       user
         .get("accounts")
         .get(code)
-        .put({
-          reset: await Gun.SEA.encrypt(reset, user._.sea),
-          expiry: Date.now() + 86400000,
+        .put(data, ack => {
+          if (ack.err) {
+            console.error(ack.err)
+          }
         })
 
       resetPassword(account.name, remaining, email, code, reset)
@@ -370,13 +402,124 @@ app.post("/update-password", (req, res) => {
         return
       }
 
-      user.get("accounts").get(code).put({
+      const data = {
         pub: req.body.pub,
         alias: req.body.alias,
         name: req.body.name,
         prev: account.pub,
-      })
+      }
+      user
+        .get("accounts")
+        .get(code)
+        .put(data, ack => {
+          if (ack.err) {
+            console.error(ack.err)
+          }
+        })
       res.send(account.pub)
+    })
+})
+
+app.post("/add-feed", (req, res) => {
+  const code = req.body.code
+  if (!code) {
+    res.status(400).send({error: "code required"})
+    return
+  }
+  if (!req.body.url) {
+    res.status(400).send({error: "url required"})
+    return
+  }
+
+  user
+    .get("accounts")
+    .get(code)
+    .once(async account => {
+      if (!account) {
+        res.status(404).send({error: "Account not found"})
+        return
+      }
+
+      const url = await Gun.SEA.verify(req.body.url, account.pub)
+      if (!url) {
+        res.status(400).send({error: "Could not verify signed url"})
+        return
+      }
+
+      gun
+        .user(account.pub)
+        .get("public")
+        .get("feeds")
+        .once(feeds => {
+          if (!feeds) {
+            res.status(500).send({error: "Error checking feeds"})
+            return
+          }
+
+          delete feeds._
+          if (Object.keys(feeds).length === account.feeds) {
+            res
+              .status(400)
+              .send(`Account currently has a limit of ${account.feeds} feeds`)
+            return
+          }
+
+          const addFeedUrl = process.env.ADD_FEED_URL
+          const addFeedID = process.env.ADD_FEED_ID
+          const addFeedApiKey = process.env.ADD_FEED_API_KEY
+          if (!addFeedUrl || !addFeedID || !addFeedApiKey) {
+            res.status(500).send({error: "Could not add feed, env not set"})
+            return
+          }
+
+          fetch(addFeedUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json;charset=utf-8",
+            },
+            body: JSON.stringify({
+              id: addFeedID,
+              key: addFeedApiKey,
+              action: "add-feed",
+              xmlUrl: url,
+            }),
+          })
+            .then(res => res.json().then(json => ({ok: res.ok, json: json})))
+            .then(res => {
+              if (!res.ok) {
+                console.log("Error from", addFeedUrl, url)
+                res.status(500).send({error: "Error adding feed"})
+                return
+              }
+
+              if (res.json.error) {
+                console.log("Error from", addFeedUrl, url)
+                console.log(res.json.error)
+                res.status(500).send({error: "Error adding feed"})
+                return
+              }
+
+              const data = {
+                title: enc(res.json.add.title),
+                description: enc(res.json.add.description),
+                html_url: enc(res.json.add.html_url),
+                language: enc(res.json.add.language),
+                image: enc(res.json.add.image),
+              }
+              user
+                .get("feeds")
+                .get(enc(url))
+                .put(data, ack => {
+                  if (ack.err) {
+                    console.log(ack.err)
+                    res.status(500).send("Error saving feed")
+                    return
+                  }
+
+                  res.send(res.json)
+                })
+            })
+        })
     })
 })
 
@@ -415,7 +558,45 @@ app.post("/private/create-invite-codes", (req, res) => {
     })
 })
 
-app.post("/private/feed", (req, res) => {
+app.post("/private/update-feed-limit", (req, res) => {
+  const code = req.body.code
+  if (!code) {
+    res.status(400).send("code required")
+    return
+  }
+
+  const limit = req.body.limit
+  if (!limit) {
+    res.status(400).send("limit required")
+    return
+  }
+
+  user
+    .get("accounts")
+    .get(code)
+    .once(account => {
+      if (!account) {
+        res.status(404).send("Account not found")
+        return
+      }
+      if (account.validate) {
+        res.status(400).send("Email not validated")
+        return
+      }
+
+      user
+        .get("accounts")
+        .get(code)
+        .put({feeds: limit}, ack => {
+          if (ack.err) {
+            console.error(ack.err)
+          }
+        })
+      res.end()
+    })
+})
+
+app.post("/private/remove-feed", (req, res) => {
   if (!req.body.url) {
     res.status(400).send("url required")
     return
@@ -424,27 +605,18 @@ app.post("/private/feed", (req, res) => {
   user
     .get("feeds")
     .get(enc(req.body.url))
-    .put(
-      {
-        title: enc(req.body.title) ?? "",
-        description: enc(req.body.description) ?? "",
-        html_url: enc(req.body.html_url) ?? "",
-        language: enc(req.body.language) ?? "",
-        image: enc(req.body.image) ?? "",
-      },
-      ack => {
-        if (!ack.err) {
-          res.end()
-          return
-        }
+    .put(null, ack => {
+      if (!ack.err) {
+        res.end()
+        return
+      }
 
-        console.log(ack.err)
-        res.status(500).send("error saving feed")
-      },
-    )
+      console.log(ack.err)
+      res.status(500).send("Error removing feed")
+    })
 })
 
-app.post("/private/item", (req, res) => {
+app.post("/private/add-item", (req, res) => {
   if (!req.body.url) {
     res.status(400).send("url required")
     return
@@ -463,36 +635,81 @@ app.post("/private/item", (req, res) => {
   }
   setTimeout(() => {
     lastSaved = Date.now()
-    // TODO: If the item timestamp is *outside* of +/- 60 seconds of lastSaved,
-    // then get all items around the given timestamp, filter by url and see if
-    // there's a matching guid. If there is then update the item rather than
-    // creating a new one.
-    console.log("lastSaved", lastSaved)
+    const item = {
+      title: enc(req.body.title),
+      content: enc(req.body.content),
+      author: enc(req.body.author),
+      category: enc(req.body.category),
+      enclosure: enc(req.body.enclosure),
+      permalink: enc(req.body.permalink),
+      guid: enc(req.body.guid),
+      timestamp: enc(req.body.timestamp),
+      url: enc(req.body.url),
+    }
+    // If the given item has a guid and it's timestamp is older than 2 hours,
+    // then check if there's an existing item and update that instead.
+    if (req.body.guid && req.body.timestamp < lastSaved - 7200000) {
+      let found = false
+      user
+        .get("items")
+        .map()
+        .once((check, key) => {
+          if (!check || found) return
+
+          if (
+            check.guid &&
+            check.guid === item.guid &&
+            check.url === item.url
+          ) {
+            found = true
+            user
+              .get("items")
+              .get(key)
+              .put(item, ack => {
+                if (!ack.err) {
+                  res.end()
+                  return
+                }
+
+                console.log(ack.err)
+                res.status(500).send("Error saving item")
+              })
+          }
+        })
+      setTimeout(() => {
+        // If not found then give the item the current time so that it's not
+        // buried. Don't want to see all items when subscribing to a new feed,
+        // so ignore items older than 48 hours.
+        if (!found && req.body.timestamp > lastSaved - 172800000) {
+          user
+            .get("items")
+            .get(lastSaved)
+            .put(item, ack => {
+              if (!ack.err) {
+                res.end()
+                return
+              }
+
+              console.log(ack.err)
+              res.status(500).send("Error saving item")
+            })
+        }
+      }, 5000)
+      return
+    }
+
     user
       .get("items")
       .get(lastSaved)
-      .put(
-        {
-          title: enc(req.body.title) ?? "",
-          content: enc(req.body.content) ?? "",
-          author: enc(req.body.author) ?? "",
-          category: enc(req.body.category) ?? "",
-          enclosure: enc(req.body.enclosure) ?? "",
-          permalink: enc(req.body.permalink) ?? "",
-          guid: enc(req.body.guid) ?? "",
-          timestamp: enc(req.body.timestamp) ?? enc(lastSaved),
-          url: enc(req.body.url),
-        },
-        ack => {
-          if (!ack.err) {
-            res.end()
-            return
-          }
+      .put(item, ack => {
+        if (!ack.err) {
+          res.end()
+          return
+        }
 
-          console.log(ack.err)
-          res.status(500).send("error saving item")
-        },
-      )
+        console.log(ack.err)
+        res.status(500).send("Error saving item")
+      })
   }, wait)
 })
 

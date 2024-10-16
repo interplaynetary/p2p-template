@@ -98,9 +98,10 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
               return
             }
 
-            // The previous public key is returned to copy over public user data.
-            // Need to go through all items that should be copied and create new
-            // plain objects since the old data references the previous account.
+            // The previous public key is returned to copy over public user
+            // data. Need to go through all items that should be copied and
+            // create new plain objects since the old data references the
+            // previous account.
             let oldUser = gun.user(res.text).get("public")
             oldUser
               .get("contacts")
@@ -123,8 +124,9 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
                     }
                   })
               })
-            // Nested objects need to be dereferenced and gun data removed before
-            // it can be copied to the new user.
+
+            // Nested objects (like feeds here) need to be dereferenced and gun
+            // data removed before they can be copied to the new user.
             oldUser
               .get("groups")
               .map()
@@ -152,6 +154,29 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
                       })
                   })
               })
+
+            oldUser
+              .get("feeds")
+              .map()
+              .once((feed, url) => {
+                let update = {
+                  title: feed.title,
+                  description: feed.description,
+                  html_url: feed.html_url,
+                  language: feed.language,
+                  image: feed.image,
+                }
+                user
+                  .get("public")
+                  .get("feeds")
+                  .get(url)
+                  .put(update, ack => {
+                    if (ack.err) {
+                      console.error(ack.err)
+                    }
+                  })
+              })
+
             // Note: Any new public data needs to also be copied over here.
 
             setMessage("Password updated")

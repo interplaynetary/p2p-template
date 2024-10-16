@@ -9,7 +9,7 @@ import SearchAppBar from "./SearchAppBar"
 const Help = ({loggedIn, mode, setMode}) => {
   return (
     <>
-      {loggedIn && <SearchAppBar mode={mode} setMode={setMode} />}
+      {loggedIn && <SearchAppBar page="help" mode={mode} setMode={setMode} />}
       <Container maxWidth="md">
         <Grid container>
           <Grid item xs={12}>

@@ -1,16 +1,18 @@
 import {useCallback, useEffect, useReducer, useRef, useState} from "react"
 import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
+import AddFeed from "./AddFeed"
 import FeedList from "./FeedList"
 import GroupList from "./GroupList"
 import ItemList from "./ItemList"
 import SearchAppBar from "./SearchAppBar"
 
-const Display = ({host, user, mode, setMode}) => {
+const Display = ({host, user, code, mode, setMode}) => {
   const sortByLatest = (a, b) => b.latest - a.latest
   const [groups, updateGroup] = useReducer(reducer(sortByLatest), init)
   const [groupList, setGroupList] = useState(true)
   const [feedList, setFeedList] = useState(false)
+  const [addFeed, setAddFeed] = useState(false)
   const [group, setGroup] = useState(null)
   const [currentKeys, setCurrentKeys] = useState([])
   const [newKeys, setNewKeys] = useState([])
@@ -20,6 +22,14 @@ const Display = ({host, user, mode, setMode}) => {
   const createGroup = () => {
     setGroupList(false)
     setFeedList(true)
+    setAddFeed(false)
+    setGroup(null)
+  }
+
+  const createFeed = () => {
+    setGroupList(false)
+    setFeedList(true)
+    setAddFeed(true)
     setGroup(null)
   }
 
@@ -166,8 +176,9 @@ const Display = ({host, user, mode, setMode}) => {
     <>
       {user.is && (
         <SearchAppBar
-          groupList={groupList}
+          page="display"
           createGroup={createGroup}
+          createFeed={createFeed}
           mode={mode}
           setMode={setMode}
           title={group ? group.key : ""}
@@ -176,8 +187,11 @@ const Display = ({host, user, mode, setMode}) => {
       {groupList && !group && (
         <GroupList user={user} groups={groups} setGroup={setGroup} />
       )}
-      {feedList && !group && (
+      {feedList && !addFeed && (
         <FeedList host={host} user={user} done={createGroupDone} />
+      )}
+      {feedList && addFeed && (
+        <AddFeed host={host} user={user} code={code} setAddFeed={setAddFeed} />
       )}
       {group && (
         <ItemList

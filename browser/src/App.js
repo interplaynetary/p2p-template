@@ -93,6 +93,7 @@ const App = () => {
     localStorage.setItem("pub", pub)
     if (!user.is) return
 
+    // Listen for account changes to add new contacts, update existing contacts.
     gun
       .user(pub)
       .get("accounts")
@@ -194,6 +195,42 @@ const App = () => {
             }
           })
       })
+
+    // Listen for feed changes to apply to our own feed list.
+    gun
+      .user(pub)
+      .get("feeds")
+      .map()
+      .on((feed, url) => {
+        const userFeed = user.get("public").get("feeds").get(url)
+        userFeed.once(found => {
+          if (!found) return
+
+          if (feed) {
+            // Feed details have been updated.
+            const data = {
+              title: feed.title,
+              description: feed.description,
+              html_url: feed.html_url,
+              language: feed.language,
+              image: feed.image,
+            }
+            userFeed.put(data, ack => {
+              if (ack.err) {
+                console.error(ack.err)
+              }
+            })
+            return
+          }
+
+          // Otherwise the feed was removed.
+          userFeed.put(null, ack => {
+            if (ack.err) {
+              console.error(ack.err)
+            }
+          })
+        })
+      })
   }, [pub, code])
 
   return (
@@ -279,6 +316,7 @@ const App = () => {
                 <Display
                   host={host}
                   user={user}
+                  code={code}
                   mode={mode}
                   setMode={setMode}
                 />
