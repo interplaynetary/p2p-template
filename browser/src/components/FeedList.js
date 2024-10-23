@@ -9,41 +9,118 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
+import {
+  nytFavicon,
+  bbcFavicon,
+  tcFavicon,
+  wiredFavicon,
+  espnFavicon,
+  cbsFavicon,
+} from "../images/favicons.js"
 import Feed from "./Feed"
 
 // TODO: Display a filtered list using the search bar.
-const FeedList = ({host, user, done}) => {
+const FeedList = ({user, groups, done}) => {
   const [groupName, setGroupName] = useState("")
   const [selected, setSelected] = useState([])
   const [message, setMessage] = useState("")
   const [disabledButton, setDisabledButton] = useState(false)
+  const [hideDefaultFeeds, setHideDefaultFeeds] = useState(false)
   const [feeds, updateFeed] = useReducer(reducer(), init)
+  const defaultGroups = ["News", "Tech", "Sport"]
 
   useEffect(() => {
-    if (!host) return
+    updateFeed({
+      key: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+      title: "NYT > Top Stories",
+      html_url: "https://www.nytimes.com/",
+      language: "en-us",
+      image: nytFavicon,
+      defaultGroup: "News",
+    })
+    updateFeed({
+      key: "https://feeds.bbci.co.uk/news/world/rss.xml",
+      title: "BBC News",
+      html_url: "https://www.bbc.co.uk/news/world",
+      language: "en-gb",
+      image: bbcFavicon,
+      defaultGroup: "News",
+    })
+    updateFeed({
+      key: "https://techcrunch.com/feed/",
+      title: "TechCrunch",
+      html_url: "https://techcrunch.com/",
+      language: "en-US",
+      image: tcFavicon,
+      defaultGroup: "Tech",
+    })
+    updateFeed({
+      key: "https://www.wired.com/feed",
+      title: "Wired",
+      html_url: "https://www.wired.com",
+      language: "en-US",
+      image: wiredFavicon,
+      defaultGroup: "Tech",
+    })
+    updateFeed({
+      key: "https://www.espn.com/espn/rss/news",
+      title: "www.espn.com - TOP",
+      html_url: "https://www.espn.com",
+      language: "en",
+      image: espnFavicon,
+      defaultGroup: "Sport",
+    })
+    updateFeed({
+      key: "https://www.cbssports.com/rss/headlines/",
+      title: "CBSSports.com Headlines",
+      html_url: "https://www.cbssports.com",
+      language: "en-us",
+      image: cbsFavicon,
+      defaultGroup: "Sport",
+    })
+  }, [])
 
-    updateFeed({reset: true})
-    // TODO: Filter by user.get("public").get("feeds"), which should be a
-    // list of feeds the user has subscribed to so that they don't need to
-    // see everyone else's...
-    host
+  useEffect(() => {
+    if (!user) return
+
+    user
+      .get("public")
       .get("feeds")
       .map()
       .on((data, key) => {
-        if (!data) return
-
         updateFeed({
           key: dec(key),
-          title: dec(data.title),
-          description: dec(data.description),
-          html_url: dec(data.html_url),
-          language: dec(data.language),
-          image: dec(data.image),
+          title: data ? dec(data.title) : "",
+          description: data ? dec(data.description) : "",
+          html_url: data ? dec(data.html_url) : "",
+          language: data ? dec(data.language) : "",
+          image: data ? dec(data.image) : "",
         })
       })
-  }, [host])
 
-  const selectItem = feed => {
+    user
+      .get("public")
+      .get("settings")
+      .get("hideDefaultFeeds")
+      .once(setHideDefaultFeeds)
+  }, [user])
+
+  const dismissDefaults = () => {
+    user
+      .get("public")
+      .get("settings")
+      .get("hideDefaultFeeds")
+      .put(true, ack => {
+        if (ack.err) {
+          console.error(ack.err)
+          return
+        }
+
+        setHideDefaultFeeds(true)
+      })
+  }
+
+  const selectFeed = feed => {
     if (selected.includes(feed.key)) {
       setSelected(selected.filter(key => key !== feed.key))
     } else {
@@ -55,7 +132,7 @@ const FeedList = ({host, user, done}) => {
     setDisabledButton(true)
     setMessage("Creating group...")
 
-    let group = {
+    const group = {
       feeds: selected.reduce((acc, feed) => {
         // This function converts selected feeds to an object to store in gun.
         // see Display useEffect which converts back to an array.
@@ -137,15 +214,54 @@ const FeedList = ({host, user, done}) => {
         <Grid item xs={12}>
           <List>
             {feeds &&
-              feeds.all.map(f => (
-                <Feed
-                  feed={f}
-                  selected={selected.includes(f.key)}
-                  selectItem={selectItem}
-                />
-              ))}
+              feeds.all.map(
+                f =>
+                  f.title &&
+                  !f.defaultGroup && (
+                    <Feed
+                      user={user}
+                      groups={groups}
+                      feed={f}
+                      selected={selected.includes(f.key)}
+                      selectFeed={selectFeed}
+                    />
+                  ),
+              )}
           </List>
         </Grid>
+        {!hideDefaultFeeds && (
+          <Typography>
+            Looking for feeds? Click add feed in the menu, or try some of the
+            options below.
+          </Typography>
+        )}
+        {!hideDefaultFeeds &&
+          defaultGroups.map(defaultGroup => (
+            <Grid item xs={12}>
+              <Typography variant="h6">{defaultGroup}</Typography>
+              <List>
+                {feeds &&
+                  feeds.all.map(
+                    f =>
+                      f.title &&
+                      f.defaultGroup === defaultGroup && (
+                        <Feed
+                          user={user}
+                          groups={groups}
+                          feed={f}
+                          selected={selected.includes(f.key)}
+                          selectFeed={selectFeed}
+                        />
+                      ),
+                  )}
+              </List>
+            </Grid>
+          ))}
+        {!hideDefaultFeeds && (
+          <Button sx={{mt: 1}} variant="contained" onClick={dismissDefaults}>
+            Dismiss Defaults
+          </Button>
+        )}
       </Grid>
     </Container>
   )

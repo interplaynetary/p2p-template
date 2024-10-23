@@ -3,6 +3,7 @@ import {styled, alpha} from "@mui/material/styles"
 import {red} from "@mui/material/colors"
 import AppBar from "@mui/material/AppBar"
 import Box from "@mui/material/Box"
+import Button from "@mui/material/Button"
 import IconButton from "@mui/material/IconButton"
 import InputBase from "@mui/material/InputBase"
 import MenuItem from "@mui/material/MenuItem"
@@ -10,7 +11,6 @@ import Menu from "@mui/material/Menu"
 import Switch from "@mui/material/Switch"
 import Toolbar from "@mui/material/Toolbar"
 import Typography from "@mui/material/Typography"
-
 import AccountCircleIcon from "@mui/icons-material/AccountCircle"
 import DarkModeIcon from "@mui/icons-material/DarkMode"
 import LightModeIcon from "@mui/icons-material/LightMode"
@@ -60,6 +60,7 @@ const StyledInputBase = styled(InputBase)(({theme}) => ({
 
 const SearchAppBar = ({
   createGroup,
+  editGroup,
   createFeed,
   page,
   mode,
@@ -220,14 +221,23 @@ const SearchAppBar = ({
               })}
             />
           </IconButton>
-          <Typography
-            variant="h6"
-            noWrap
-            component="div"
-            sx={{display: {xs: "none", sm: "block"}}}
-          >
-            {title === "" ? "rsstream" : title}
-          </Typography>
+          {title === "" ? (
+            <Typography
+              variant="h6"
+              noWrap
+              component="div"
+              sx={{display: {xs: "none", sm: "block"}}}
+            >
+              rsstream
+            </Typography>
+          ) : (
+            <Button
+              sx={{color: "white", fontSize: "1.25em", textTransform: "none"}}
+              onClick={() => editGroup(title)}
+            >
+              {title}
+            </Button>
+          )}
           <Search>
             <SearchIconWrapper>
               <SearchIcon />

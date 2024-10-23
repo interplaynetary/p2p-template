@@ -2,6 +2,7 @@ import {useCallback, useEffect, useReducer, useRef, useState} from "react"
 import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
 import AddFeed from "./AddFeed"
+import EditGroup from "./EditGroup"
 import FeedList from "./FeedList"
 import GroupList from "./GroupList"
 import ItemList from "./ItemList"
@@ -11,6 +12,7 @@ const Display = ({host, user, code, mode, setMode}) => {
   const sortByLatest = (a, b) => b.latest - a.latest
   const [groups, updateGroup] = useReducer(reducer(sortByLatest), init)
   const [groupList, setGroupList] = useState(true)
+  const [currentGroup, setCurrentGroup] = useState("")
   const [feedList, setFeedList] = useState(false)
   const [addFeed, setAddFeed] = useState(false)
   const [group, setGroup] = useState(null)
@@ -21,21 +23,33 @@ const Display = ({host, user, code, mode, setMode}) => {
 
   const createGroup = () => {
     setGroupList(false)
+    setCurrentGroup("")
     setFeedList(true)
+    setAddFeed(false)
+    setGroup(null)
+  }
+
+  const editGroup = groupName => {
+    setGroupList(false)
+    setCurrentGroup(groupName)
+    setFeedList(false)
     setAddFeed(false)
     setGroup(null)
   }
 
   const createFeed = () => {
     setGroupList(false)
+    setCurrentGroup("")
     setFeedList(true)
     setAddFeed(true)
     setGroup(null)
   }
 
-  const createGroupDone = () => {
+  const done = () => {
     setGroupList(true)
+    setCurrentGroup("")
     setFeedList(false)
+    setAddFeed(false)
   }
 
   const resetGroup = useCallback(
@@ -147,26 +161,22 @@ const Display = ({host, user, code, mode, setMode}) => {
       .get("groups")
       .map()
       .on((group, name) => {
-        if (!group) return
-
         user
           .get("public")
           .get("groups")
           .get(name)
           .get("feeds")
           .once(feeds => {
-            if (!feeds) return
-
             // Convert feeds object to an array, removing data added by gun.
             // See FeedList createGroup which converts the array to an object.
-            delete feeds._
+            if (feeds) delete feeds._
             updateGroup({
               key: dec(name),
-              feeds: Object.keys(feeds).map(f => dec(f)),
-              count: group.count,
-              latest: group.latest,
-              text: dec(group.text),
-              author: dec(group.author),
+              feeds: feeds ? Object.keys(feeds).map(f => dec(f)) : [],
+              count: group ? group.count : 0,
+              latest: group ? group.latest : 0,
+              text: group ? dec(group.text) : "",
+              author: group ? dec(group.author) : "",
             })
           })
       })
@@ -178,6 +188,7 @@ const Display = ({host, user, code, mode, setMode}) => {
         <SearchAppBar
           page="display"
           createGroup={createGroup}
+          editGroup={editGroup}
           createFeed={createFeed}
           mode={mode}
           setMode={setMode}
@@ -187,8 +198,16 @@ const Display = ({host, user, code, mode, setMode}) => {
       {groupList && !group && (
         <GroupList user={user} groups={groups} setGroup={setGroup} />
       )}
+      {currentGroup && (
+        <EditGroup
+          user={user}
+          groups={groups}
+          currentGroup={currentGroup}
+          done={done}
+        />
+      )}
       {feedList && !addFeed && (
-        <FeedList host={host} user={user} done={createGroupDone} />
+        <FeedList user={user} groups={groups} done={done} />
       )}
       {feedList && addFeed && (
         <AddFeed host={host} user={user} code={code} setAddFeed={setAddFeed} />

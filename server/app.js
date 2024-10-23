@@ -3,6 +3,7 @@ const path = require("path")
 const bodyParser = require("body-parser")
 const nodemailer = require("nodemailer")
 const Gun = require("gun")
+require("gun/lib/then.js")
 require("gun/sea")
 
 const app = express()
@@ -117,12 +118,26 @@ app.get("/update-password", (req, res) => {
 
 app.post("/request-invite-code", (req, res) => {
   if (!req.body.email) {
-    res.status(400).send("Email required")
+    res.status(400).send("email required")
     return
   }
 
   requestInvite(req.body.email)
   res.send("Invite code requested")
+})
+
+app.post("/check-codes", async (req, res) => {
+  if (!req.body.codes || req.body.codes.length === 0) {
+    res.status(400).send("codes required")
+    return
+  }
+
+  if (await checkCodes(req.body.codes)) {
+    res.end() // ok
+    return
+  }
+
+  res.status(400).send("duplicate code found")
 })
 
 app.post("/check-invite-code", (req, res) => {
@@ -192,9 +207,7 @@ app.post("/claim-invite-code", async (req, res) => {
     .get("accounts")
     .get(code)
     .put(data, ack => {
-      if (ack.err) {
-        console.error(ack.err)
-      }
+      if (ack.err) console.error(ack.err)
     })
   validateEmail(req.body.alias, req.body.email, code, validate)
 
@@ -204,9 +217,7 @@ app.post("/claim-invite-code", async (req, res) => {
     .get("invite_codes")
     .get(invite.key)
     .put(null, ack => {
-      if (ack.err) {
-        console.error(ack.err)
-      }
+      if (ack.err) console.error(ack.err)
     })
   inviteCodes.delete(code)
 
@@ -245,9 +256,7 @@ app.post("/claim-invite-code", async (req, res) => {
               let shared = await Gun.SEA.decrypt(enc, secret)
               if (code === shared) {
                 owner.get(key).put(null, ack => {
-                  if (ack.err) {
-                    console.error(ack.err)
-                  }
+                  if (ack.err) console.error(ack.err)
                 })
                 break
               }
@@ -292,9 +301,7 @@ app.post("/validate-email", (req, res) => {
         .get("accounts")
         .get(code)
         .put({validate: null}, ack => {
-          if (ack.err) {
-            console.error(ack.err)
-          }
+          if (ack.err) console.error(ack.err)
         })
       res.send("Email validated")
     })
@@ -346,9 +353,7 @@ app.post("/reset-password", (req, res) => {
         .get("accounts")
         .get(code)
         .put(data, ack => {
-          if (ack.err) {
-            console.error(ack.err)
-          }
+          if (ack.err) console.error(ack.err)
         })
 
       resetPassword(account.name, remaining, email, code, reset)
@@ -412,9 +417,7 @@ app.post("/update-password", (req, res) => {
         .get("accounts")
         .get(code)
         .put(data, ack => {
-          if (ack.err) {
-            console.error(ack.err)
-          }
+          if (ack.err) console.error(ack.err)
         })
       res.send(account.pub)
     })
@@ -457,7 +460,10 @@ app.post("/add-feed", (req, res) => {
           }
 
           delete feeds._
-          if (Object.keys(feeds).length === account.feeds) {
+          if (
+            Object.values(feeds).filter(feed => feed.title).length ===
+            account.feeds
+          ) {
             res
               .status(400)
               .send(`Account currently has a limit of ${account.feeds} feeds`)
@@ -552,8 +558,15 @@ app.post("/private/create-invite-codes", (req, res) => {
             return
           }
 
-          createInviteCodes(req.body.count || 1, code, epub)
-          res.end()
+          if (createInviteCodes(req.body.count || 1, code, epub)) {
+            res.end()
+          } else {
+            res
+              .status(500)
+              .send(
+                "Error creating codes. Please check the logs for errors and try again",
+              )
+          }
         })
     })
 })
@@ -588,9 +601,7 @@ app.post("/private/update-feed-limit", (req, res) => {
         .get("accounts")
         .get(code)
         .put({feeds: limit}, ack => {
-          if (ack.err) {
-            console.error(ack.err)
-          }
+          if (ack.err) console.error(ack.err)
         })
       res.end()
     })
@@ -774,19 +785,46 @@ function mapInviteCodes() {
     })
 }
 
-function checkCodes(newCodes) {
-  // TODO: Check user.get("shared").get("invite_codes") and return false if
-  // any of newCodes are found. Add this as a function and then call the
-  // function from an endpoint. For now just call the function, but once
-  // there's a list call all the endpoints too but skip our host in the list.
+async function checkCodes(newCodes) {
+  const codes = Object.keys(await user.get("accounts").then())
+  for (let i = 0; i < newCodes.length; i++) {
+    if (codes.includes(newCodes[i])) return false
+    if (inviteCodes.has(newCodes[i])) return false
+  }
+  return true
+}
 
-  // This function should post the list of new codes to all federated hosts
-  // to make sure there are no duplicates between them. Put each of the
-  // requests in a promise, and return once all have been resolved. Note that
-  // the other servers don't need to store the codes, they just each need to
-  // check that the list they create doesn't contain duplicates when they also
-  // want to store new codes.
+async function checkHosts(newCodes) {
+  // Check for a comma separated list of federated hosts that should be checked
+  // for duplicate codes. Note that the other servers don't need to store the
+  // codes, they just each need to check that the list they create doesn't
+  // contain duplicates when they also want to store new codes.
+  const hosts = process.env.FEDERATED_HOSTS
+  if (hosts === "") return true
 
+  const urls = hosts.split(",").map(url => url + "/check-codes")
+  return (
+    await Promise.all(
+      urls.map(url =>
+        fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json;charset=utf-8",
+          },
+          body: JSON.stringify({
+            codes: newCodes,
+          }),
+        }).then(res => {
+          if (!res.ok) {
+            console.log(`checkHosts ${res.status} from ${res.url}`)
+          }
+          return res.ok
+        }),
+      ),
+    )
+  ).every(ok => ok)
+
+  // Notes for further federated updates:
   // Other hosts can decide if they want to allow logins from federated user
   // accounts by listening to get("accounts").map().on() for each of the known
   // federated hosts and adding them to their own list of accounts. "host" is
@@ -794,25 +832,21 @@ function checkCodes(newCodes) {
   // user could provide their email to another host to allow password resets
   // their too... it would just be stored on the other host account data the
   // same as it's stored here, without sharing between servers. That server
-  // can clear the "host" field in their account data in that case, as it's
-  // no longer rerequired, and can store their own validation code.
-  return true
+  // can replace the "host" field in their account data in that case, and can
+  // store their own validation code.
 }
 
 async function createInviteCodes(count, owner, epub) {
   let i = 0
   let newCodes = []
-  while (i < count) {
-    let code = newCode()
-    if (!inviteCodes.has(code)) {
-      i++
-      newCodes.push(code)
-    }
+  while (i++ < count) {
+    newCodes.push(newCode())
   }
-  if (!checkCodes(newCodes)) {
-    // Just try again with new codes.
-    createInviteCodes(count, owner, epub)
-    return
+  if (!(await checkCodes(newCodes)) || !(await checkHosts(newCodes))) {
+    // If a duplicate code is found, return false and the request can be tried
+    // again. More likely that a federated host is not reachable though, so
+    // the list will need updating before making the request again.
+    return false
   }
 
   const secret = await Gun.SEA.secret(epub, user._.sea)
@@ -823,6 +857,7 @@ async function createInviteCodes(count, owner, epub) {
     let shared = await Gun.SEA.encrypt(newCodes[i], secret)
     user.get("shared").get("invite_codes").get(owner).set(shared)
   }
+  return true
 }
 
 function requestInvite(email) {

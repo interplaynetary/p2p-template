@@ -26,7 +26,12 @@ const GroupList = ({user, groups, setGroup}) => {
         <Grid item xs={12}>
           <List>
             {groups &&
-              groups.all.map(g => <Group group={g} setGroup={setGroup} />)}
+              groups.all.map(
+                g =>
+                  g.feeds.length !== 0 && (
+                    <Group group={g} setGroup={setGroup} />
+                  ),
+              )}
           </List>
           <Typography>{message && parse(message)}</Typography>
         </Grid>

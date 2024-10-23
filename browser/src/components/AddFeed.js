@@ -46,7 +46,10 @@ const AddFeed = ({host, user, code, setAddFeed}) => {
           .once(feeds => {
             if (feeds) {
               delete feeds._
-              if (Object.keys(feeds).length === account.feeds) {
+              if (
+                Object.values(feeds).filter(feed => feed.title).length ===
+                account.feeds
+              ) {
                 setMessage(
                   `Account currently has a limit of ${account.feeds} feeds`,
                 )
@@ -110,7 +113,9 @@ const AddFeed = ({host, user, code, setAddFeed}) => {
 
                     if (res.json.results) {
                       console.log(
-                        `Multiple feeds were discovered at ${url}, subscribed to ${res.json.add.url}. Other results were:`,
+                        `Multiple feeds were discovered at ${url}
+  Subscribed to ${res.json.add.url}
+  Other results were:`,
                       )
                       console.log(res.json.results)
                     }

@@ -102,8 +102,8 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
             // data. Need to go through all items that should be copied and
             // create new plain objects since the old data references the
             // previous account.
-            let oldUser = gun.user(res.text).get("public")
-            oldUser
+            let oldPublic = gun.user(res.text).get("public")
+            oldPublic
               .get("contacts")
               .map()
               .once((contact, contactCode) => {
@@ -127,11 +127,11 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
 
             // Nested objects (like feeds here) need to be dereferenced and gun
             // data removed before they can be copied to the new user.
-            oldUser
+            oldPublic
               .get("groups")
               .map()
               .once((group, groupName) => {
-                oldUser
+                oldPublic
                   .get("groups")
                   .get(groupName)
                   .get("feeds")
@@ -155,7 +155,7 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
                   })
               })
 
-            oldUser
+            oldPublic
               .get("feeds")
               .map()
               .once((feed, url) => {
@@ -171,6 +171,21 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
                   .get("feeds")
                   .get(url)
                   .put(update, ack => {
+                    if (ack.err) {
+                      console.error(ack.err)
+                    }
+                  })
+              })
+
+            oldPublic
+              .get("settings")
+              .map()
+              .once((value, key) => {
+                user
+                  .get("public")
+                  .get("settings")
+                  .get(key)
+                  .put(value, ack => {
                     if (ack.err) {
                       console.error(ack.err)
                     }
