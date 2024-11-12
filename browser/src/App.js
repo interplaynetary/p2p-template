@@ -23,7 +23,12 @@ require("gun/lib/then.js")
 require("gun/sea")
 
 const gun = Gun({
-  peers: [`${window.location.protocol}//${window.location.hostname}:8765/gun`],
+  // Assume Gun is directly available on localhost, otherwise reverse proxy.
+  peers: [
+    window.location.hostname === "localhost"
+      ? "http://localhost:8765/gun"
+      : window.location.origin + "/gun",
+  ],
   axe: false,
   secure: true,
   localStorage: false,
@@ -83,9 +88,9 @@ const App = () => {
 
   useEffect(() => {
     if (!pub) {
-      fetch(`${window.location.origin}/host-public-key`)
-        .then(res => res.text())
-        .then(key => setPub(key))
+      fetch(`${window.location.origin}/host-public-key`).then(res => {
+        if (res.ok) res.text().then(key => setPub(key))
+      })
       return
     }
 

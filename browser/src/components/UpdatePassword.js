@@ -23,7 +23,11 @@ require("gun/lib/rindexed.js")
 require("gun/sea")
 
 const gun = Gun({
-  peers: [`${window.location.protocol}//${window.location.hostname}:8765/gun`],
+  peers: [
+    window.location.hostname === "localhost"
+      ? "http://localhost:8765/gun"
+      : window.location.origin + "/gun",
+  ],
   axe: false,
   secure: true,
   localStorage: false,

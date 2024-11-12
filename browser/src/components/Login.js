@@ -23,44 +23,48 @@ const Login = ({host, user, mode, setMode}) => {
   const [disabledButton, setDisabledButton] = useState(user.is)
   const found = useRef(false)
 
+  const checkAccounts = () => {
+    host.get("accounts").once(
+      all => {
+        if (!all) return
+
+        delete all._
+        for (const code of Object.keys(all)) {
+          if (found.current) break
+
+          host
+            .get("accounts")
+            .get(code)
+            .once(
+              account => {
+                if (!account || account.pub !== user.is.pub) return
+
+                found.current = true
+                sessionStorage.setItem("code", code)
+                sessionStorage.setItem("name", account.name)
+              },
+              {wait: 1000},
+            )
+        }
+      },
+      {wait: 1000},
+    )
+  }
+
   const login = alias => {
+    if (!host) {
+      setMessage("Host not available")
+      localStorage.removeItem("pub")
+      setTimeout(() => window.location.reload(), 1000)
+      return
+    }
+
     setDisabledButton(true)
     setMessage("Checking account...")
-
     user.auth(alias, password, ack => {
       if (!ack.err) {
-        if (!host) {
-          setDisabledButton(false)
-          setMessage("Host not available")
-          localStorage.removeItem("pub")
-          window.location.reload()
-          return
-        }
-
+        // auth is ok so look up account details in host data.
         let retry = 0
-        const checkAccounts = () => {
-          host.get("accounts").once(
-            all => {
-              if (!all) return
-
-              for (const code of Object.keys(all)) {
-                if (found.current) break
-
-                host
-                  .get("accounts")
-                  .get(code)
-                  .once(account => {
-                    if (!account || account.pub !== user.is.pub) return
-
-                    found.current = true
-                    sessionStorage.setItem("code", code)
-                    sessionStorage.setItem("name", account.name)
-                  })
-              }
-            },
-            {wait: 1000},
-          )
-        }
         checkAccounts()
         const interval = setInterval(() => {
           if (found.current) {
@@ -69,13 +73,15 @@ const Login = ({host, user, mode, setMode}) => {
           } else if (retry > 5) {
             setDisabledButton(false)
             setMessage("Account not found. Please try logging in again")
+            // Remove db and resync in case there's a problem with local data.
+            window.indexedDB.deleteDatabase("radata")
             clearInterval(interval)
             user.leave()
           } else {
             checkAccounts()
             retry++
           }
-        }, 2000)
+        }, 3000)
         return
       }
 

@@ -19,7 +19,7 @@ const Item = ({item, itemRefs, newFrom}) => {
     >
       {item.key === newFrom && <Divider textAlign="right">New</Divider>}
       <Box>
-        <Typography variant="h4">{item.title}</Typography>
+        <Typography variant="h4">{item.title && parse(item.title)}</Typography>
         <Typography>{item.content && parse(item.content)}</Typography>
         <Typography>{item.key}</Typography>
       </Box>

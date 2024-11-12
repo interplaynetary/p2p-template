@@ -17,7 +17,7 @@ const Help = ({loggedIn, mode, setMode}) => {
               <CardContent>
                 <Typography variant="h4">Welcome</Typography>
                 <Typography paragraph={true}>
-                  Thanks for checking out <b>rsstream</b>!
+                  Thanks for checking out <b>RSStream</b>!
                 </Typography>
                 <Typography paragraph={true}>
                   This web app aims to provide a great reading experience for
@@ -39,7 +39,7 @@ const Help = ({loggedIn, mode, setMode}) => {
               <CardContent>
                 <Typography variant="h6">Why invite codes?</Typography>
                 <Typography paragraph={true}>
-                  Accounts are created in rsstream using a distributed database
+                  Accounts are created in RSStream using a distributed database
                   called <Link href="https://gun.eco">GunDB</Link>. Invite codes
                   provide a way to control the sign up process, by letting
                   existing users decide who can create accounts.
@@ -84,7 +84,7 @@ const Help = ({loggedIn, mode, setMode}) => {
               <CardContent>
                 <Typography variant="h6">Get involved</Typography>
                 <Typography paragraph={true}>
-                  rsstream is an open source project written in JavaScript using{" "}
+                  RSStream is an open source project written in JavaScript using{" "}
                   <Link href="https://expressjs.com">Express</Link> and{" "}
                   <Link href="https://react.dev">React</Link>. It uses IndexedDB
                   via GunDB, to create an offline first web application that

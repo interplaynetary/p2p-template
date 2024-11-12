@@ -33,7 +33,7 @@ const FeedList = ({user, groups, done}) => {
     updateFeed({
       key: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
       title: "NYT > Top Stories",
-      html_url: "https://www.nytimes.com/",
+      html_url: "https://www.nytimes.com",
       language: "en-us",
       image: nytFavicon,
       defaultGroup: "News",
@@ -47,9 +47,9 @@ const FeedList = ({user, groups, done}) => {
       defaultGroup: "News",
     })
     updateFeed({
-      key: "https://techcrunch.com/feed/",
+      key: "https://techcrunch.com/feed",
       title: "TechCrunch",
-      html_url: "https://techcrunch.com/",
+      html_url: "https://techcrunch.com",
       language: "en-US",
       image: tcFavicon,
       defaultGroup: "Tech",
@@ -71,7 +71,7 @@ const FeedList = ({user, groups, done}) => {
       defaultGroup: "Sport",
     })
     updateFeed({
-      key: "https://www.cbssports.com/rss/headlines/",
+      key: "https://www.cbssports.com/rss/headlines",
       title: "CBSSports.com Headlines",
       html_url: "https://www.cbssports.com",
       language: "en-us",
@@ -236,27 +236,32 @@ const FeedList = ({user, groups, done}) => {
           </Typography>
         )}
         {!hideDefaultFeeds &&
-          defaultGroups.map(defaultGroup => (
-            <Grid item xs={12}>
-              <Typography variant="h6">{defaultGroup}</Typography>
-              <List>
-                {feeds &&
-                  feeds.all.map(
-                    f =>
-                      f.title &&
-                      f.defaultGroup === defaultGroup && (
-                        <Feed
-                          user={user}
-                          groups={groups}
-                          feed={f}
-                          selected={selected.includes(f.key)}
-                          selectFeed={selectFeed}
-                        />
-                      ),
-                  )}
-              </List>
-            </Grid>
-          ))}
+          defaultGroups.map(
+            defaultGroup =>
+              feeds &&
+              feeds.all.filter(f => f.title && f.defaultGroup === defaultGroup)
+                .length > 0 && (
+                <Grid item xs={12}>
+                  <Typography variant="h6">{defaultGroup}</Typography>
+                  <List>
+                    {feeds &&
+                      feeds.all.map(
+                        f =>
+                          f.title &&
+                          f.defaultGroup === defaultGroup && (
+                            <Feed
+                              user={user}
+                              groups={groups}
+                              feed={f}
+                              selected={selected.includes(f.key)}
+                              selectFeed={selectFeed}
+                            />
+                          ),
+                      )}
+                  </List>
+                </Grid>
+              ),
+          )}
         {!hideDefaultFeeds && (
           <Button sx={{mt: 1}} variant="contained" onClick={dismissDefaults}>
             Dismiss Defaults

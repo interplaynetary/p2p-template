@@ -1,14 +1,16 @@
-const express = require("express")
-const path = require("path")
-const bodyParser = require("body-parser")
-const nodemailer = require("nodemailer")
-const Gun = require("gun")
-require("gun/lib/then.js")
-require("gun/sea")
+import bodyParser from "body-parser"
+import express from "express"
+import fetch from "node-fetch"
+import nodemailer from "nodemailer"
+import path from "path"
+import {fileURLToPath} from "url"
+import Gun from "gun"
+import "gun/lib/then.js"
+import "gun/sea.js"
+import {enc, dec} from "./utils/text.js"
 
-const app = express()
 const gun = Gun({
-  web: app.listen(8765),
+  web: express().listen(8765),
   multicast: false,
   axe: false,
   secure: true,
@@ -17,30 +19,16 @@ const user = gun.user()
 const alias = process.env.GUN_USER_ALIAS ?? "host"
 const pass = process.env.GUN_USER_PASS ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
-
-// See ../browser/src/utils/text.js.
-const a = t => {
-  try {
-    return atob(t)
-  } catch {
-    return ""
+const dirname = path.dirname(fileURLToPath(import.meta.url))
+const basicAuth = (req, res, next) => {
+  const auth = (req.headers.authorization || "").split(" ")[1] || ""
+  const [username, password] = Buffer.from(auth, "base64").toString().split(":")
+  if (username === alias && password === pass) {
+    next()
+  } else {
+    res.status(401).end()
   }
 }
-const b = t => {
-  try {
-    return btoa(t)
-  } catch {
-    return ""
-  }
-}
-const enc = t =>
-  b(
-    Array.from(new TextEncoder().encode(t), e => String.fromCodePoint(e)).join(
-      "",
-    ),
-  )
-const dec = t =>
-  new TextDecoder().decode(Uint8Array.from(a(t), e => e.codePointAt(0)))
 
 // lastSaved is the timestamp of the last time save was called. This allows
 // slowing calls to save so that the timestamp can be used as a unique key.
@@ -50,36 +38,26 @@ var lastSaved = 0
 // to avoid decrypting them in each of the endpoints they're required in.
 const inviteCodes = new Map()
 
+// items is also in memory version of feed items to avoid extra lookups.
+// Note need to also remove items from memory store.
+let items = {}
+
 console.log("Trying auth credentials for " + alias)
 user.auth(alias, pass, auth)
 
+const app = express()
 app.use(Gun.serve)
 app.use(bodyParser.json())
-app.use(express.static(path.join(__dirname, "../browser/build")))
-app.use("/private", (req, res, next) => {
-  const auth = (req.headers.authorization || "").split(" ")[1] || ""
-  const [username, password] = Buffer.from(auth, "base64").toString().split(":")
-  if (username === alias && password === pass) {
-    next()
-  } else {
-    res.status(401).end()
-  }
-})
+app.use(express.static(path.join(dirname, "../browser/build")))
+app.use("/private", basicAuth)
 
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../browser/build", "index.html"))
+  res.sendFile(path.join(dirname, "../browser/build", "index.html"))
 })
 
-// The host public key is requested by the browser, so that it knows where to
-// get data from (all data is stored under user accounts when using secure).
-app.get("/host-public-key", (req, res) => {
-  if (!user.is) {
-    res.status(404).send("Host public key not found")
-  } else {
-    res.send(user.is.pub)
-  }
-})
-
+// These redirects are required because the browser does local first routing,
+// which is fine except for an initial request or hard refresh, in which case
+// the server needs to respond to the request.
 app.get("/invite", (req, res) => {
   res.redirect("/?redirect=invite")
 })
@@ -114,6 +92,18 @@ app.get("/update-password", (req, res) => {
   res.redirect(
     `/?redirect=update-password&username=${req.query.username}&code=${req.query.code}&reset=${req.query.reset}`,
   )
+})
+
+// The host public key is requested by the browser so that it knows where to
+// get data from (all data is stored under user accounts when using the
+// secure flag in Gun opts).
+app.get("/host-public-key", (req, res) => {
+  if (user.is) {
+    res.send(user.is.pub)
+    return
+  }
+
+  res.status(404).send("Host public key not found")
 })
 
 app.post("/request-invite-code", (req, res) => {
@@ -453,21 +443,23 @@ app.post("/add-feed", (req, res) => {
         .user(account.pub)
         .get("public")
         .get("feeds")
-        .once(feeds => {
-          if (!feeds) {
-            res.status(500).send({error: "Error checking feeds"})
-            return
-          }
-
-          delete feeds._
-          if (
-            Object.values(feeds).filter(feed => feed.title).length ===
-            account.feeds
-          ) {
-            res
-              .status(400)
-              .send(`Account currently has a limit of ${account.feeds} feeds`)
-            return
+        .once(async feeds => {
+          if (feeds) {
+            delete feeds._
+            const activeFeeds = Object.values(feeds).filter(feed => {
+              return gun
+                .user(account.pub)
+                .get("public")
+                .get("feeds")
+                .get(feed)
+                .get("title")
+            })
+            if (activeFeeds.length === account.feeds) {
+              res
+                .status(400)
+                .send(`Account currently has a limit of ${account.feeds} feeds`)
+              return
+            }
           }
 
           const addFeedUrl = process.env.ADD_FEED_URL
@@ -478,53 +470,51 @@ app.post("/add-feed", (req, res) => {
             return
           }
 
-          fetch(addFeedUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json;charset=utf-8",
-            },
-            body: JSON.stringify({
-              id: addFeedID,
-              key: addFeedApiKey,
-              action: "add-feed",
-              xmlUrl: url,
-            }),
-          })
-            .then(res => res.json().then(json => ({ok: res.ok, json: json})))
-            .then(res => {
-              if (!res.ok) {
-                console.log("Error from", addFeedUrl, url)
-                res.status(500).send({error: "Error adding feed"})
-                return
-              }
-
-              if (res.json.error) {
-                console.log("Error from", addFeedUrl, url)
-                console.log(res.json.error)
-                res.status(500).send({error: "Error adding feed"})
-                return
-              }
-
-              const data = {
-                title: enc(res.json.add.title),
-                description: enc(res.json.add.description),
-                html_url: enc(res.json.add.html_url),
-                language: enc(res.json.add.language),
-                image: enc(res.json.add.image),
-              }
-              user
-                .get("feeds")
-                .get(enc(url))
-                .put(data, ack => {
-                  if (ack.err) {
-                    console.log(ack.err)
-                    res.status(500).send("Error saving feed")
-                    return
-                  }
-
-                  res.send(res.json)
-                })
+          try {
+            const addFeed = await fetch(addFeedUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: `id=${addFeedID}&key=${addFeedApiKey}&action=add-feed&xmlUrl=${encodeURIComponent(url)}`,
             })
+            if (!addFeed.ok) {
+              console.log("Error from", addFeedUrl, url, addFeed.statusText)
+              res.status(500).send({error: "Error adding feed"})
+              return
+            }
+
+            const feed = await addFeed.json()
+            if (feed.error) {
+              console.log("Error from", addFeedUrl, url)
+              console.log(feed.error)
+              res.status(500).send({error: "Error adding feed"})
+              return
+            }
+
+            const data = {
+              title: enc(feed.add.title),
+              description: enc(feed.add.description),
+              html_url: enc(feed.add.html_url),
+              language: enc(feed.add.language),
+              image: enc(feed.add.image),
+            }
+            user
+              .get("feeds")
+              .get(enc(url))
+              .put(data, async ack => {
+                if (ack.err) {
+                  console.log(ack.err)
+                  res.status(500).send("Error saving feed")
+                  return
+                }
+
+                res.send(feed)
+              })
+          } catch (error) {
+            console.log(error)
+            res.status(500).send({error: "Error adding feed"})
+          }
         })
     })
 })
@@ -532,7 +522,7 @@ app.post("/add-feed", (req, res) => {
 app.post("/private/create-invite-codes", (req, res) => {
   const code = req.body.code
   if (!code) {
-    res.status(400).send("Invite code required")
+    res.status(400).send("code required")
     return
   }
 
@@ -560,15 +550,33 @@ app.post("/private/create-invite-codes", (req, res) => {
 
           if (createInviteCodes(req.body.count || 1, code, epub)) {
             res.end()
-          } else {
-            res
-              .status(500)
-              .send(
-                "Error creating codes. Please check the logs for errors and try again",
-              )
+            return
           }
+
+          res
+            .status(500)
+            .send(
+              "Error creating codes. Please check the logs for errors and try again",
+            )
         })
     })
+})
+
+app.post("/private/send-invite-code", (req, res) => {
+  const code = req.body.code
+  if (!code) {
+    res.status(400).send("code required")
+    return
+  }
+
+  const email = req.body.email
+  if (!email) {
+    res.status(400).send("email required")
+    return
+  }
+
+  sendInviteCode(code, email)
+  res.end()
 })
 
 app.post("/private/update-feed-limit", (req, res) => {
@@ -627,10 +635,14 @@ app.post("/private/remove-feed", (req, res) => {
     })
 })
 
-app.post("/private/add-item", (req, res) => {
+app.post("/private/add-item", async (req, res) => {
   if (!req.body.url) {
     res.status(400).send("url required")
     return
+  }
+
+  if (Object.keys(items).length === 0) {
+    items = await user.get("items").then()
   }
 
   // limit and wait times are in milliseconds.
@@ -661,40 +673,14 @@ app.post("/private/add-item", (req, res) => {
     // then check if there's an existing item and update that instead.
     if (req.body.guid && req.body.timestamp < lastSaved - 7200000) {
       let found = false
-      user
-        .get("items")
-        .map()
-        .once((check, key) => {
-          if (!check || found) return
+      for (let [key, check] of Object.entries(items ?? {})) {
+        if (!key || !check) continue
 
-          if (
-            check.guid &&
-            check.guid === item.guid &&
-            check.url === item.url
-          ) {
-            found = true
-            user
-              .get("items")
-              .get(key)
-              .put(item, ack => {
-                if (!ack.err) {
-                  res.end()
-                  return
-                }
-
-                console.log(ack.err)
-                res.status(500).send("Error saving item")
-              })
-          }
-        })
-      setTimeout(() => {
-        // If not found then give the item the current time so that it's not
-        // buried. Don't want to see all items when subscribing to a new feed,
-        // so ignore items older than 48 hours.
-        if (!found && req.body.timestamp > lastSaved - 172800000) {
+        if (check.guid && check.guid === item.guid && check.url === item.url) {
+          found = true
           user
             .get("items")
-            .get(lastSaved)
+            .get(key)
             .put(item, ack => {
               if (!ack.err) {
                 res.end()
@@ -705,7 +691,33 @@ app.post("/private/add-item", (req, res) => {
               res.status(500).send("Error saving item")
             })
         }
-      }, 5000)
+      }
+      // If not found then give the item the current time so that it's not
+      // buried. Don't want to see all items when subscribing to a new feed,
+      // so ignore items older than 48 hours.
+      if (!found && req.body.timestamp > lastSaved - 172800000) {
+        user
+          .get("items")
+          .get(lastSaved)
+          .put(item, ack => {
+            if (!ack.err) {
+              // Keep in memory items in sync.
+              if (items) {
+                items.lastSaved = item
+              } else {
+                items = {lastSaved: item}
+              }
+              res.end()
+              return
+            }
+
+            console.log(ack.err)
+            res.status(500).send("Error saving item")
+          })
+        return
+      }
+
+      res.end()
       return
     }
 
@@ -714,6 +726,12 @@ app.post("/private/add-item", (req, res) => {
       .get(lastSaved)
       .put(item, ack => {
         if (!ack.err) {
+          // Keep in memory items in sync.
+          if (items) {
+            items.lastSaved = item
+          } else {
+            items = {lastSaved: item}
+          }
           res.end()
           return
         }
@@ -805,22 +823,26 @@ async function checkHosts(newCodes) {
   const urls = hosts.split(",").map(url => url + "/check-codes")
   return (
     await Promise.all(
-      urls.map(url =>
-        fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json;charset=utf-8",
-          },
-          body: JSON.stringify({
-            codes: newCodes,
-          }),
-        }).then(res => {
-          if (!res.ok) {
-            console.log(`checkHosts ${res.status} from ${res.url}`)
-          }
-          return res.ok
-        }),
-      ),
+      urls.map(url => {
+        try {
+          fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json;charset=utf-8",
+            },
+            body: JSON.stringify({
+              codes: newCodes,
+            }),
+          }).then(res => {
+            if (!res.ok) {
+              console.log(`checkHosts ${res.status} from ${res.url}`)
+            }
+            return res.ok
+          })
+        } catch (error) {
+          console.log(error)
+        }
+      }),
     )
   ).every(ok => ok)
 
@@ -863,23 +885,34 @@ async function createInviteCodes(count, owner, epub) {
 function requestInvite(email) {
   const message = `Thanks for requesting an invite code at ${host}
 
-There is a waiting list to create new accounts, so an invite code will be sent to your email address: ${email} when it becomes available.`
+There is a waiting list to create new accounts, an invite code will be sent to your email address ${email} when it becomes available.`
 
   const bcc = process.env.MAIL_BCC
   // If MAIL_FROM is not set then the message is already logged.
   if (process.env.MAIL_FROM && !bcc) {
-    console.log("Request Invite", email)
+    console.log("Invite request", email)
   }
-  mail(email, "Request Invite", message, bcc)
+  mail(email, "Invite request", message, bcc)
+}
+
+function sendInviteCode(code, email) {
+  const message = `Hello, thanks for waiting!
+
+You can now create an account at ${host}/register using your invite code ${code}
+`
+  mail(email, "Invite code", message)
 }
 
 function validateEmail(name, email, code, validate) {
   const message = `Hello ${name}
+
 Thanks for creating an account at ${host}
 
-Please validate your email at ${host}/validate-email?code=${code}&validate=${validate} in case you ever need to reset your password. (Which can be done at ${host}/reset-password if required${code === "admin" ? "." : `, using the code ${code}`})
+Please validate your email at ${host}/validate-email?code=${code}&validate=${validate}
+
+If you ever need to reset your password you will then be able to use ${host}/reset-password${code === "admin" ? "" : ` with the code ${code}`}
 `
-  mail(email, "Validate Email", message)
+  mail(email, "Validate your email", message)
 }
 
 function resetPassword(name, remaining, email, code, reset) {
@@ -890,7 +923,7 @@ This link will be valid to use for the next 24 hours.
 
 ${remaining <= 5 ? `Note that you can only reset your password ${remaining} more time${remaining != 1 ? "s" : ""}.` : ""}
 `
-  mail(email, "Update Password", message)
+  mail(email, "Update your password", message)
 }
 
 function mail(email, subject, message, bcc) {
@@ -912,6 +945,7 @@ function mail(email, subject, message, bcc) {
   }
   nodemailer.createTransport({sendmail: true}).sendMail(data, (err, info) => {
     if (err) {
+      console.log("sendmail returned an error:")
       console.log(err)
       return
     }

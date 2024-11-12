@@ -1,3 +1,4 @@
+import parse from "html-react-parser"
 import Avatar from "@mui/material/Avatar"
 import IconButton from "@mui/material/IconButton"
 import ListItem from "@mui/material/ListItem"
@@ -93,7 +94,7 @@ const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
           )}
         </ListItemAvatar>
         <ListItemText
-          primary={feed.title}
+          primary={feed.title && parse(feed.title)}
           secondary={feed.html_url !== "" ? feed.html_url : feed.key}
         />
         {selected && (

@@ -13,10 +13,10 @@ const GroupList = ({user, groups, setGroup}) => {
     const timeout = setTimeout(() => {
       if (groups && groups.all.length === 0) {
         setMessage(
-          "Welcome to your group list page! Select <b>New group</b> from the account menu to create your first group.",
+          "Welcome to your group list page! Select <b>Add group</b> from the account menu to create your first group.",
         )
       }
-    }, 3000)
+    }, 2000)
     return () => clearTimeout(timeout)
   }, [groups])
 

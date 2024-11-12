@@ -43,7 +43,7 @@ const Group = ({group, setGroup}) => {
           secondary={
             <Box sx={{display: "flex"}}>
               <Typography sx={{flexGrow: 1}}>
-                `${group.author && `${group.author}: `}${group.text}`
+                {`${group.author && `${group.author}: `}${group.text}`}
               </Typography>
               {group.count > 0 && (
                 <Avatar
