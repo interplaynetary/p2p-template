@@ -59,10 +59,11 @@ const StyledInputBase = styled(InputBase)(({theme}) => ({
 }))
 
 const SearchAppBar = ({
+  page,
+  showGroupList,
   createGroup,
   editGroup,
   createFeed,
-  page,
   mode,
   setMode,
   title,
@@ -93,6 +94,14 @@ const SearchAppBar = ({
   const changeMode = () => {
     sessionStorage.setItem("mode", mode === "light" ? "dark" : "light")
     setMode(mode === "light" ? "dark" : "light")
+  }
+
+  const home = () => {
+    if (page === "display") {
+      showGroupList()
+    } else {
+      window.location = "/"
+    }
   }
 
   const menuId = "search-account-menu"
@@ -213,7 +222,7 @@ const SearchAppBar = ({
             color="inherit"
             aria-label="home"
             sx={{mr: 2}}
-            onClick={() => (window.location = "/")}
+            onClick={home}
           >
             <RssFeedIcon
               sx={theme => ({
@@ -221,7 +230,14 @@ const SearchAppBar = ({
               })}
             />
           </IconButton>
-          {title === "" ? (
+          {title ? (
+            <Button
+              sx={{color: "white", fontSize: "1.25em", textTransform: "none"}}
+              onClick={() => editGroup(title)}
+            >
+              {title}
+            </Button>
+          ) : (
             <Typography
               variant="h6"
               noWrap
@@ -230,13 +246,6 @@ const SearchAppBar = ({
             >
               rsstream
             </Typography>
-          ) : (
-            <Button
-              sx={{color: "white", fontSize: "1.25em", textTransform: "none"}}
-              onClick={() => editGroup(title)}
-            >
-              {title}
-            </Button>
           )}
           <Search>
             <SearchIconWrapper>

@@ -38,9 +38,10 @@ var lastSaved = 0
 // to avoid decrypting them in each of the endpoints they're required in.
 const inviteCodes = new Map()
 
-// items is also in memory version of feed items to avoid extra lookups.
-// Note need to also remove items from memory store.
-let items = {}
+// items is also in memory version of some item fields to avoid extra lookups.
+const items = new Map()
+// itemKeys is a lookup so that old items can be removed.
+const itemKeys = []
 
 console.log("Trying auth credentials for " + alias)
 user.auth(alias, pass, auth)
@@ -197,7 +198,7 @@ app.post("/claim-invite-code", async (req, res) => {
     .get("accounts")
     .get(code)
     .put(data, ack => {
-      if (ack.err) console.error(ack.err)
+      if (ack.err) console.log(ack.err)
     })
   validateEmail(req.body.alias, req.body.email, code, validate)
 
@@ -207,7 +208,7 @@ app.post("/claim-invite-code", async (req, res) => {
     .get("invite_codes")
     .get(invite.key)
     .put(null, ack => {
-      if (ack.err) console.error(ack.err)
+      if (ack.err) console.log(ack.err)
     })
   inviteCodes.delete(code)
 
@@ -239,14 +240,16 @@ app.post("/claim-invite-code", async (req, res) => {
 
           const owner = user.get("shared").get("invite_codes").get(invite.owner)
           owner.once(async codes => {
+            if (!codes) return
+
             const secret = await Gun.SEA.secret(epub, user._.sea)
             for (let [key, enc] of Object.entries(codes)) {
-              if (!enc) continue
+              if (!enc || !key) continue
 
               let shared = await Gun.SEA.decrypt(enc, secret)
               if (code === shared) {
                 owner.get(key).put(null, ack => {
-                  if (ack.err) console.error(ack.err)
+                  if (ack.err) console.log(ack.err)
                 })
                 break
               }
@@ -291,19 +294,23 @@ app.post("/validate-email", (req, res) => {
         .get("accounts")
         .get(code)
         .put({validate: null}, ack => {
-          if (ack.err) console.error(ack.err)
+          if (ack.err) console.log(ack.err)
         })
       res.send("Email validated")
     })
 })
 
 app.post("/reset-password", (req, res) => {
+  const code = req.body.code
+  if (!code) {
+    res.status(400).send("Invite code required")
+    return
+  }
   if (!req.body.email) {
     res.status(400).send("Email required")
     return
   }
 
-  const code = req.body.code || "admin"
   user
     .get("accounts")
     .get(code)
@@ -343,7 +350,7 @@ app.post("/reset-password", (req, res) => {
         .get("accounts")
         .get(code)
         .put(data, ack => {
-          if (ack.err) console.error(ack.err)
+          if (ack.err) console.log(ack.err)
         })
 
       resetPassword(account.name, remaining, email, code, reset)
@@ -407,7 +414,7 @@ app.post("/update-password", (req, res) => {
         .get("accounts")
         .get(code)
         .put(data, ack => {
-          if (ack.err) console.error(ack.err)
+          if (ack.err) console.log(ack.err)
         })
       res.send(account.pub)
     })
@@ -447,6 +454,8 @@ app.post("/add-feed", (req, res) => {
           if (feeds) {
             delete feeds._
             const activeFeeds = Object.values(feeds).filter(feed => {
+              if (!feed) return false
+
               return gun
                 .user(account.pub)
                 .get("public")
@@ -488,6 +497,13 @@ app.post("/add-feed", (req, res) => {
             if (feed.error) {
               console.log("Error from", addFeedUrl, url)
               console.log(feed.error)
+              res.status(500).send({error: "Error adding feed"})
+              return
+            }
+
+            if (!feed.add || !feed.add.title) {
+              console.log("No feed data from", addFeedUrl, url)
+              console.log(feed)
               res.status(500).send({error: "Error adding feed"})
               return
             }
@@ -609,7 +625,7 @@ app.post("/private/update-feed-limit", (req, res) => {
         .get("accounts")
         .get(code)
         .put({feeds: limit}, ack => {
-          if (ack.err) console.error(ack.err)
+          if (ack.err) console.log(ack.err)
         })
       res.end()
     })
@@ -640,15 +656,16 @@ app.post("/private/add-item", async (req, res) => {
     res.status(400).send("url required")
     return
   }
-
-  if (Object.keys(items).length === 0) {
-    items = await user.get("items").then()
+  // Also drop items without a guid to avoid duplicates.
+  // (SimplePie generates them if not found in a feed.)
+  if (!req.body.guid) {
+    res.status(400).send("guid required")
+    return
   }
 
   // limit and wait times are in milliseconds.
   const limit = 10
   var wait = 0
-
   if (lastSaved !== 0) {
     const elapsed = Date.now() - lastSaved
     if (elapsed < limit) {
@@ -669,69 +686,14 @@ app.post("/private/add-item", async (req, res) => {
       timestamp: enc(req.body.timestamp),
       url: enc(req.body.url),
     }
-    // If the given item has a guid and it's timestamp is older than 2 hours,
-    // then check if there's an existing item and update that instead.
-    if (req.body.guid && req.body.timestamp < lastSaved - 7200000) {
-      let found = false
-      for (let [key, check] of Object.entries(items ?? {})) {
-        if (!key || !check) continue
-
-        if (check.guid && check.guid === item.guid && check.url === item.url) {
-          found = true
-          user
-            .get("items")
-            .get(key)
-            .put(item, ack => {
-              if (!ack.err) {
-                res.end()
-                return
-              }
-
-              console.log(ack.err)
-              res.status(500).send("Error saving item")
-            })
-        }
-      }
-      // If not found then give the item the current time so that it's not
-      // buried. Don't want to see all items when subscribing to a new feed,
-      // so ignore items older than 48 hours.
-      if (!found && req.body.timestamp > lastSaved - 172800000) {
-        user
-          .get("items")
-          .get(lastSaved)
-          .put(item, ack => {
-            if (!ack.err) {
-              // Keep in memory items in sync.
-              if (items) {
-                items.lastSaved = item
-              } else {
-                items = {lastSaved: item}
-              }
-              res.end()
-              return
-            }
-
-            console.log(ack.err)
-            res.status(500).send("Error saving item")
-          })
-        return
-      }
-
-      res.end()
-      return
-    }
-
+    // Update the item if it already exists.
+    const check = items.get(item.guid)
+    const key = check && check.url === item.url ? check.key : lastSaved
     user
       .get("items")
-      .get(lastSaved)
+      .get(key)
       .put(item, ack => {
         if (!ack.err) {
-          // Keep in memory items in sync.
-          if (items) {
-            items.lastSaved = item
-          } else {
-            items = {lastSaved: item}
-          }
           res.end()
           return
         }
@@ -739,6 +701,25 @@ app.post("/private/add-item", async (req, res) => {
         console.log(ack.err)
         res.status(500).send("Error saving item")
       })
+
+    // Also remove any items older than 2 weeks.
+    const twoWeeks = lastSaved - 1209600000
+    for (let i = 0; i < itemKeys.length; i++) {
+      // Item keys are sorted ascending so stop once a key matches.
+      if (itemKeys[i] > twoWeeks) {
+        if (i > 0) {
+          itemKeys.splice(0, i)
+        }
+        break
+      }
+
+      user
+        .get("items")
+        .get(itemKeys[i])
+        .put(null, ack => {
+          if (ack.err) console.log(ack.err)
+        })
+    }
   }, wait)
 })
 
@@ -758,6 +739,7 @@ function auth(ack) {
   if (!ack.err) {
     console.log(alias + " logged in")
     mapInviteCodes()
+    mapItems()
     return
   }
 
@@ -779,8 +761,14 @@ function auth(ack) {
       // will have an owner code that get stored as the referring account.
       console.log("Creating admin invite code")
       const enc = await Gun.SEA.encrypt({code: "admin", owner: ""}, user._.sea)
-      user.get("available").get("invite_codes").set(enc)
+      user
+        .get("available")
+        .get("invite_codes")
+        .set(enc, ack => {
+          if (ack.err) console.log(ack.err)
+        })
       mapInviteCodes()
+      mapItems()
     })
   })
 }
@@ -793,12 +781,28 @@ function mapInviteCodes() {
     .get("invite_codes")
     .map()
     .once(async (enc, key) => {
-      if (!enc) return
+      if (!enc || !key) return
 
       const invite = await Gun.SEA.decrypt(enc, user._.sea)
       if (!inviteCodes.has(invite.code)) {
         invite.key = key
         inviteCodes.set(invite.code, invite)
+      }
+    })
+}
+
+function mapItems() {
+  // map items so that guids can be checked to update existing items.
+  user
+    .get("items")
+    .map()
+    .once((item, key) => {
+      if (!item || !key) return
+
+      if (item.guid && !items.has(item.guid)) {
+        items.set(item.guid, {key, url: item.url})
+        itemKeys.push(key)
+        itemKeys.sort((a, b) => a - b)
       }
     })
 }
@@ -818,7 +822,7 @@ async function checkHosts(newCodes) {
   // codes, they just each need to check that the list they create doesn't
   // contain duplicates when they also want to store new codes.
   const hosts = process.env.FEDERATED_HOSTS
-  if (hosts === "") return true
+  if (!hosts) return true
 
   const urls = hosts.split(",").map(url => url + "/check-codes")
   return (
@@ -875,9 +879,20 @@ async function createInviteCodes(count, owner, epub) {
   for (let i = 0; i < newCodes.length; i++) {
     let invite = {code: newCodes[i], owner: owner}
     let enc = await Gun.SEA.encrypt(invite, user._.sea)
-    user.get("available").get("invite_codes").set(enc)
+    user
+      .get("available")
+      .get("invite_codes")
+      .set(enc, ack => {
+        if (ack.err) console.log(ack.err)
+      })
     let shared = await Gun.SEA.encrypt(newCodes[i], secret)
-    user.get("shared").get("invite_codes").get(owner).set(shared)
+    user
+      .get("shared")
+      .get("invite_codes")
+      .get(owner)
+      .set(shared, ack => {
+        if (ack.err) console.log(ack.err)
+      })
   }
   return true
 }
@@ -910,7 +925,7 @@ Thanks for creating an account at ${host}
 
 Please validate your email at ${host}/validate-email?code=${code}&validate=${validate}
 
-If you ever need to reset your password you will then be able to use ${host}/reset-password${code === "admin" ? "" : ` with the code ${code}`}
+If you ever need to reset your password you will then be able to use ${host}/reset-password with the code ${code}
 `
   mail(email, "Validate your email", message)
 }

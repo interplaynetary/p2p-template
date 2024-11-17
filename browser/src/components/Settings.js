@@ -50,6 +50,8 @@ const Settings = ({host, user, code, mode, setMode}) => {
       const secret = await Gun.SEA.secret(epub, user._.sea)
       const shared = host.get("shared").get("invite_codes").get(code)
       shared.map().on(async (enc, key) => {
+        if (!key) return
+
         if (enc) {
           updated.set(key, {
             key: key,

@@ -1,4 +1,4 @@
-import {useEffect, useState, useMemo} from "react"
+import {useEffect, useMemo, useState} from "react"
 import {BrowserRouter, Routes, Route, Navigate} from "react-router-dom"
 import {red} from "@mui/material/colors"
 import {ThemeProvider, createTheme} from "@mui/material/styles"
@@ -104,7 +104,7 @@ const App = () => {
       .get("accounts")
       .map()
       .on((account, accountCode) => {
-        if (!account) return
+        if (!account || !accountCode) return
 
         let check = {
           pub: account.pub,
@@ -167,7 +167,7 @@ const App = () => {
                           )
                           const secret = await Gun.SEA.secret(epub, user._.sea)
                           for (let [key, oldEnc] of Object.entries(shared)) {
-                            if (!oldEnc) continue
+                            if (!key || !oldEnc) continue
 
                             let data = await Gun.SEA.decrypt(oldEnc, oldSecret)
                             let enc = await Gun.SEA.encrypt(data, secret)
@@ -207,6 +207,8 @@ const App = () => {
       .get("feeds")
       .map()
       .on((feed, url) => {
+        if (!url) return
+
         const userFeed = user.get("public").get("feeds").get(url)
         userFeed.once(found => {
           if (!found) return

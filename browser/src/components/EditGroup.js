@@ -11,7 +11,7 @@ import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
 import Feed from "./Feed"
 
-const EditGroup = ({user, groups, currentGroup, done}) => {
+const EditGroup = ({user, groups, currentGroup, showGroupList}) => {
   const [groupName, setGroupName] = useState(currentGroup)
   const [selected, setSelected] = useState([])
   const [message, setMessage] = useState("")
@@ -27,6 +27,8 @@ const EditGroup = ({user, groups, currentGroup, done}) => {
       .get("feeds")
       .map()
       .on((data, key) => {
+        if (!data || !key) return
+
         updateFeed({
           key: dec(key),
           title: data ? dec(data.title) : "",
@@ -47,13 +49,19 @@ const EditGroup = ({user, groups, currentGroup, done}) => {
   }
 
   const updateGroup = () => {
+    if (!group) {
+      setMessage("Group not set")
+      return
+    }
+    if (!groupName) {
+      setMessage("Group name required")
+      return
+    }
+
     const feeds = [...group.feeds, ...selected]
     if (feeds.length === 0) {
-      if (
-        !window.confirm("Removing all feeds will remove the group. Continue?")
-      ) {
-        return
-      }
+      const message = "Removing all feeds will remove the group. Continue?"
+      if (!window.confirm(message)) return
     }
 
     setDisabledButton(true)
@@ -63,7 +71,7 @@ const EditGroup = ({user, groups, currentGroup, done}) => {
       feeds: feeds.reduce((acc, feed) => {
         // This function converts selected feeds to an object to store in gun.
         // see Display useEffect which converts back to an array.
-        return {...acc, [enc(feed)]: ""}
+        return feed ? {...acc, [enc(feed)]: ""} : {...acc}
       }, {}),
       count: group.count,
       latest: group.latest,
@@ -73,7 +81,7 @@ const EditGroup = ({user, groups, currentGroup, done}) => {
     let retry = 0
     const interval = setInterval(() => {
       // Delete the old group if the name changes.
-      if (group.key !== groupName) {
+      if (group.key && group.key !== groupName) {
         user
           .get("public")
           .get("groups")
@@ -82,7 +90,6 @@ const EditGroup = ({user, groups, currentGroup, done}) => {
             if (ack.err) console.error(ack.err)
           })
       }
-
       user
         .get("public")
         .get("groups")
@@ -97,7 +104,7 @@ const EditGroup = ({user, groups, currentGroup, done}) => {
           }
 
           clearInterval(interval)
-          done()
+          showGroupList()
         })
       if (retry > 5) {
         setDisabledButton(false)

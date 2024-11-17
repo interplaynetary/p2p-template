@@ -15,7 +15,9 @@ const Help = ({loggedIn, mode, setMode}) => {
           <Grid item xs={12}>
             <Card sx={{mt: 2}}>
               <CardContent>
-                <Typography variant="h4">Welcome</Typography>
+                <Typography sx={{pb: 2}} variant="h4">
+                  Welcome
+                </Typography>
                 <Typography paragraph={true}>
                   Thanks for checking out <b>RSStream</b>!
                 </Typography>
@@ -26,10 +28,11 @@ const Help = ({loggedIn, mode, setMode}) => {
                   Stream.
                 </Typography>
                 <Typography paragraph={true}>
-                  You can <Link href="/login">login here</Link> if you have an
+                  You can <Link href="/login">log in here</Link> if you have an
                   account, otherwise you will need an invite code to{" "}
                   <Link href="/register">register</Link>. You can request an{" "}
-                  <Link href="/invite">invite code here</Link>.
+                  <Link href="/invite">invite code here</Link> and you will
+                  receive a reply when it becomes available.
                 </Typography>
               </CardContent>
             </Card>

@@ -10,10 +10,15 @@ const GroupList = ({user, groups, setGroup}) => {
   const [message, setMessage] = useState("")
 
   useEffect(() => {
+    if (groups && groups.all.length !== 0) {
+      setMessage("")
+    }
+
     const timeout = setTimeout(() => {
       if (groups && groups.all.length === 0) {
         setMessage(
-          "Welcome to your group list page! Select <b>Add group</b> from the account menu to create your first group.",
+          "Welcome to your group list page! Select <b>Add group</b>" +
+            " from the account menu to create your first group.",
         )
       }
     }, 2000)

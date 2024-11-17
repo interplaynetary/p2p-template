@@ -20,12 +20,13 @@ import {
 import Feed from "./Feed"
 
 // TODO: Display a filtered list using the search bar.
-const FeedList = ({user, groups, done}) => {
+const FeedList = ({user, groups, showGroupList}) => {
   const [groupName, setGroupName] = useState("")
   const [selected, setSelected] = useState([])
   const [message, setMessage] = useState("")
   const [disabledButton, setDisabledButton] = useState(false)
   const [hideDefaultFeeds, setHideDefaultFeeds] = useState(false)
+  const [delay, setDelay] = useState(true)
   const [feeds, updateFeed] = useReducer(reducer(), init)
   const defaultGroups = ["News", "Tech", "Sport"]
 
@@ -78,6 +79,7 @@ const FeedList = ({user, groups, done}) => {
       image: cbsFavicon,
       defaultGroup: "Sport",
     })
+    setTimeout(() => setDelay(false), 1000)
   }, [])
 
   useEffect(() => {
@@ -88,6 +90,8 @@ const FeedList = ({user, groups, done}) => {
       .get("feeds")
       .map()
       .on((data, key) => {
+        if (!data || !key) return
+
         updateFeed({
           key: dec(key),
           title: data ? dec(data.title) : "",
@@ -147,6 +151,13 @@ const FeedList = ({user, groups, done}) => {
     }
     let retry = 0
     const interval = setInterval(() => {
+      if (!groupName) {
+        setDisabledButton(false)
+        setMessage("Group name required")
+        clearInterval(interval)
+        return
+      }
+
       user
         .get("public")
         .get("groups")
@@ -161,7 +172,7 @@ const FeedList = ({user, groups, done}) => {
           }
 
           clearInterval(interval)
-          done()
+          showGroupList()
         })
       if (retry > 5) {
         setDisabledButton(false)
@@ -229,13 +240,14 @@ const FeedList = ({user, groups, done}) => {
               )}
           </List>
         </Grid>
-        {!hideDefaultFeeds && (
+        {!hideDefaultFeeds && !delay && (
           <Typography>
             Looking for feeds? Click add feed in the menu, or try some of the
             options below.
           </Typography>
         )}
         {!hideDefaultFeeds &&
+          !delay &&
           defaultGroups.map(
             defaultGroup =>
               feeds &&
@@ -262,7 +274,7 @@ const FeedList = ({user, groups, done}) => {
                 </Grid>
               ),
           )}
-        {!hideDefaultFeeds && (
+        {!hideDefaultFeeds && !delay && (
           <Button sx={{mt: 1}} variant="contained" onClick={dismissDefaults}>
             Dismiss Defaults
           </Button>

@@ -30,6 +30,7 @@ const Login = ({host, user, mode, setMode}) => {
 
         delete all._
         for (const code of Object.keys(all)) {
+          if (!code) continue
           if (found.current) break
 
           host

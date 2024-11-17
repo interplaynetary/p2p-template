@@ -12,6 +12,8 @@ import {enc} from "../utils/text.js"
 
 const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
   const deleteFeed = feed => {
+    if (!feed || !feed.key) return
+
     user
       .get("public")
       .get("feeds")
@@ -22,6 +24,8 @@ const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
   }
 
   const updateGroupFeeds = feeds => {
+    if (!currentGroup) return
+
     user
       .get("public")
       .get("groups")
@@ -31,7 +35,7 @@ const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
         feeds.reduce((acc, feed) => {
           // This function converts selected feeds to an object to store in gun.
           // see Display useEffect which converts back to an array.
-          return {...acc, [enc(feed)]: ""}
+          return feed ? {...acc, [enc(feed)]: ""} : {...acc}
         }, {}),
         ack => {
           if (ack.err) console.error(ack.err)

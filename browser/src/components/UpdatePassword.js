@@ -111,6 +111,8 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
               .get("contacts")
               .map()
               .once((contact, contactCode) => {
+                if (!contact || !contactCode) return
+
                 let update = {
                   pub: contact.pub,
                   alias: contact.alias,
@@ -135,6 +137,8 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
               .get("groups")
               .map()
               .once((group, groupName) => {
+                if (!group || !groupName) return
+
                 oldPublic
                   .get("groups")
                   .get(groupName)
@@ -163,6 +167,8 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
               .get("feeds")
               .map()
               .once((feed, url) => {
+                if (!feed || !url) return
+
                 let update = {
                   title: feed.title,
                   description: feed.description,
@@ -185,6 +191,8 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
               .get("settings")
               .map()
               .once((value, key) => {
+                if (!value || !key) return
+
                 user
                   .get("public")
                   .get("settings")

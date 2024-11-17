@@ -21,11 +21,14 @@ const AddFeed = ({host, user, code, setAddFeed}) => {
   const [disabledButton, setDisabledButton] = useState(false)
 
   const addFeed = () => {
+    if (!url) {
+      setMessage("Feed required")
+      return
+    }
     if (!host) {
       setMessage("Host not available")
       return
     }
-
     if (!code) {
       setMessage("Code not found. Please try logging in again")
       return
@@ -46,10 +49,8 @@ const AddFeed = ({host, user, code, setAddFeed}) => {
           .once(feeds => {
             if (feeds) {
               delete feeds._
-              if (
-                Object.values(feeds).filter(feed => feed.title).length ===
-                account.feeds
-              ) {
+              const len = Object.values(feeds).filter(feed => feed.title).length
+              if (len === account.feeds) {
                 setMessage(
                   `Account currently has a limit of ${account.feeds} feeds`,
                 )

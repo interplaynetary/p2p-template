@@ -13,17 +13,18 @@ const ItemList = ({
   resetGroup,
   currentKeys,
   newKeys,
+  loading,
 }) => {
   const [items, updateItem] = useReducer(reducer(), init)
   const [newFrom, setNewFrom] = useState(0)
   const [groupKey, setGroupKey] = useState("")
-  const loadTime = useRef(Date.now())
   const itemListRef = useRef()
   const itemRefs = useRef(new Map())
   const lastKey = useRef(Date.now())
   const loadMore = useRef(0)
   const watchStart = useRef()
   const watchEnd = useRef()
+  const interval = useRef(0)
 
   const updateStart = useCallback(
     async keys => {
@@ -44,11 +45,10 @@ const ItemList = ({
         if (updated === 10) break
 
         remove++
+        if (!key) continue
+
         const item = await host.get("items").get(key).then()
         if (!item) continue
-
-        // Group feeds are decoded in Display.js
-        if (!group.feeds.includes(dec(item.url))) continue
 
         // Find a new key that is between the current scroll position and the
         // last item to be loaded.
@@ -76,16 +76,27 @@ const ItemList = ({
           watchStart.current.observe(target)
         }
       }, 100)
-      // Scroll to the end when the group is first displayed.
-      if (loadTime.current > Date.now() - 3000) {
-        itemListRef.current.scrollIntoView({block: "end"})
-      }
     },
-    [host, group],
+    [host],
   )
 
   useEffect(() => {
-    if (!host || !group) {
+    if (loading) return
+
+    let retry = 0
+    clearInterval(interval.current)
+    interval.current = setInterval(() => {
+      if (retry++ > 5) {
+        clearInterval(interval.current)
+      }
+      if (itemListRef.current) {
+        itemListRef.current.scrollIntoView({block: "end"})
+      }
+    }, 500)
+  }, [loading])
+
+  useEffect(() => {
+    if (!host || !group || currentKeys.length === 0) {
       updateItem({reset: true})
       return
     }
@@ -99,7 +110,7 @@ const ItemList = ({
   }, [host, group, groupKey, currentKeys, updateStart, resetGroup])
 
   useEffect(() => {
-    // Display handles updates when group is not set.
+    // Display module updates stats when group is not set.
     if (!host || !group || newKeys.length === 0) return
 
     const groupStats = new Map()
@@ -121,6 +132,8 @@ const ItemList = ({
     let earliest = 0
     let latest = 0
     newKeys.forEach(async key => {
+      if (!key) return
+
       const item = await host.get("items").get(key).then()
       if (!item) return
 
