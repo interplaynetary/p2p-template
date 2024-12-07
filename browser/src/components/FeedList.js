@@ -20,7 +20,7 @@ import {
 import Feed from "./Feed"
 
 // TODO: Display a filtered list using the search bar.
-const FeedList = ({user, groups, showGroupList}) => {
+const FeedList = ({user, code, groups, showGroupList}) => {
   const [groupName, setGroupName] = useState("")
   const [selected, setSelected] = useState([])
   const [message, setMessage] = useState("")
@@ -89,16 +89,16 @@ const FeedList = ({user, groups, showGroupList}) => {
       .get("public")
       .get("feeds")
       .map()
-      .on((data, key) => {
-        if (!data || !key) return
+      .on((f, url) => {
+        if (!url) return
 
         updateFeed({
-          key: dec(key),
-          title: data ? dec(data.title) : "",
-          description: data ? dec(data.description) : "",
-          html_url: data ? dec(data.html_url) : "",
-          language: data ? dec(data.language) : "",
-          image: data ? dec(data.image) : "",
+          key: dec(url),
+          title: f ? dec(f.title) : "",
+          description: f ? dec(f.description) : "",
+          html_url: f ? dec(f.html_url) : "",
+          language: f ? dec(f.language) : "",
+          image: f ? dec(f.image) : "",
         })
       })
 
@@ -137,17 +137,18 @@ const FeedList = ({user, groups, showGroupList}) => {
     setMessage("Creating group...")
 
     const group = {
-      feeds: selected.reduce((acc, feed) => {
+      feeds: selected.reduce((acc, f) => {
         // This function converts selected feeds to an object to store in gun.
         // see Display useEffect which converts back to an array.
-        return {...acc, [enc(feed)]: ""}
+        return f ? {...acc, [enc(f)]: true} : {...acc}
       }, {}),
       // Show an unread count for the group and display the author, text and
-      // timestamp of the latest item.
+      // timestamp of the latest item. (latest field is the item key.)
       count: 0,
-      latest: Date.now(),
+      latest: 0,
       text: "",
       author: "",
+      timestamp: Date.now(),
     }
     let retry = 0
     const interval = setInterval(() => {
@@ -231,6 +232,7 @@ const FeedList = ({user, groups, showGroupList}) => {
                   !f.defaultGroup && (
                     <Feed
                       user={user}
+                      code={code}
                       groups={groups}
                       feed={f}
                       selected={selected.includes(f.key)}
@@ -263,6 +265,7 @@ const FeedList = ({user, groups, showGroupList}) => {
                           f.defaultGroup === defaultGroup && (
                             <Feed
                               user={user}
+                              code={code}
                               groups={groups}
                               feed={f}
                               selected={selected.includes(f.key)}

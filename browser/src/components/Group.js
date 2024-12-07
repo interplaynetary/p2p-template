@@ -8,6 +8,7 @@ import ListItemText from "@mui/material/ListItemText"
 import Typography from "@mui/material/Typography"
 import PersonIcon from "@mui/icons-material/Person"
 import GroupIcon from "@mui/icons-material/Group"
+import {formatDate} from "../utils/format.js"
 
 const Group = ({group, setGroup}) => {
   return (
@@ -34,9 +35,11 @@ const Group = ({group, setGroup}) => {
         <ListItemText
           primary={
             <Box sx={{display: "flex"}}>
-              <Typography sx={{flexGrow: 1}}>{group.key}</Typography>
+              <Typography variant="h6" sx={{flexGrow: 1}}>
+                {group.key}
+              </Typography>
               <Typography variant="body2" sx={{color: "text.secondary"}}>
-                {group.latest}
+                {formatDate(group.timestamp)}
               </Typography>
             </Box>
           }

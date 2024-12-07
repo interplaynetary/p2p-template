@@ -19,6 +19,9 @@ const user = gun.user()
 const alias = process.env.GUN_USER_ALIAS ?? "host"
 const pass = process.env.GUN_USER_PASS ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
+const addFeedUrl = process.env.ADD_FEED_URL
+const addFeedID = process.env.ADD_FEED_ID
+const addFeedApiKey = process.env.ADD_FEED_API_KEY
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const basicAuth = (req, res, next) => {
   const auth = (req.headers.authorization || "").split(" ")[1] || ""
@@ -37,11 +40,6 @@ var lastSaved = 0
 // inviteCodes is a map of invite codes and their gun keys, stored in memory
 // to avoid decrypting them in each of the endpoints they're required in.
 const inviteCodes = new Map()
-
-// items is also in memory version of some item fields to avoid extra lookups.
-const items = new Map()
-// itemKeys is a lookup so that old items can be removed.
-const itemKeys = []
 
 console.log("Trying auth credentials for " + alias)
 user.auth(alias, pass, auth)
@@ -193,6 +191,7 @@ app.post("/claim-invite-code", async (req, res) => {
     ref: invite.owner,
     host: enc(host),
     feeds: 10,
+    subscribed: 0,
   }
   user
     .get("accounts")
@@ -243,16 +242,24 @@ app.post("/claim-invite-code", async (req, res) => {
             if (!codes) return
 
             const secret = await Gun.SEA.secret(epub, user._.sea)
-            for (let [key, enc] of Object.entries(codes)) {
-              if (!enc || !key) continue
+            delete codes._
+            let found = false
+            for (const key of Object.keys(codes)) {
+              if (found) break
 
-              let shared = await Gun.SEA.decrypt(enc, secret)
-              if (code === shared) {
-                owner.get(key).put(null, ack => {
-                  if (ack.err) console.log(ack.err)
-                })
-                break
-              }
+              if (!key) continue
+
+              owner.get(key).once(async encrypted => {
+                if (!encrypted) return
+
+                let shared = await Gun.SEA.decrypt(encrypted, secret)
+                if (code === shared) {
+                  owner.get(key).put(null, ack => {
+                    if (ack.err) console.log(ack.err)
+                  })
+                  found = true
+                }
+              })
             }
           })
           res.end()
@@ -446,92 +453,241 @@ app.post("/add-feed", (req, res) => {
         return
       }
 
-      gun
-        .user(account.pub)
-        .get("public")
-        .get("feeds")
-        .once(async feeds => {
-          if (feeds) {
-            delete feeds._
-            const activeFeeds = Object.values(feeds).filter(feed => {
-              if (!feed) return false
+      if (account.subscribed === account.feeds) {
+        res
+          .status(400)
+          .send(`Account currently has a limit of ${account.feeds} feeds`)
+        return
+      }
 
-              return gun
-                .user(account.pub)
-                .get("public")
-                .get("feeds")
-                .get(feed)
-                .get("title")
-            })
-            if (activeFeeds.length === account.feeds) {
-              res
-                .status(400)
-                .send(`Account currently has a limit of ${account.feeds} feeds`)
-              return
-            }
-          }
+      if (!addFeedUrl || !addFeedID || !addFeedApiKey) {
+        res.status(500).send({error: "Could not add feed, env not set"})
+        return
+      }
 
-          const addFeedUrl = process.env.ADD_FEED_URL
-          const addFeedID = process.env.ADD_FEED_ID
-          const addFeedApiKey = process.env.ADD_FEED_API_KEY
-          if (!addFeedUrl || !addFeedID || !addFeedApiKey) {
-            res.status(500).send({error: "Could not add feed, env not set"})
-            return
-          }
+      try {
+        const add = await fetch(addFeedUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: `id=${addFeedID}&key=${addFeedApiKey}&action=add-feed&xmlUrl=${encodeURIComponent(url)}`,
+        })
+        if (!add.ok) {
+          console.log("Error from", addFeedUrl, url, add.statusText)
+          res.status(500).send({error: "Error adding feed"})
+          return
+        }
 
-          try {
-            const addFeed = await fetch(addFeedUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: `id=${addFeedID}&key=${addFeedApiKey}&action=add-feed&xmlUrl=${encodeURIComponent(url)}`,
-            })
-            if (!addFeed.ok) {
-              console.log("Error from", addFeedUrl, url, addFeed.statusText)
-              res.status(500).send({error: "Error adding feed"})
-              return
-            }
+        const feed = await add.json()
+        if (feed.error) {
+          console.log("Error from", addFeedUrl, url)
+          console.log(feed.error)
+          res.status(500).send({error: "Error adding feed"})
+          return
+        }
 
-            const feed = await addFeed.json()
-            if (feed.error) {
-              console.log("Error from", addFeedUrl, url)
-              console.log(feed.error)
-              res.status(500).send({error: "Error adding feed"})
-              return
-            }
+        if (!feed.add || !feed.add.url || !feed.add.title) {
+          console.log("No feed data from", addFeedUrl, url)
+          console.log(feed)
+          res.status(500).send({error: "Error adding feed"})
+          return
+        }
 
-            if (!feed.add || !feed.add.title) {
-              console.log("No feed data from", addFeedUrl, url)
-              console.log(feed)
-              res.status(500).send({error: "Error adding feed"})
+        const data = {
+          title: enc(feed.add.title),
+          description: enc(feed.add.description),
+          html_url: enc(feed.add.html_url),
+          language: enc(feed.add.language),
+          image: enc(feed.add.image),
+          subscriber_count: 1,
+        }
+        user
+          .get("feeds")
+          .get(enc(feed.add.url))
+          .put(data, ack => {
+            if (ack.err) {
+              console.log(ack.err)
+              res.status(500).send("Error saving feed")
               return
             }
 
-            const data = {
-              title: enc(feed.add.title),
-              description: enc(feed.add.description),
-              html_url: enc(feed.add.html_url),
-              language: enc(feed.add.language),
-              image: enc(feed.add.image),
-            }
             user
-              .get("feeds")
-              .get(enc(url))
-              .put(data, async ack => {
+              .get("accounts")
+              .get(code)
+              .put({subscribed: account.subscribed + 1}, ack => {
                 if (ack.err) {
                   console.log(ack.err)
-                  res.status(500).send("Error saving feed")
+                  res.status(500).send("Error adding to account subscribed")
                   return
                 }
 
                 res.send(feed)
               })
-          } catch (error) {
-            console.log(error)
-            res.status(500).send({error: "Error adding feed"})
+          })
+      } catch (error) {
+        console.log(error)
+        res.status(500).send({error: "Error adding feed"})
+      }
+    })
+})
+
+app.post("/add-subscriber", (req, res) => {
+  const code = req.body.code
+  if (!code) {
+    res.status(400).send({error: "code required"})
+    return
+  }
+  if (!req.body.url) {
+    res.status(400).send({error: "url required"})
+    return
+  }
+
+  user
+    .get("accounts")
+    .get(code)
+    .once(async account => {
+      if (!account) {
+        res.status(404).send({error: "Account not found"})
+        return
+      }
+
+      const url = await Gun.SEA.verify(req.body.url, account.pub)
+      if (!url) {
+        res.status(400).send({error: "Could not verify signed url"})
+        return
+      }
+
+      if (account.subscribed === account.feeds) {
+        res
+          .status(400)
+          .send(`Account currently has a limit of ${account.feeds} feeds`)
+        return
+      }
+
+      user
+        .get("feeds")
+        .get(enc(url))
+        .once(feed => {
+          if (!feed) {
+            console.log("Feed not found for add-subscriber", url)
+            res.end()
+            return
           }
+
+          user
+            .get("feeds")
+            .get(enc(url))
+            .put({subscriber_count: feed.subscriber_count + 1}, ack => {
+              if (ack.err) {
+                console.log(ack.err)
+                res.status(500).send("Error adding to feed subscriber_count")
+                return
+              }
+
+              user
+                .get("accounts")
+                .get(code)
+                .put({subscribed: account.subscribed + 1}, ack => {
+                  if (ack.err) {
+                    console.log(ack.err)
+                    res.status(500).send("Error adding to account subscribed")
+                    return
+                  }
+
+                  res.end()
+                })
+            })
         })
+    })
+})
+
+app.post("/remove-subscriber", (req, res) => {
+  const code = req.body.code
+  if (!code) {
+    res.status(400).send({error: "code required"})
+    return
+  }
+  if (!req.body.url) {
+    res.status(400).send({error: "url required"})
+    return
+  }
+
+  const removeFeed = async url => {
+    if (!addFeedUrl || !addFeedID || !addFeedApiKey) {
+      console.log("Could not remove feed, env not set")
+      return
+    }
+
+    try {
+      const remove = await fetch(addFeedUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `id=${addFeedID}&key=${addFeedApiKey}&action=remove-feed&xmlUrl=${encodeURIComponent(url)}`,
+      })
+      if (!remove.ok) {
+        console.log("Error from", addFeedUrl, url, remove.statusText)
+      }
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  user
+    .get("accounts")
+    .get(code)
+    .once(async account => {
+      if (!account) {
+        res.status(404).send({error: "Account not found"})
+        return
+      }
+
+      const url = await Gun.SEA.verify(req.body.url, account.pub)
+      if (!url) {
+        res.status(400).send({error: "Could not verify signed url"})
+        return
+      }
+
+      const userFeed = user.get("feeds").get(enc(url))
+      userFeed.once(feed => {
+        if (!feed) {
+          console.log("Feed not found for remove-subscriber", url)
+          res.end()
+          return
+        }
+
+        if (feed.subscriber_count === 0) {
+          console.log("remove-subscriber called but subscriber_count is 0", url)
+          res.end()
+          return
+        }
+
+        if (feed.subscriber_count === 1) {
+          removeFeed(url)
+        }
+        userFeed.put({subscriber_count: feed.subscriber_count - 1}, ack => {
+          if (ack.err) {
+            console.log(ack.err)
+            res.status(500).send("Error removing from subscriber_count")
+            return
+          }
+
+          user
+            .get("accounts")
+            .get(code)
+            .put({subscribed: account.subscribed - 1}, ack => {
+              if (ack.err) {
+                console.log(ack.err)
+                res.status(500).send("Error removing from account subscribed")
+                return
+              }
+
+              res.end()
+            })
+        })
+      })
     })
 })
 
@@ -637,10 +793,18 @@ app.post("/private/remove-feed", (req, res) => {
     return
   }
 
+  // Don't modify subscriber_count so users can still call remove-subscriber.
+  const data = {
+    title: "",
+    description: "",
+    html_url: "",
+    language: "",
+    image: "",
+  }
   user
     .get("feeds")
     .get(enc(req.body.url))
-    .put(null, ack => {
+    .put(data, ack => {
       if (!ack.err) {
         res.end()
         return
@@ -651,13 +815,13 @@ app.post("/private/remove-feed", (req, res) => {
     })
 })
 
-app.post("/private/add-item", async (req, res) => {
+app.post("/private/add-item", (req, res) => {
   if (!req.body.url) {
     res.status(400).send("url required")
     return
   }
   // Also drop items without a guid to avoid duplicates.
-  // (SimplePie generates them if not found in a feed.)
+  // (SimplePie generates guids if not found in a feed.)
   if (!req.body.guid) {
     res.status(400).send("guid required")
     return
@@ -673,24 +837,37 @@ app.post("/private/add-item", async (req, res) => {
       console.log("Waiting " + wait + " ms before save")
     }
   }
-  setTimeout(() => {
+  setTimeout(async () => {
     lastSaved = Date.now()
+    const twoWeeks = lastSaved - 1209600000
     const item = {
       title: enc(req.body.title),
-      content: enc(req.body.content),
       author: enc(req.body.author),
       category: enc(req.body.category),
       enclosure: enc(req.body.enclosure),
       permalink: enc(req.body.permalink),
       guid: enc(req.body.guid),
-      timestamp: enc(req.body.timestamp),
       url: enc(req.body.url),
     }
-    // Update the item if it already exists.
-    const check = items.get(item.guid)
-    const key = check && check.url === item.url ? check.key : lastSaved
+    // Check if the item already has a key stored for it's guid.
+    let key = await user.get("guids" + item.guid).then()
+    if (!key) {
+      // Try and use the item's timestamp as the key if not found.
+      const t = req.body.timestamp
+      if (!(await user.get("items" + day(t)).get(t).then())) {
+        key = t
+      } else {
+        key = lastSaved
+      }
+      user.get("guids" + item.guid).put(key, ack => {
+        if (ack.err) console.log(ack.err)
+      })
+      // Don't update the timestamp on existing items.
+      item.timestamp = enc(req.body.timestamp)
+    }
+    if (key < twoWeeks) item = null
     user
-      .get("items")
+      .get("items" + day(key))
       .get(key)
       .put(item, ack => {
         if (!ack.err) {
@@ -703,22 +880,20 @@ app.post("/private/add-item", async (req, res) => {
       })
 
     // Also remove any items older than 2 weeks.
-    const twoWeeks = lastSaved - 1209600000
-    for (let i = 0; i < itemKeys.length; i++) {
-      // Item keys are sorted ascending so stop once a key matches.
-      if (itemKeys[i] > twoWeeks) {
-        if (i > 0) {
-          itemKeys.splice(0, i)
-        }
-        break
-      }
+    const dayKey = day(twoWeeks)
+    if (!(await user.get("removed" + dayKey).then())) {
+      user.get("items" + dayKey).map()
+        .once((item, key) => {
+          if (!item) return
 
-      user
-        .get("items")
-        .get(itemKeys[i])
-        .put(null, ack => {
-          if (ack.err) console.log(ack.err)
+          user.get("items" + dayKey).get(key).put(null, ack => {
+            if (ack.err) console.log(ack.err)
+          })
         })
+      // Flag this day as removed.
+      user.get("removed" + dayKey).put(true, ack => {
+        if (ack.err) console.log(ack.err)
+      })
     }
   }, wait)
 })
@@ -739,7 +914,6 @@ function auth(ack) {
   if (!ack.err) {
     console.log(alias + " logged in")
     mapInviteCodes()
-    mapItems()
     return
   }
 
@@ -768,7 +942,6 @@ function auth(ack) {
           if (ack.err) console.log(ack.err)
         })
       mapInviteCodes()
-      mapItems()
     })
   })
 }
@@ -791,20 +964,12 @@ function mapInviteCodes() {
     })
 }
 
-function mapItems() {
-  // map items so that guids can be checked to update existing items.
-  user
-    .get("items")
-    .map()
-    .once((item, key) => {
-      if (!item || !key) return
-
-      if (item.guid && !items.has(item.guid)) {
-        items.set(item.guid, {key, url: item.url})
-        itemKeys.push(key)
-        itemKeys.sort((a, b) => a - b)
-      }
-    })
+// day is a helper function that returns the zero timestamp on the day of the
+// given timestamp. This is used because items are grouped by day to make it
+// easier for the browser to find recent items.
+function day(key) {
+  const t = new Date(+key)
+  return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate())
 }
 
 async function checkCodes(newCodes) {
@@ -932,6 +1097,7 @@ If you ever need to reset your password you will then be able to use ${host}/res
 
 function resetPassword(name, remaining, email, code, reset) {
   const message = `Hello ${name}
+
 You can now update your password at ${host}/update-password?username=${name}&code=${code}&reset=${reset}
 
 This link will be valid to use for the next 24 hours.

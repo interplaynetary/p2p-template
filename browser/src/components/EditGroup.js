@@ -11,13 +11,21 @@ import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
 import Feed from "./Feed"
 
-const EditGroup = ({user, groups, currentGroup, showGroupList}) => {
+const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
+  const [group, setGroup] = useState(() => {
+    groups.all.find(g => g.key === currentGroup)
+  })
   const [groupName, setGroupName] = useState(currentGroup)
   const [selected, setSelected] = useState([])
   const [message, setMessage] = useState("")
   const [disabledButton, setDisabledButton] = useState(false)
   const [feeds, updateFeed] = useReducer(reducer(), init)
-  const group = groups.all.find(g => g.key === currentGroup)
+
+  useEffect(() => {
+    if (!groups) return
+
+    setGroup(groups.all.find(g => g.key === currentGroup))
+  }, [groups, currentGroup])
 
   useEffect(() => {
     if (!user) return
@@ -26,16 +34,16 @@ const EditGroup = ({user, groups, currentGroup, showGroupList}) => {
       .get("public")
       .get("feeds")
       .map()
-      .on((data, key) => {
-        if (!data || !key) return
+      .on((feed, url) => {
+        if (!url) return
 
         updateFeed({
-          key: dec(key),
-          title: data ? dec(data.title) : "",
-          description: data ? dec(data.description) : "",
-          html_url: data ? dec(data.html_url) : "",
-          language: data ? dec(data.language) : "",
-          image: data ? dec(data.image) : "",
+          key: dec(url),
+          title: feed ? dec(feed.title) : "",
+          description: feed ? dec(feed.description) : "",
+          html_url: feed ? dec(feed.html_url) : "",
+          language: feed ? dec(feed.language) : "",
+          image: feed ? dec(feed.image) : "",
         })
       })
   }, [user])
@@ -68,10 +76,10 @@ const EditGroup = ({user, groups, currentGroup, showGroupList}) => {
     setMessage("Updating group...")
 
     const data = {
-      feeds: feeds.reduce((acc, feed) => {
+      feeds: feeds.reduce((acc, f) => {
         // This function converts selected feeds to an object to store in gun.
         // see Display useEffect which converts back to an array.
-        return feed ? {...acc, [enc(feed)]: ""} : {...acc}
+        return f ? {...acc, [enc(f)]: true} : {...acc}
       }, {}),
       count: group.count,
       latest: group.latest,
@@ -86,9 +94,18 @@ const EditGroup = ({user, groups, currentGroup, showGroupList}) => {
           .get("public")
           .get("groups")
           .get(enc(group.key))
-          .put(null, ack => {
-            if (ack.err) console.error(ack.err)
-          })
+          .put(
+            {
+              feeds: {},
+              count: 0,
+              latest: 0,
+              text: "",
+              author: "",
+            },
+            ack => {
+              if (ack.err) console.error(ack.err)
+            },
+          )
       }
       user
         .get("public")
@@ -162,6 +179,7 @@ const EditGroup = ({user, groups, currentGroup, showGroupList}) => {
                   group.feeds.includes(f.key) && (
                     <Feed
                       user={user}
+                      code={code}
                       groups={groups}
                       currentGroup={currentGroup}
                       feed={f}
@@ -182,7 +200,9 @@ const EditGroup = ({user, groups, currentGroup, showGroupList}) => {
                   !group.feeds.includes(f.key) && (
                     <Feed
                       user={user}
+                      code={code}
                       groups={groups}
+                      currentGroup={currentGroup}
                       feed={f}
                       selected={selected.includes(f.key)}
                       selectFeed={selectFeed}

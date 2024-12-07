@@ -10,7 +10,22 @@ import DeleteIcon from "@mui/icons-material/Delete"
 import PersonIcon from "@mui/icons-material/Person"
 import {enc} from "../utils/text.js"
 
-const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
+import Gun from "gun"
+require("gun/lib/radix.js")
+require("gun/lib/radisk.js")
+require("gun/lib/store.js")
+require("gun/lib/rindexed.js")
+require("gun/sea")
+
+const Feed = ({
+  user,
+  code,
+  groups,
+  currentGroup,
+  feed,
+  selected,
+  selectFeed,
+}) => {
   const deleteFeed = feed => {
     if (!feed || !feed.key) return
 
@@ -18,13 +33,38 @@ const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
       .get("public")
       .get("feeds")
       .get(enc(feed.key))
-      .put(null, ack => {
-        if (ack.err) console.error(ack.err)
+      .put({title: ""}, async ack => {
+        if (ack.err) {
+          console.error(ack.err)
+          return
+        }
+
+        try {
+          const signedUrl = await Gun.SEA.sign(feed.key, user._.sea)
+          const res = await fetch(
+            `${window.location.origin}/remove-subscriber`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json;charset=utf-8",
+              },
+              body: JSON.stringify({code: code, url: signedUrl}),
+            },
+          )
+          if (!res.ok) {
+            console.error(res)
+          }
+        } catch (error) {
+          console.error(error)
+        }
       })
   }
 
-  const updateGroupFeeds = feeds => {
+  const updateGroupFeeds = (feeds, remove) => {
     if (!currentGroup) return
+
+    const message = "Removing the last feed will remove the group. Continue?"
+    if (feeds.length === 1 && !window.confirm(message)) return
 
     user
       .get("public")
@@ -32,10 +72,10 @@ const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
       .get(enc(currentGroup))
       .get("feeds")
       .put(
-        feeds.reduce((acc, feed) => {
+        feeds.reduce((acc, f) => {
           // This function converts selected feeds to an object to store in gun.
           // see Display useEffect which converts back to an array.
-          return feed ? {...acc, [enc(feed)]: ""} : {...acc}
+          return f ? {...acc, [enc(f)]: f !== remove} : {...acc}
         }, {}),
         ack => {
           if (ack.err) console.error(ack.err)
@@ -48,14 +88,12 @@ const Feed = ({user, groups, currentGroup, feed, selected, selectFeed}) => {
     // from that group, otherwise removing the feed for the user.
     if (currentGroup) {
       const group = groups.all.find(g => g.key === currentGroup)
-      if (group.feeds.includes(feed.key)) {
+      if (group && group.feeds.includes(feed.key)) {
         return (
           <IconButton
             edge="end"
             aria-label="delete"
-            onClick={() =>
-              updateGroupFeeds(group.feeds.filter(f => f !== feed))
-            }
+            onClick={() => updateGroupFeeds(group.feeds, feed.key)}
           >
             <DeleteIcon />
           </IconButton>

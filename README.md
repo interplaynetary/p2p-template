@@ -37,9 +37,10 @@ codes to. You can set the number of invite codes to create for an account by
 adding `"count": <number>` to the request, otherwise one code will be created.
 
 If you have sendmail available on your server you can export `MAIL_FROM` and
-`MAIL_BCC` to send email to your users. If `MAIL_FROM` is not set then emails
-will be logged to `~/.pm2/logs/app-out.log`. Export `APP_HOST` to create links
-that point to a server other than localhost.
+`MAIL_BCC` to send email to your users. If `MAIL_FROM` is not set then the
+same information will be logged so that you have access to it.
+(See `~/.pm2/logs/app-out.log` if you're using pm2.) Export `APP_HOST` to
+create links that point to a server other than localhost.
 
 RSStream relies on Dobrado for its feed processing, which is accessed via it's
 API. You can set it up on a subdomain and then access it via the `ADD_FEED_URL`,

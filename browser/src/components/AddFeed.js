@@ -43,122 +43,127 @@ const AddFeed = ({host, user, code, setAddFeed}) => {
           return
         }
 
-        user
-          .get("public")
+        if (account.subscribed === account.feeds) {
+          setMessage(`Account currently has a limit of ${account.feeds} feeds`)
+          return
+        }
+
+        setDisabledButton(true)
+        setMessage("Adding feed...")
+        host
           .get("feeds")
-          .once(feeds => {
-            if (feeds) {
-              delete feeds._
-              const len = Object.values(feeds).filter(feed => feed.title).length
-              if (len === account.feeds) {
-                setMessage(
-                  `Account currently has a limit of ${account.feeds} feeds`,
-                )
-                return
+          .get(enc(url))
+          .once(async feed => {
+            if (feed && feed.title) {
+              const data = {
+                title: feed.title,
+                description: feed.description,
+                html_url: feed.html_url,
+                language: feed.language,
+                image: feed.image,
               }
+              user
+                .get("public")
+                .get("feeds")
+                .get(enc(url))
+                .put(data, async ack => {
+                  setDisabledButton(false)
+                  if (ack.err) {
+                    console.error(ack.err)
+                    setMessage("Error adding feed")
+                    return
+                  }
+
+                  setMessage("Feed added")
+                  setTimeout(() => setAddFeed(false), 1000)
+                  try {
+                    const signedUrl = await Gun.SEA.sign(url, user._.sea)
+                    const res = await fetch(
+                      `${window.location.origin}/add-subscriber`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json;charset=utf-8",
+                        },
+                        body: JSON.stringify({code: code, url: signedUrl}),
+                      },
+                    )
+                    if (!res.ok) {
+                      console.error(res)
+                    }
+                  } catch (error) {
+                    console.error(error)
+                  }
+                })
+              return
             }
 
-            setDisabledButton(true)
-            setMessage("Adding feed...")
-            host
-              .get("feeds")
-              .get(enc(url))
-              .once(async feed => {
-                if (feed) {
-                  const data = {
-                    title: feed.title,
-                    description: feed.description,
-                    html_url: feed.html_url,
-                    language: feed.language,
-                    image: feed.image,
+            try {
+              const signedUrl = await Gun.SEA.sign(url, user._.sea)
+              const res = await fetch(`${window.location.origin}/add-feed`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json;charset=utf-8",
+                },
+                body: JSON.stringify({code: code, url: signedUrl}),
+              })
+              if (!res.ok) {
+                setDisabledButton(false)
+                setMessage("Error adding feed")
+                console.error(res)
+                return
+              }
+
+              const json = await res.json()
+              if (json.error) {
+                setDisabledButton(false)
+                setMessage(json.error)
+                return
+              }
+
+              if (!json.add || !json.add.url) {
+                setDisabledButton(false)
+                setMessage("Error adding feed")
+                console.log("No feed returned")
+                return
+              }
+
+              if (json.results) {
+                console.log(`Multiple feeds were discovered at ${url}
+  Subscribed to ${json.add.url}
+  Other results were:`)
+                console.log(json.results)
+              }
+
+              const data = {
+                title: enc(json.add.title),
+                description: enc(json.add.description),
+                html_url: enc(json.add.html_url),
+                language: enc(json.add.language),
+                image: enc(json.add.image),
+              }
+              user
+                .get("public")
+                .get("feeds")
+                .get(enc(json.add.url))
+                .put(data, ack => {
+                  if (ack.err) {
+                    setDisabledButton(false)
+                    setMessage("Error adding feed")
+                    console.error(ack.err)
+                    return
                   }
-                  user
-                    .get("public")
-                    .get("feeds")
-                    .get(enc(url))
-                    .put(data, ack => {
-                      if (ack.err) {
-                        console.error(ack.err)
-                      }
-                    })
+
                   setDisabledButton(false)
                   setMessage("Feed added")
                   setTimeout(() => setAddFeed(false), 1000)
                   return
-                }
-
-                try {
-                  const signedUrl = await Gun.SEA.sign(url, user._.sea)
-                  const res = await fetch(
-                    `${window.location.origin}/add-feed`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json;charset=utf-8",
-                      },
-                      body: JSON.stringify({code: code, url: signedUrl}),
-                    },
-                  )
-                  if (!res.ok) {
-                    setDisabledButton(false)
-                    setMessage("Error adding feed")
-                    console.error(res)
-                    return
-                  }
-
-                  const json = await res.json()
-                  if (json.error) {
-                    setDisabledButton(false)
-                    setMessage(json.error)
-                    return
-                  }
-
-                  if (!json.add || !json.add.url) {
-                    setDisabledButton(false)
-                    setMessage("Error adding feed")
-                    console.log("No feed returned")
-                    return
-                  }
-
-                  if (json.results) {
-                    console.log(
-                      `Multiple feeds were discovered at ${url}
-  Subscribed to ${json.add.url}
-  Other results were:`,
-                    )
-                    console.log(json.results)
-                  }
-
-                  const data = {
-                    title: enc(json.add.title),
-                    description: enc(json.add.description),
-                    html_url: enc(json.add.html_url),
-                    language: enc(json.add.language),
-                    image: enc(json.add.image),
-                  }
-                  user
-                    .get("public")
-                    .get("feeds")
-                    .get(enc(json.add.url))
-                    .put(data, ack => {
-                      if (ack.err) {
-                        setDisabledButton(false)
-                        setMessage("Error adding feed")
-                        console.error(ack.err)
-                        return
-                      }
-
-                      setDisabledButton(false)
-                      setMessage("Feed added")
-                      setTimeout(() => setAddFeed(false), 1000)
-                      return
-                    })
-                } catch (error) {
-                  setDisabledButton(false)
-                  setMessage("Error adding feed")
-                  console.error(error)
-                }
-              })
+                })
+            } catch (error) {
+              setDisabledButton(false)
+              setMessage("Error adding feed")
+              console.error(error)
+            }
           })
       })
   }

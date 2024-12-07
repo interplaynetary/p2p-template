@@ -221,7 +221,6 @@ const SearchAppBar = ({
             edge="start"
             color="inherit"
             aria-label="home"
-            sx={{mr: 2}}
             onClick={home}
           >
             <RssFeedIcon
@@ -232,7 +231,15 @@ const SearchAppBar = ({
           </IconButton>
           {title ? (
             <Button
-              sx={{color: "white", fontSize: "1.25em", textTransform: "none"}}
+              sx={{
+                color: "white",
+                fontSize: "1.25em",
+                textTransform: "none",
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+                overflow: "hidden",
+                display: "block",
+              }}
               onClick={() => editGroup(title)}
             >
               {title}

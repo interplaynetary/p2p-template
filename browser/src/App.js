@@ -3,6 +3,7 @@ import {BrowserRouter, Routes, Route, Navigate} from "react-router-dom"
 import {red} from "@mui/material/colors"
 import {ThemeProvider, createTheme} from "@mui/material/styles"
 import CssBaseline from "@mui/material/CssBaseline"
+import {dec} from "./utils/text.js"
 import Display from "./components/Display"
 import Help from "./components/Help"
 import Register from "./components/Register"
@@ -61,6 +62,7 @@ const App = () => {
   const [mode, setMode] = useState(() => {
     return sessionStorage.getItem("mode") || "light"
   })
+  const [feeds, setFeeds] = useState(new Map())
   const theme = useMemo(
     () =>
       createTheme({
@@ -104,7 +106,7 @@ const App = () => {
       .get("accounts")
       .map()
       .on((account, accountCode) => {
-        if (!account || !accountCode) return
+        if (!account) return
 
         let check = {
           pub: account.pub,
@@ -114,91 +116,75 @@ const App = () => {
           host: account.host,
         }
         // Check this account against the users list of contacts.
-        user
-          .get("public")
-          .get("contacts")
-          .once(contacts => {
-            let found = false
-            for (let [contactCode, contact] of Object.entries(contacts ?? {})) {
-              if (contactCode !== accountCode) continue
+        const contacts = user.get("public").get("contacts")
+        contacts.once(async c => {
+          if (c) delete c._
+          let found = false
+          for (const contactCode of Object.keys(c ?? {})) {
+            if (contactCode !== accountCode) continue
 
-              found = true
-              if (contact.pub === check.pub) break
+            found = true
+            const contact = await contacts.get(contactCode).then()
+            if (contact.pub === check.pub) break
 
-              // If the public key has changed for this contact then store their
-              // new account details and re-share encrypted data with them to
-              // help restore their account.
-              user
-                .get("public")
-                .get("contacts")
-                .get(contactCode)
-                .put(check, ack => {
-                  if (ack.err) {
-                    console.error(ack.err)
-                  }
-                })
-              gun
-                .user(contact.pub)
-                .get("epub")
-                .once(oldEPub => {
-                  if (!oldEPub) {
-                    console.error("User not found for old public key")
-                    return
-                  }
+            // If the public key has changed for this contact then store their
+            // new account details and re-share encrypted data with them to
+            // help restore their account.
+            contacts.get(contactCode).put(check, ack => {
+              if (ack.err) {
+                console.error(ack.err)
+              }
+            })
+            gun
+              .user(contact.pub)
+              .get("epub")
+              .once(oldEPub => {
+                if (!oldEPub) {
+                  console.error("User not found for old public key")
+                  return
+                }
 
-                  gun
-                    .user(check.pub)
-                    .get("epub")
-                    .once(epub => {
-                      if (!epub) {
-                        console.error("User not found for new public key")
-                        return
-                      }
+                gun
+                  .user(check.pub)
+                  .get("epub")
+                  .once(epub => {
+                    if (!epub) {
+                      console.error("User not found for new public key")
+                      return
+                    }
 
-                      user
-                        .get("shared")
-                        .get(contactCode)
-                        .once(async shared => {
-                          if (!shared) return
+                    const shared = user.get("shared").get(contactCode)
+                    shared.once(async s => {
+                      if (!s) return
 
-                          const oldSecret = await Gun.SEA.secret(
-                            oldEPub,
-                            user._.sea,
-                          )
-                          const secret = await Gun.SEA.secret(epub, user._.sea)
-                          for (let [key, oldEnc] of Object.entries(shared)) {
-                            if (!key || !oldEnc) continue
+                      delete s._
+                      const oldSecret = await Gun.SEA.secret(
+                        oldEPub,
+                        user._.sea,
+                      )
+                      const secret = await Gun.SEA.secret(epub, user._.sea)
+                      for (const key of Object.keys(s)) {
+                        if (!key) continue
 
-                            let data = await Gun.SEA.decrypt(oldEnc, oldSecret)
-                            let enc = await Gun.SEA.encrypt(data, secret)
-                            user
-                              .get("shared")
-                              .get(contactCode)
-                              .get(key)
-                              .put(enc, ack => {
-                                if (ack.err) {
-                                  console.error(ack.err)
-                                }
-                              })
-                          }
+                        const oldEnc = await shared.get(key).then()
+                        let data = await Gun.SEA.decrypt(oldEnc, oldSecret)
+                        let enc = await Gun.SEA.encrypt(data, secret)
+                        shared.get(key).put(enc, ack => {
+                          if (ack.err) console.error(ack.err)
                         })
+                      }
                     })
-                })
-              break
-            }
-            // Add the new contact if we referred them.
-            if (!found && account.ref === code) {
-              user
-                .get("public")
-                .get("contacts")
-                .get(accountCode)
-                .put(check, ack => {
-                  if (ack.err) {
-                    console.error(ack.err)
-                  }
-                })
-            }
-          })
+                  })
+              })
+            break
+          }
+          // Add the new contact if we referred them.
+          if (!found && account.ref === code) {
+            contacts.get(accountCode).put(check, ack => {
+              if (ack.err) console.error(ack.err)
+            })
+          }
+        })
       })
 
     // Listen for feed changes to apply to our own feed list.
@@ -209,11 +195,23 @@ const App = () => {
       .on((feed, url) => {
         if (!url) return
 
+        if (feed && feed.title !== "") {
+          setFeeds(
+            f =>
+              new Map(
+                f.set(url, {
+                  url: feed.html_url,
+                  title: feed.title,
+                  image: feed.image,
+                }),
+              ),
+          )
+        }
         const userFeed = user.get("public").get("feeds").get(url)
         userFeed.once(found => {
-          if (!found) return
+          if (!found || found.title === "") return
 
-          if (feed) {
+          if (feed && feed.title !== "") {
             // Feed details have been updated.
             const data = {
               title: feed.title,
@@ -223,17 +221,36 @@ const App = () => {
               image: feed.image,
             }
             userFeed.put(data, ack => {
-              if (ack.err) {
-                console.error(ack.err)
-              }
+              if (ack.err) console.error(ack.err)
             })
             return
           }
 
           // Otherwise the feed was removed.
-          userFeed.put(null, ack => {
+          userFeed.put({title: ""}, async ack => {
             if (ack.err) {
               console.error(ack.err)
+              return
+            }
+
+            // Request to lower account subscribed count when a feed is removed.
+            try {
+              const signedUrl = await Gun.SEA.sign(dec(url), user._.sea)
+              const res = await fetch(
+                `${window.location.origin}/remove-subscriber`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json;charset=utf-8",
+                  },
+                  body: JSON.stringify({code: code, url: signedUrl}),
+                },
+              )
+              if (!res.ok) {
+                console.error(res)
+              }
+            } catch (error) {
+              console.error(error)
             }
           })
         })
@@ -326,6 +343,7 @@ const App = () => {
                   code={code}
                   mode={mode}
                   setMode={setMode}
+                  feeds={feeds}
                 />
               ) : (
                 <Help />

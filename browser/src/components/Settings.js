@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from "react"
+import {grey} from "@mui/material/colors"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -16,6 +17,7 @@ import Typography from "@mui/material/Typography"
 import ContentCopy from "@mui/icons-material/ContentCopy"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
+import {buildDate} from "../utils/buildDate.js"
 import SearchAppBar from "./SearchAppBar"
 
 import Gun from "gun"
@@ -214,6 +216,9 @@ const Settings = ({host, user, code, mode, setMode}) => {
                 </Button>
               </CardContent>
             </Card>
+            <Typography sx={{m: 1, color: grey[400]}}>
+              Build date: {buildDate}
+            </Typography>
           </Grid>
         </Grid>
       </Container>
