@@ -98,7 +98,7 @@ const SearchAppBar = ({
 
   const home = () => {
     if (page === "display") {
-      showGroupList()
+      showGroupList(false)
     } else {
       window.location = "/"
     }

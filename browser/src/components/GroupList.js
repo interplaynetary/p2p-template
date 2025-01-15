@@ -21,7 +21,7 @@ const GroupList = ({user, groups, setGroup}) => {
             " from the account menu to create your first group.",
         )
       }
-    }, 2000)
+    }, 5000)
     return () => clearTimeout(timeout)
   }, [groups])
 

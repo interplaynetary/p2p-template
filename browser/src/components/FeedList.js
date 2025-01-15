@@ -7,7 +7,6 @@ import Grid from "@mui/material/Grid"
 import List from "@mui/material/List"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
-import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
 import {
   nytFavicon,
@@ -85,22 +84,20 @@ const FeedList = ({user, code, groups, showGroupList}) => {
   useEffect(() => {
     if (!user) return
 
-    user
-      .get("public")
-      .get("feeds")
-      .map()
-      .on((f, url) => {
-        if (!url) return
+    const update = (f, url) => {
+      if (!url) return
 
-        updateFeed({
-          key: dec(url),
-          title: f ? dec(f.title) : "",
-          description: f ? dec(f.description) : "",
-          html_url: f ? dec(f.html_url) : "",
-          language: f ? dec(f.language) : "",
-          image: f ? dec(f.image) : "",
-        })
+      updateFeed({
+        key: url,
+        title: f ? f.title : "",
+        description: f ? f.description : "",
+        html_url: f ? f.html_url : "",
+        language: f ? f.language : "",
+        image: f ? f.image : "",
       })
+    }
+    user.get("public").get("feeds").map().once(update)
+    user.get("public").get("feeds").map().on(update)
 
     user
       .get("public")
@@ -140,7 +137,7 @@ const FeedList = ({user, code, groups, showGroupList}) => {
       feeds: selected.reduce((acc, f) => {
         // This function converts selected feeds to an object to store in gun.
         // see Display useEffect which converts back to an array.
-        return f ? {...acc, [enc(f)]: true} : {...acc}
+        return f ? {...acc, [f]: true} : {...acc}
       }, {}),
       // Show an unread count for the group and display the author, text and
       // timestamp of the latest item. (latest field is the item key.)
@@ -162,7 +159,7 @@ const FeedList = ({user, code, groups, showGroupList}) => {
       user
         .get("public")
         .get("groups")
-        .get(enc(groupName))
+        .get(groupName)
         .put(group, ack => {
           if (ack.err) {
             setDisabledButton(false)
@@ -173,7 +170,7 @@ const FeedList = ({user, code, groups, showGroupList}) => {
           }
 
           clearInterval(interval)
-          showGroupList()
+          showGroupList(true)
         })
       if (retry > 5) {
         setDisabledButton(false)
@@ -243,10 +240,12 @@ const FeedList = ({user, code, groups, showGroupList}) => {
           </List>
         </Grid>
         {!hideDefaultFeeds && !delay && (
-          <Typography>
-            Looking for feeds? Click add feed in the menu, or try some of the
-            options below.
-          </Typography>
+          <Grid item xs={12}>
+            <Typography>
+              Looking for feeds? Click add feed in the menu, or try some of the
+              options below.
+            </Typography>
+          </Grid>
         )}
         {!hideDefaultFeeds &&
           !delay &&
@@ -278,9 +277,11 @@ const FeedList = ({user, code, groups, showGroupList}) => {
               ),
           )}
         {!hideDefaultFeeds && !delay && (
-          <Button sx={{mt: 1}} variant="contained" onClick={dismissDefaults}>
-            Dismiss Defaults
-          </Button>
+          <Grid item xs={12}>
+            <Button sx={{mt: 1}} variant="contained" onClick={dismissDefaults}>
+              Dismiss Defaults
+            </Button>
+          </Grid>
         )}
       </Grid>
     </Container>

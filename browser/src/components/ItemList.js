@@ -1,7 +1,6 @@
-import {useEffect, useReducer, useRef, useState} from "react"
+import {useCallback, useEffect, useReducer, useRef, useState} from "react"
 import Container from "@mui/material/Container"
 import Grid from "@mui/material/Grid"
-import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
 import Item from "./Item"
 
@@ -19,7 +18,7 @@ const ItemList = ({
   const [items, updateItem] = useReducer(reducer(), init)
   const [groupKey, setGroupKey] = useState("")
   const [newFrom, setNewFrom] = useState(0)
-  const [scrollOnce, setScrollOnce] = useState(false)
+  const [scrollToEnd, setScrollToEnd] = useState(false)
   const [updateStart, setUpdateStart] = useState(false)
   const itemListRef = useRef()
   const itemRefs = useRef(new Map())
@@ -35,19 +34,90 @@ const ItemList = ({
     return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate())
   }
 
-  // Wait for enough items for the scroll bar to appear and then scroll to the
-  // end once so that the intersection observer is not automatically triggered.
-  useEffect(() => {
-    if (scrollOnce || items.all.length < 10) return
+  const mapEnclosure = useCallback(
+    async key => {
+      if (!host || !key) return null
 
-    setScrollOnce(true)
+      let found = false
+      const e = host
+        .get("items" + day(key))
+        .get(key)
+        .get("enclosure")
+      const p = await e.get("photo").then()
+      const a = await e.get("audio").then()
+      const v = await e.get("video").then()
+
+      let enclosure = {}
+      if (p) {
+        found = true
+        enclosure.photo = []
+        delete p._
+        for (const [link, alt] of Object.entries(p)) {
+          enclosure.photo.push({link: link, alt: alt})
+        }
+      }
+      if (a) {
+        found = true
+        enclosure.audio = []
+        delete a._
+        for (const audio of Object.keys(a)) {
+          enclosure.audio.push(audio)
+        }
+      }
+      if (v) {
+        found = true
+        enclosure.video = []
+        delete v._
+        for (const video of Object.keys(v)) {
+          enclosure.video.push(video)
+        }
+      }
+      return found ? enclosure : null
+    },
+    [host],
+  )
+
+  const mapCategory = useCallback(
+    async key => {
+      if (!host || !key) return null
+
+      let found = false
+      const c = await host
+        .get("items" + day(key))
+        .get(key)
+        .get("category")
+        .then()
+
+      let category = []
+      if (c) {
+        found = true
+        delete c._
+        for (const value of Object.keys(c)) {
+          category.push(value)
+        }
+      }
+      return found ? category : null
+    },
+    [host],
+  )
+
+  // Scroll to end so that the intersection observer is not triggered.
+  useEffect(() => {
+    if (!scrollToEnd || items.all.length === 0) return
+
     if (itemListRef.current) {
       itemListRef.current.scrollIntoView({block: "end"})
     }
-  }, [scrollOnce, items])
+    document.body.onscroll = () => {
+      setTimeout(() => {
+        setScrollToEnd(false)
+        document.body.onscroll = null
+      }, 3000)
+    }
+  }, [scrollToEnd, items])
 
   useEffect(() => {
-    if (!updateStart) return
+    if (!host || !updateStart) return
 
     setUpdateStart(false)
 
@@ -71,18 +141,18 @@ const ItemList = ({
         const feed = feeds.get(item.url)
         updateItem({
           key,
-          title: dec(item.title),
-          content: dec(item.content),
-          author: dec(item.author),
-          category: dec(item.category),
-          enclosure: dec(item.enclosure),
-          permalink: dec(item.permalink),
-          guid: dec(item.guid),
-          timestamp: dec(item.timestamp),
-          feedUrl: feed && feed.url ? dec(feed.html_url) : "",
-          feedTitle: feed && feed.title ? dec(feed.title) : "",
-          feedImage: feed && feed.image ? dec(feed.image) : "",
-          url: dec(item.url),
+          title: item.title,
+          content: item.content,
+          author: item.author,
+          category: await mapCategory(item.category ? key : null),
+          enclosure: await mapEnclosure(item.enclosure ? key : null),
+          permalink: item.permalink,
+          guid: item.guid,
+          timestamp: item.timestamp,
+          feedUrl: feed && feed.url ? feed.url : "",
+          feedTitle: feed && feed.title ? feed.title : "",
+          feedImage: feed && feed.image ? feed.image : "",
+          url: item.url,
         })
       }
       // Wait for the ref to be added for the new loadMore item.
@@ -96,25 +166,35 @@ const ItemList = ({
             if (currentKeys.length - itemRefs.current.size <= 10) {
               loadMoreItems()
               // Wait for loadMoreItems to add to currentKeys.
-              setTimeout(() => setUpdateStart(true), 6000)
+              setTimeout(() => setUpdateStart(true), 4000)
             } else {
               setUpdateStart(true)
             }
           }
         })
-        // Find a new target to trigger loading more items.
-        for (let i = firstKeyIndex.current - 1; i > 0; i--) {
+        // Find a new target to trigger loading more items. Aim for the third
+        // item from the top, but may not be enough items.
+        let aim = 0
+        for (let i = firstKeyIndex.current; i >= 0; i--) {
           const target = itemRefs.current.get(currentKeys[i])
           if (target) {
             watchStart.current.observe(target)
             loadMore.current = currentKeys[i]
-            break
+            if (aim++ === 3) break
           }
         }
       }, 1000)
     }
     update()
-  }, [host, updateStart, loadMoreItems, currentKeys, feeds])
+  }, [
+    host,
+    updateStart,
+    loadMoreItems,
+    currentKeys,
+    feeds,
+    mapEnclosure,
+    mapCategory,
+  ])
 
   useEffect(() => {
     if (!group) {
@@ -122,7 +202,6 @@ const ItemList = ({
       loadKeyIndex.current = 10
       loadMore.current = 0
       updateItem({reset: true})
-      setScrollOnce(false)
       setNewFrom(0)
       setGroupKey("")
       return
@@ -132,6 +211,7 @@ const ItemList = ({
 
     setGroupKey(group.key)
     resetGroup(group.key)
+    setScrollToEnd(true)
     setUpdateStart(true)
   }, [group, groupKey, currentKeys, resetGroup])
 
@@ -140,7 +220,7 @@ const ItemList = ({
 
     if (!watchEnd.current) {
       watchEnd.current = new IntersectionObserver(e => {
-        if (e[0].isIntersecting) setNewFrom(0)
+        if (e[0].isIntersecting) setTimeout(() => setNewFrom(0), 5000)
       })
     }
 
@@ -165,49 +245,44 @@ const ItemList = ({
         .then()
       if (!item) return
 
-      // Group feeds are decoded in Display.js, so compare decoded.
-      const url = dec(item.url)
       groups.all.forEach(g => {
-        if (!g.feeds.includes(url)) return
+        if (!g.feeds.includes(item.url)) return
 
         let stats = groupStats.get(g.key)
         if (key > stats.latest) {
           stats.latest = key
           stats.author = item.author
           stats.timestamp = item.timestamp
-          const title = dec(item.title)
-          const content = dec(item.content)
           const tag = /(<([^>]+)>)/g
-          const text = title ? title.replace(tag, "") : content.replace(tag, "")
-          stats.text =
-            text.length > 200 ? enc(text.substring(0, 200)) : enc(text)
+          const text = item.title
+            ? item.title.replace(tag, "")
+            : item.content.replace(tag, "")
+          stats.text = text.length > 200 ? text.substring(0, 200) : text
         }
         if (!group || g.key !== group.key) stats.count++
         groupStats.set(g.key, stats)
       })
-      if (!group || !group.feeds.includes(url)) return
+      if (!group || !group.feeds.includes(item.url)) return
 
-      // Feeds are mapped encoded in App.js
       const feed = feeds.get(item.url)
       updateItem({
         key,
-        title: dec(item.title),
-        content: dec(item.content),
-        author: dec(item.author),
-        category: dec(item.category),
-        enclosure: dec(item.enclosure),
-        permalink: dec(item.permalink),
-        guid: dec(item.guid),
-        timestamp: dec(item.timestamp),
-        feedUrl: feed && feed.url ? dec(feed.html_url) : "",
-        feedTitle: feed && feed.title ? dec(feed.title) : "",
-        feedImage: feed && feed.image ? dec(feed.image) : "",
-        url: dec(item.url),
+        title: item.title,
+        content: item.content,
+        author: item.author,
+        category: await mapCategory(item.category ? key : null),
+        enclosure: await mapEnclosure(item.enclosure ? key : null),
+        permalink: item.permalink,
+        guid: item.guid,
+        timestamp: item.timestamp,
+        feedUrl: feed && feed.url ? feed.url : "",
+        feedTitle: feed && feed.title ? feed.title : "",
+        feedImage: feed && feed.image ? feed.image : "",
+        url: item.url,
       })
       if (key < earliest || earliest === 0) earliest = key
       if (key > latest || latest === 0) latest = key
     })
-    if (!group) return
 
     setTimeout(() => {
       if (earliest !== 0 && newFrom === 0) {
@@ -225,7 +300,17 @@ const ItemList = ({
       }
       setGroupStats(groupStats)
     }, 5000)
-  }, [host, group, groups, newKeys, setGroupStats, newFrom, feeds])
+  }, [
+    host,
+    group,
+    groups,
+    newKeys,
+    setGroupStats,
+    newFrom,
+    feeds,
+    mapEnclosure,
+    mapCategory,
+  ])
 
   return (
     <Container maxWidth="md">

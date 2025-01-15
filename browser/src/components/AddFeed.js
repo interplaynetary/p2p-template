@@ -1,5 +1,4 @@
 import {useState} from "react"
-import {enc} from "../utils/text.js"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
 import CardContent from "@mui/material/CardContent"
@@ -52,48 +51,60 @@ const AddFeed = ({host, user, code, setAddFeed}) => {
         setMessage("Adding feed...")
         host
           .get("feeds")
-          .get(enc(url))
+          .get(url)
           .once(async feed => {
             if (feed && feed.title) {
-              const data = {
-                title: feed.title,
-                description: feed.description,
-                html_url: feed.html_url,
-                language: feed.language,
-                image: feed.image,
-              }
               user
                 .get("public")
                 .get("feeds")
-                .get(enc(url))
-                .put(data, async ack => {
-                  setDisabledButton(false)
-                  if (ack.err) {
-                    console.error(ack.err)
-                    setMessage("Error adding feed")
+                .get(url)
+                .once(userFeed => {
+                  if (userFeed && userFeed.title) {
+                    setDisabledButton(false)
+                    setMessage("Already added feed")
                     return
                   }
 
-                  setMessage("Feed added")
-                  setTimeout(() => setAddFeed(false), 1000)
-                  try {
-                    const signedUrl = await Gun.SEA.sign(url, user._.sea)
-                    const res = await fetch(
-                      `${window.location.origin}/add-subscriber`,
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json;charset=utf-8",
-                        },
-                        body: JSON.stringify({code: code, url: signedUrl}),
-                      },
-                    )
-                    if (!res.ok) {
-                      console.error(res)
-                    }
-                  } catch (error) {
-                    console.error(error)
+                  const data = {
+                    title: feed.title,
+                    description: feed.description,
+                    html_url: feed.html_url,
+                    language: feed.language,
+                    image: feed.image,
                   }
+                  user
+                    .get("public")
+                    .get("feeds")
+                    .get(url)
+                    .put(data, async ack => {
+                      setDisabledButton(false)
+                      if (ack.err) {
+                        console.error(ack.err)
+                        setMessage("Error adding feed")
+                        return
+                      }
+
+                      setMessage("Feed added")
+                      setTimeout(() => setAddFeed(false), 1000)
+                      try {
+                        const signedUrl = await Gun.SEA.sign(url, user._.sea)
+                        const res = await fetch(
+                          `${window.location.origin}/add-subscriber`,
+                          {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json;charset=utf-8",
+                            },
+                            body: JSON.stringify({code: code, url: signedUrl}),
+                          },
+                        )
+                        if (!res.ok) {
+                          console.error(res)
+                        }
+                      } catch (error) {
+                        console.error(error)
+                      }
+                    })
                 })
               return
             }
@@ -136,16 +147,16 @@ const AddFeed = ({host, user, code, setAddFeed}) => {
               }
 
               const data = {
-                title: enc(json.add.title),
-                description: enc(json.add.description),
-                html_url: enc(json.add.html_url),
-                language: enc(json.add.language),
-                image: enc(json.add.image),
+                title: json.add.title,
+                description: json.add.description,
+                html_url: json.add.html_url,
+                language: json.add.language,
+                image: json.add.image,
               }
               user
                 .get("public")
                 .get("feeds")
-                .get(enc(json.add.url))
+                .get(json.add.url)
                 .put(data, ack => {
                   if (ack.err) {
                     setDisabledButton(false)

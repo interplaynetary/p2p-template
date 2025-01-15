@@ -7,34 +7,12 @@ import Grid from "@mui/material/Grid"
 import Link from "@mui/material/Link"
 import Typography from "@mui/material/Typography"
 import PersonIcon from "@mui/icons-material/Person"
+import {urlAvatar} from "../utils/avatar.js"
 import {formatDate} from "../utils/format.js"
-
-const toColor = url => {
-  let hash = 0
-  for (let i = 0; i < url.length; i++) {
-    hash = url.charCodeAt(i) + ((hash << 5) - hash)
-  }
-
-  let color = "#"
-  for (let i = 0; i < 3; i++) {
-    let value = (hash >> (i * 8)) & 0xff
-    if (value > 80) value -= 80
-    color += `00${value.toString(16)}`.slice(-2)
-  }
-  return color
-}
-
-const urlAvatar = url => {
-  return {
-    sx: {
-      bgcolor: toColor(url),
-    },
-    children: url.match(/https?:\/\/(?:www\.)(.)/)[0],
-  }
-}
 
 const Item = ({item, itemRefs, newFrom}) => {
   const [showMore, setShowMore] = useState(false)
+  const stripped = item.content && item.content.replace(/(<([^>]+)>)/g, "")
 
   return (
     <Grid
@@ -86,7 +64,7 @@ const Item = ({item, itemRefs, newFrom}) => {
             <b>{parse(item.title)}</b>
           </Typography>
         )}
-        {item.content && item.content.length > 1200 && showMore && (
+        {item.content && stripped.length > 1200 && showMore && (
           <Typography>
             {parse(item.content)}{" "}
             <Link
@@ -99,9 +77,9 @@ const Item = ({item, itemRefs, newFrom}) => {
             </Link>
           </Typography>
         )}
-        {item.content && item.content.length > 1200 && !showMore && (
+        {item.content && stripped.length > 1200 && !showMore && (
           <Typography>
-            {item.content.replace(/(<([^>]+)>)/g, "").substring(0, 800)}...{" "}
+            {stripped.substring(0, 800)}...{" "}
             <Link
               component="button"
               onClick={() => {
@@ -112,9 +90,36 @@ const Item = ({item, itemRefs, newFrom}) => {
             </Link>
           </Typography>
         )}
-        {item.content && item.content.length <= 1200 && (
+        {item.content && stripped.length <= 1200 && (
           <Typography>{parse(item.content)}</Typography>
         )}
+        {item.enclosure &&
+          item.enclosure.photo &&
+          item.enclosure.photo.map(p => (
+            <img key={p.link} src={p.link} alt={p.alt} />
+          ))}
+        {item.enclosure &&
+          item.enclosure.audio &&
+          item.enclosure.audio.map(a =>
+            a.startsWith("https") ? (
+              <audio key={a} controls src={a}></audio>
+            ) : (
+              <Link href={a} target="_blank">
+                {a}
+              </Link>
+            ),
+          )}
+        {item.enclosure &&
+          item.enclosure.video &&
+          item.enclosure.video.map(v =>
+            v.startsWith("https") ? (
+              <video key={v} controls src={v}></video>
+            ) : (
+              <Link href={v} target="_blank">
+                {v}
+              </Link>
+            ),
+          )}
       </Box>
     </Grid>
   )

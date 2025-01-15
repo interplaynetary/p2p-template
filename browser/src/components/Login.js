@@ -23,32 +23,26 @@ const Login = ({host, user, mode, setMode}) => {
   const [disabledButton, setDisabledButton] = useState(user.is)
   const found = useRef(false)
 
-  const checkAccounts = () => {
-    host.get("accounts").once(
-      all => {
-        if (!all) return
+  const checkAccount = () => {
+    host.get("accountMap" + user.is.pub).once(
+      code => {
+        if (!code) return
 
-        delete all._
-        for (const code of Object.keys(all)) {
-          if (!code) continue
-          if (found.current) break
+        host
+          .get("accounts")
+          .get(code)
+          .once(
+            account => {
+              if (!account || account.pub !== user.is.pub) return
 
-          host
-            .get("accounts")
-            .get(code)
-            .once(
-              account => {
-                if (!account || account.pub !== user.is.pub) return
-
-                found.current = true
-                sessionStorage.setItem("code", code)
-                sessionStorage.setItem("name", account.name)
-              },
-              {wait: 1000},
-            )
-        }
+              found.current = true
+              sessionStorage.setItem("code", code)
+              sessionStorage.setItem("name", account.name)
+            },
+            {wait: 2000},
+          )
       },
-      {wait: 1000},
+      {wait: 2000},
     )
   }
 
@@ -66,7 +60,7 @@ const Login = ({host, user, mode, setMode}) => {
       if (!ack.err) {
         // auth is ok so look up account details in host data.
         let retry = 0
-        checkAccounts()
+        checkAccount()
         const interval = setInterval(() => {
           if (found.current) {
             clearInterval(interval)
@@ -79,7 +73,7 @@ const Login = ({host, user, mode, setMode}) => {
             clearInterval(interval)
             user.leave()
           } else {
-            checkAccounts()
+            checkAccount()
             retry++
           }
         }, 3000)

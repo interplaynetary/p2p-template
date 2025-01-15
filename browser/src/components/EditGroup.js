@@ -7,8 +7,15 @@ import Grid from "@mui/material/Grid"
 import List from "@mui/material/List"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
-import {enc, dec} from "../utils/text.js"
 import {init, reducer} from "../utils/reducer.js"
+import {
+  nytFavicon,
+  bbcFavicon,
+  tcFavicon,
+  wiredFavicon,
+  espnFavicon,
+  cbsFavicon,
+} from "../images/favicons.js"
 import Feed from "./Feed"
 
 const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
@@ -27,32 +34,83 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
     setGroup(groups.all.find(g => g.key === currentGroup))
   }, [groups, currentGroup])
 
+  // This is copied from FeedList in case users have added default feeds to
+  // a group which also need to be displayed here.
+  useEffect(() => {
+    updateFeed({
+      key: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+      title: "NYT > Top Stories",
+      html_url: "https://www.nytimes.com",
+      language: "en-us",
+      image: nytFavicon,
+      defaultGroup: "News",
+    })
+    updateFeed({
+      key: "https://feeds.bbci.co.uk/news/world/rss.xml",
+      title: "BBC News",
+      html_url: "https://www.bbc.co.uk/news/world",
+      language: "en-gb",
+      image: bbcFavicon,
+      defaultGroup: "News",
+    })
+    updateFeed({
+      key: "https://techcrunch.com/feed",
+      title: "TechCrunch",
+      html_url: "https://techcrunch.com",
+      language: "en-US",
+      image: tcFavicon,
+      defaultGroup: "Tech",
+    })
+    updateFeed({
+      key: "https://www.wired.com/feed",
+      title: "Wired",
+      html_url: "https://www.wired.com",
+      language: "en-US",
+      image: wiredFavicon,
+      defaultGroup: "Tech",
+    })
+    updateFeed({
+      key: "https://www.espn.com/espn/rss/news",
+      title: "www.espn.com - TOP",
+      html_url: "https://www.espn.com",
+      language: "en",
+      image: espnFavicon,
+      defaultGroup: "Sport",
+    })
+    updateFeed({
+      key: "https://www.cbssports.com/rss/headlines",
+      title: "CBSSports.com Headlines",
+      html_url: "https://www.cbssports.com",
+      language: "en-us",
+      image: cbsFavicon,
+      defaultGroup: "Sport",
+    })
+  }, [])
+
   useEffect(() => {
     if (!user) return
 
-    user
-      .get("public")
-      .get("feeds")
-      .map()
-      .on((feed, url) => {
-        if (!url) return
+    const update = (f, url) => {
+      if (!url) return
 
-        updateFeed({
-          key: dec(url),
-          title: feed ? dec(feed.title) : "",
-          description: feed ? dec(feed.description) : "",
-          html_url: feed ? dec(feed.html_url) : "",
-          language: feed ? dec(feed.language) : "",
-          image: feed ? dec(feed.image) : "",
-        })
+      updateFeed({
+        key: url,
+        title: f ? f.title : "",
+        description: f ? f.description : "",
+        html_url: f ? f.html_url : "",
+        language: f ? f.language : "",
+        image: f ? f.image : "",
       })
+    }
+    user.get("public").get("feeds").map().once(update)
+    user.get("public").get("feeds").map().on(update)
   }, [user])
 
-  const selectFeed = feed => {
-    if (selected.includes(feed.key)) {
-      setSelected(selected.filter(key => key !== feed.key))
+  const selectFeed = f => {
+    if (selected.includes(f.key)) {
+      setSelected(selected.filter(key => key !== f.key))
     } else {
-      setSelected([...selected, feed.key])
+      setSelected([...selected, f.key])
     }
   }
 
@@ -66,8 +124,8 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
       return
     }
 
-    const feeds = [...group.feeds, ...selected]
-    if (feeds.length === 0) {
+    const allFeeds = [...group.feeds, ...selected]
+    if (allFeeds.length === 0) {
       const message = "Removing all feeds will remove the group. Continue?"
       if (!window.confirm(message)) return
     }
@@ -76,15 +134,15 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
     setMessage("Updating group...")
 
     const data = {
-      feeds: feeds.reduce((acc, f) => {
+      feeds: allFeeds.reduce((acc, f) => {
         // This function converts selected feeds to an object to store in gun.
         // see Display useEffect which converts back to an array.
-        return f ? {...acc, [enc(f)]: true} : {...acc}
+        return f ? {...acc, [f]: true} : {...acc}
       }, {}),
-      count: group.count,
-      latest: group.latest,
-      text: enc(group.text),
-      author: enc(group.author),
+      count: 0,
+      latest: 0,
+      text: "",
+      author: "",
     }
     let retry = 0
     const interval = setInterval(() => {
@@ -93,7 +151,7 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
         user
           .get("public")
           .get("groups")
-          .get(enc(group.key))
+          .get(group.key)
           .put(
             {
               feeds: {},
@@ -110,7 +168,7 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
       user
         .get("public")
         .get("groups")
-        .get(enc(groupName))
+        .get(groupName)
         .put(data, ack => {
           if (ack.err) {
             setDisabledButton(false)
@@ -121,7 +179,7 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
           }
 
           clearInterval(interval)
-          showGroupList()
+          showGroupList(true)
         })
       if (retry > 5) {
         setDisabledButton(false)

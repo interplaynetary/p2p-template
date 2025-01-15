@@ -104,6 +104,10 @@ const Help = ({loggedIn, mode, setMode}) => {
                   </Link>
                   .
                 </Typography>
+                <Typography sx={{pb: 1}}>
+                  For more information and updates, follow{" "}
+                  <Link href="https://mal.haza.website">mal.haza.website</Link>
+                </Typography>
               </CardContent>
             </Card>
           </Grid>

@@ -51,7 +51,7 @@ const Settings = ({host, user, code, mode, setMode}) => {
 
       const secret = await Gun.SEA.secret(epub, user._.sea)
       const shared = host.get("shared").get("invite_codes").get(code)
-      shared.map().on(async (enc, key) => {
+      const update = async (enc, key) => {
         if (!key) return
 
         if (enc) {
@@ -63,7 +63,9 @@ const Settings = ({host, user, code, mode, setMode}) => {
           updated.delete(key)
         }
         set = true
-      })
+      }
+      shared.map().once(update)
+      shared.map().on(update)
     })
     // Batch the update otherwise there are too many calls to setInvites.
     clearInterval(interval.current)

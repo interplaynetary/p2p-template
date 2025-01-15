@@ -8,7 +8,7 @@ import ListItemText from "@mui/material/ListItemText"
 import CheckIcon from "@mui/icons-material/Check"
 import DeleteIcon from "@mui/icons-material/Delete"
 import PersonIcon from "@mui/icons-material/Person"
-import {enc} from "../utils/text.js"
+import {urlAvatar} from "../utils/avatar.js"
 
 import Gun from "gun"
 require("gun/lib/radix.js")
@@ -32,7 +32,7 @@ const Feed = ({
     user
       .get("public")
       .get("feeds")
-      .get(enc(feed.key))
+      .get(feed.key)
       .put({title: ""}, async ack => {
         if (ack.err) {
           console.error(ack.err)
@@ -66,21 +66,24 @@ const Feed = ({
     const message = "Removing the last feed will remove the group. Continue?"
     if (feeds.length === 1 && !window.confirm(message)) return
 
+    const data = {
+      feeds: feeds.reduce((acc, f) => {
+        // This function converts selected feeds to an object to store in gun.
+        // see Display useEffect which converts back to an array.
+        return f ? {...acc, [f]: f !== remove} : {...acc}
+      }, {}),
+      count: 0,
+      latest: 0,
+      text: "",
+      author: "",
+    }
     user
       .get("public")
       .get("groups")
-      .get(enc(currentGroup))
-      .get("feeds")
-      .put(
-        feeds.reduce((acc, f) => {
-          // This function converts selected feeds to an object to store in gun.
-          // see Display useEffect which converts back to an array.
-          return f ? {...acc, [enc(f)]: f !== remove} : {...acc}
-        }, {}),
-        ack => {
-          if (ack.err) console.error(ack.err)
-        },
-      )
+      .get(currentGroup)
+      .put(data, ack => {
+        if (ack.err) console.error(ack.err)
+      })
   }
 
   const showDelete = feed => {
@@ -129,6 +132,8 @@ const Feed = ({
         <ListItemAvatar>
           {feed.image ? (
             <Avatar alt={`Avatar for ${feed.title}`} src={feed.image} />
+          ) : feed.html_url ? (
+            <Avatar {...urlAvatar(feed.html_url)} />
           ) : (
             <Avatar>
               <PersonIcon />

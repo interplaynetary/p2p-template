@@ -7,7 +7,6 @@ import {fileURLToPath} from "url"
 import Gun from "gun"
 import "gun/lib/then.js"
 import "gun/sea.js"
-import {enc, dec} from "./utils/text.js"
 
 const gun = Gun({
   web: express().listen(8765),
@@ -40,6 +39,10 @@ var lastSaved = 0
 // inviteCodes is a map of invite codes and their gun keys, stored in memory
 // to avoid decrypting them in each of the endpoints they're required in.
 const inviteCodes = new Map()
+
+// removeDays is a set of days where old data has already been removed so that
+// gun doesn't need to be checked every time an item is added.
+const removeDays = new Set()
 
 console.log("Trying auth credentials for " + alias)
 user.auth(alias, pass, auth)
@@ -120,7 +123,10 @@ app.post("/check-codes", async (req, res) => {
     res.status(400).send("codes required")
     return
   }
-
+  if (!user.is) {
+    res.status(500).send("Host error")
+    return
+  }
   if (await checkCodes(req.body.codes)) {
     res.end() // ok
     return
@@ -133,6 +139,10 @@ app.post("/check-invite-code", (req, res) => {
   const code = req.body.code || "admin"
   if (inviteCodes.has(code)) {
     res.end() // ok
+    return
+  }
+  if (!user.is) {
+    res.status(500).send("Host error")
     return
   }
 
@@ -178,6 +188,10 @@ app.post("/claim-invite-code", async (req, res) => {
     res.status(400).send("Email required")
     return
   }
+  if (!user.is) {
+    res.status(500).send("Host error")
+    return
+  }
 
   const validate = newCode()
   const encValidate = await Gun.SEA.encrypt(validate, user._.sea)
@@ -189,7 +203,7 @@ app.post("/claim-invite-code", async (req, res) => {
     email: encEmail,
     validate: encValidate,
     ref: invite.owner,
-    host: enc(host),
+    host: host,
     feeds: 10,
     subscribed: 0,
   }
@@ -199,6 +213,10 @@ app.post("/claim-invite-code", async (req, res) => {
     .put(data, ack => {
       if (ack.err) console.log(ack.err)
     })
+  // Also map the code to the user's public key to make login easier.
+  user.get("accountMap" + req.body.pub).put(code, ack => {
+    if (ack.err) console.log(ack.err)
+  })
   validateEmail(req.body.alias, req.body.email, code, validate)
 
   // Remove invite code as it's no longer available.
@@ -277,6 +295,10 @@ app.post("/validate-email", (req, res) => {
     res.status(400).send("Validation code required")
     return
   }
+  if (!user.is) {
+    res.status(500).send("Host error")
+    return
+  }
 
   user
     .get("accounts")
@@ -315,6 +337,10 @@ app.post("/reset-password", (req, res) => {
   }
   if (!req.body.email) {
     res.status(400).send("Email required")
+    return
+  }
+  if (!user.is) {
+    res.status(500).send("Host error")
     return
   }
 
@@ -387,6 +413,10 @@ app.post("/update-password", (req, res) => {
     res.status(400).send("Display Name required")
     return
   }
+  if (!user.is) {
+    res.status(500).send("Host error")
+    return
+  }
 
   user
     .get("accounts")
@@ -435,6 +465,10 @@ app.post("/add-feed", (req, res) => {
   }
   if (!req.body.url) {
     res.status(400).send({error: "url required"})
+    return
+  }
+  if (!user.is) {
+    res.status(500).send("Host error")
     return
   }
 
@@ -495,16 +529,16 @@ app.post("/add-feed", (req, res) => {
         }
 
         const data = {
-          title: enc(feed.add.title),
-          description: enc(feed.add.description),
-          html_url: enc(feed.add.html_url),
-          language: enc(feed.add.language),
-          image: enc(feed.add.image),
+          title: feed.add.title,
+          description: feed.add.description,
+          html_url: feed.add.html_url,
+          language: feed.add.language,
+          image: feed.add.image,
           subscriber_count: 1,
         }
         user
           .get("feeds")
-          .get(enc(feed.add.url))
+          .get(feed.add.url)
           .put(data, ack => {
             if (ack.err) {
               console.log(ack.err)
@@ -542,6 +576,10 @@ app.post("/add-subscriber", (req, res) => {
     res.status(400).send({error: "url required"})
     return
   }
+  if (!user.is) {
+    res.status(500).send("Host error")
+    return
+  }
 
   user
     .get("accounts")
@@ -567,7 +605,7 @@ app.post("/add-subscriber", (req, res) => {
 
       user
         .get("feeds")
-        .get(enc(url))
+        .get(url)
         .once(feed => {
           if (!feed) {
             console.log("Feed not found for add-subscriber", url)
@@ -577,7 +615,7 @@ app.post("/add-subscriber", (req, res) => {
 
           user
             .get("feeds")
-            .get(enc(url))
+            .get(url)
             .put({subscriber_count: feed.subscriber_count + 1}, ack => {
               if (ack.err) {
                 console.log(ack.err)
@@ -610,6 +648,10 @@ app.post("/remove-subscriber", (req, res) => {
   }
   if (!req.body.url) {
     res.status(400).send({error: "url required"})
+    return
+  }
+  if (!user.is) {
+    res.status(500).send("Host error")
     return
   }
 
@@ -650,7 +692,7 @@ app.post("/remove-subscriber", (req, res) => {
         return
       }
 
-      const userFeed = user.get("feeds").get(enc(url))
+      const userFeed = user.get("feeds").get(url)
       userFeed.once(feed => {
         if (!feed) {
           console.log("Feed not found for remove-subscriber", url)
@@ -697,6 +739,10 @@ app.post("/private/create-invite-codes", (req, res) => {
     res.status(400).send("code required")
     return
   }
+  if (!user.is) {
+    res.status(500).send("Host error")
+    return
+  }
 
   user
     .get("accounts")
@@ -714,13 +760,13 @@ app.post("/private/create-invite-codes", (req, res) => {
       gun
         .user(account.pub)
         .get("epub")
-        .once(epub => {
+        .once(async epub => {
           if (!epub) {
             res.status(404).send("User not found for public key")
             return
           }
 
-          if (createInviteCodes(req.body.count || 1, code, epub)) {
+          if (await createInviteCodes(req.body.count || 1, code, epub)) {
             res.end()
             return
           }
@@ -757,10 +803,13 @@ app.post("/private/update-feed-limit", (req, res) => {
     res.status(400).send("code required")
     return
   }
-
   const limit = req.body.limit
   if (!limit) {
     res.status(400).send("limit required")
+    return
+  }
+  if (!user.is) {
+    res.status(500).send("Host error")
     return
   }
 
@@ -792,6 +841,10 @@ app.post("/private/remove-feed", (req, res) => {
     res.status(400).send("url required")
     return
   }
+  if (!user.is) {
+    res.status(500).send("Host error")
+    return
+  }
 
   // Don't modify subscriber_count so users can still call remove-subscriber.
   const data = {
@@ -803,15 +856,15 @@ app.post("/private/remove-feed", (req, res) => {
   }
   user
     .get("feeds")
-    .get(enc(req.body.url))
+    .get(req.body.url)
     .put(data, ack => {
-      if (!ack.err) {
-        res.end()
+      if (ack.err) {
+        console.log(ack.err)
+        res.status(500).send("Error removing feed")
         return
       }
 
-      console.log(ack.err)
-      res.status(500).send("Error removing feed")
+      res.end()
     })
 })
 
@@ -824,6 +877,10 @@ app.post("/private/add-item", (req, res) => {
   // (SimplePie generates guids if not found in a feed.)
   if (!req.body.guid) {
     res.status(400).send("guid required")
+    return
+  }
+  if (!user.is) {
+    res.status(500).send("Host error")
     return
   }
 
@@ -839,66 +896,141 @@ app.post("/private/add-item", (req, res) => {
   }
   setTimeout(async () => {
     lastSaved = Date.now()
-    const twoWeeks = lastSaved - 1209600000
-    const item = {
-      title: enc(req.body.title),
-      author: enc(req.body.author),
-      category: enc(req.body.category),
-      enclosure: enc(req.body.enclosure),
-      permalink: enc(req.body.permalink),
-      guid: enc(req.body.guid),
-      url: enc(req.body.url),
-    }
+    const twoWeeksAgo = lastSaved - 1209600000
+    const guid = req.body.guid
+    const enclosure = mapEnclosure(req.body.enclosure)
+    const category = mapCategory(req.body.category)
     // Check if the item already has a key stored for it's guid.
-    let key = await user.get("guids" + item.guid).then()
+    let key = await user.get("guids" + guid).then()
     if (!key) {
-      // Try and use the item's timestamp as the key if not found.
+      // Try and use the item's timestamp as the key if it's not already used.
       const t = req.body.timestamp
-      if (!(await user.get("items" + day(t)).get(t).then())) {
-        key = t
-      } else {
-        key = lastSaved
-      }
-      user.get("guids" + item.guid).put(key, ack => {
+      const used = await user
+        .get("items" + day(t))
+        .get(t)
+        .then()
+      key = used ? lastSaved : t
+      user.get("guids" + guid).put(key, ack => {
         if (ack.err) console.log(ack.err)
       })
-      // Don't update the timestamp on existing items.
-      item.timestamp = enc(req.body.timestamp)
     }
-    if (key < twoWeeks) item = null
-    user
-      .get("items" + day(key))
-      .get(key)
-      .put(item, ack => {
-        if (!ack.err) {
-          res.end()
+    if (key > twoWeeksAgo) {
+      const data = {
+        title: req.body.title,
+        content: req.body.content,
+        author: req.body.author,
+        permalink: req.body.permalink,
+        guid: guid,
+        timestamp: key,
+        url: req.body.url,
+      }
+      if (enclosure) data.enclosure = enclosure
+      if (category) data.category = category
+      const item = user.get("items" + day(key)).get(key)
+      let cb = false
+      item.put(data, ack => {
+        cb = true
+        if (ack.err) {
+          console.log(ack.err)
+          res.status(500).send("Error saving item")
           return
         }
 
-        console.log(ack.err)
-        res.status(500).send("Error saving item")
+        res.end()
       })
+      setTimeout(() => {
+        if (!cb) {
+          res.status(500).send("No callback - exiting")
+          console.log("No callback - exiting")
+          // This is bad but storing data seems to recover when the process
+          // restarts. Need to work out what the actual problem is.
+          process.exit(1)
+        }
+      }, 3000)
+    } else {
+      // Ignore items that are older than 2 weeks.
+      res.end()
+    }
 
     // Also remove any items older than 2 weeks.
-    const dayKey = day(twoWeeks)
-    if (!(await user.get("removed" + dayKey).then())) {
-      user.get("items" + dayKey).map()
+    const dayKey = day(twoWeeksAgo)
+    if (removeDays.has(dayKey)) return
+
+    removeDays.add(dayKey)
+    user.get("removed" + dayKey).once(removed => {
+      if (removed) return
+
+      user
+        .get("items" + dayKey)
+        .map()
         .once((item, key) => {
           if (!item) return
 
-          user.get("items" + dayKey).get(key).put(null, ack => {
-            if (ack.err) console.log(ack.err)
-          })
+          user
+            .get("items" + dayKey)
+            .get(key)
+            .put(null, ack => {
+              if (ack.err) console.log(ack.err)
+            })
         })
       // Flag this day as removed.
       user.get("removed" + dayKey).put(true, ack => {
         if (ack.err) console.log(ack.err)
       })
-    }
+    })
   }, wait)
 })
 
 app.listen(3000)
+
+function mapEnclosure(e) {
+  if (!e) return null
+
+  let found = false
+  let enclosure = {}
+  if (e.photo && e.photo.length !== 0) {
+    enclosure.photo = {}
+    e.photo.forEach(p => {
+      if (p.link) {
+        found = true
+        enclosure.photo[p.link] = p.alt
+      }
+    })
+  }
+  if (e.audio && e.audio.length !== 0) {
+    enclosure.audio = {}
+    e.audio.forEach(a => {
+      if (a) {
+        found = true
+        enclosure.audio[a] = true
+      }
+    })
+  }
+  if (e.video && e.video.length !== 0) {
+    enclosure.video = {}
+    e.video.forEach(v => {
+      if (v) {
+        found = true
+        enclosure.video[v] = true
+      }
+    })
+  }
+  return found ? enclosure : null
+}
+
+function mapCategory(c) {
+  let found = false
+  let category = {}
+  if (c && c.length !== 0) {
+    c.forEach(value => {
+      if (value) {
+        found = true
+        category[value] = true
+      }
+    })
+  }
+  return found ? category : null
+}
 
 function newCode() {
   const chars = "bcdfghjkmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ123456789"
@@ -947,6 +1079,11 @@ function auth(ack) {
 }
 
 function mapInviteCodes() {
+  if (!user.is) {
+    console.log("mapInviteCodes: Host error")
+    return
+  }
+
   // map subscribes to invite_codes, so this will also be called when new
   // invite codes are created.
   user
@@ -1049,6 +1186,7 @@ async function createInviteCodes(count, owner, epub) {
       .get("invite_codes")
       .set(enc, ack => {
         if (ack.err) console.log(ack.err)
+        else console.log("New invite code available", invite)
       })
     let shared = await Gun.SEA.encrypt(newCodes[i], secret)
     user
@@ -1057,6 +1195,7 @@ async function createInviteCodes(count, owner, epub) {
       .get(owner)
       .set(shared, ack => {
         if (ack.err) console.log(ack.err)
+        else console.log("Shared invite code", invite)
       })
   }
   return true
