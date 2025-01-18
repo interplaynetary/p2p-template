@@ -1,13 +1,13 @@
 
 # Treemap
 [✅] - make text scale to fit
-[✅] - remove multiple types
 [✅] - descriptions on nodes
 [✅] - make contributor a special node?
 [✅] - make contributor instances last node (can't go further down in tree)
-[✅] - Make calcualtions more efficient? using contributor-map?
-[] - How to remove nodes? 
-[] - How to unallocate points? 
+[✅] - Make calculations more efficient? using contributor-map?
+[] - allow for choosing your own name!
+[] - Allow adding multiple types/contributors to nodes
+[] - How to unallocate points? (when points = 0, remove node)
 [] - How to manually reorder them? (by dragging?)
 [] - How do we show mutuality directly in the structure? (Showing max min and overlap? Of colors? Of self and other?)
 [] - Add a new intermediary class? For networking / persistence?

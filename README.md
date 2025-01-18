@@ -37,16 +37,16 @@ Associations are relations where:
 4. Relations can be composed into larger structures while maintaining these properties
 
 **Let:**
-Surplus = Roles one holds but does not desire
-Surplus can be distributed directly/transitively via Mutual Recognition Distributions
+- Surplus = Roles one holds but does not desire
+- Surplus can be distributed directly/transitively via Mutual Recognition Distributions
 
 "From each according to his ability, to each according to his needs!"
 
 **Let:**
-Real = True
-Playing = Active-Participation
-Desire = Will-to-Play
-Total Recognition = True Recognition + False Recognition
+- Real = True
+- Playing = Active-Participation
+- Desire = Will-to-Play
+- Total Recognition = True Recognition + False Recognition
 
 **For any participant:**
 ∴ ↑False Recognition = ↓True Recognition
