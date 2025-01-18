@@ -2,7 +2,6 @@
 # Treemap
 [✅] - make text scale to fit
 [✅] - descriptions on nodes
-[✅] - make contributor a special node?
 [✅] - make contributor instances last node (can't go further down in tree)
 [✅] - Make calculations more efficient? using contributor-map?
 [] - allow for choosing your own name!

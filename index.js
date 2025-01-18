@@ -512,109 +512,141 @@ function createTreemap(data) {
   
       group.call(position, root);
 
-    // Modify the node event listeners
-    node.filter(d => true)  // Allow all nodes to be interactive
-        .attr("cursor", "pointer")
-        .on("mousedown", (event, d) => {
-            if (d !== root) {  // Keep growth restricted to non-root nodes
-                if (growthInterval) clearInterval(growthInterval);
-                if (growthTimeout) clearTimeout(growthTimeout);
-                
-                growthTimeout = setTimeout(() => {
-                    isGrowing = true;
-                    console.log("\n=== Starting growth for:", d.data.name, "===");
-                    console.log("Initial node points:", d.data.points);
-                    console.log("Initial node value:", d.value);
-                    
-                    growthInterval = setInterval(() => {
-                        // Calculate growth rate based on current points
-                        const growthAmount = GROWTH_RATE(d);
-                        
-                        // Update points with calculated growth
-                        d.data.setPoints(d.data.points + growthAmount);
-                        
-                        // Recompute hierarchy ensuring values match points
-                        hierarchy.sum(node => node.data.points)
-                            .each(node => {
-                                // Force value to exactly match points
-                                node.value = node.data.points || 0;
-                            });
-                        
-                        // Apply treemap
-                        const treemap = d3.treemap().tile(tile);
-                        treemap(hierarchy);
-                        
-                        // Update visualization
-                        const nodes = group.selectAll("g")
-                            .filter(node => node !== root);
-                        
-                        // Transition positions
-                        nodes.transition()
-                            .duration(GROWTH_TICK)
-                            .attr("transform", d => d === root ? 
-                                `translate(0,-50)` : 
-                                `translate(${x(d.x0)},${y(d.y0)})`);
-                        
-                        // Transition rectangles
-                        nodes.select("rect")
-                            .transition()
-                            .duration(GROWTH_TICK)
-                            .attr("width", d => d === root ? 
-                                width : 
-                                Math.max(0, x(d.x1) - x(d.x0)))
-                            .attr("height", d => d === root ? 
-                                50 : 
-                                Math.max(0, y(d.y1) - y(d.y0)));
-                        
-                        // Update text positions
-                        nodes.select("text")
-                            .transition()
-                            .duration(GROWTH_TICK)
-                            .attr("transform", d => {
-                                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                return `translate(${rectWidth / 2},${rectHeight / 2})`;
-                            })
-                            .style("font-size", d => {
-                                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
-                            });
-                            
-                        console.log("\nFinal values:");
-                        console.log("Node points:", d.data.points);
-                        console.log("Node value:", d.value);
-                        console.log("Hierarchy value:", hierarchy.value);
+    // Add touch state tracking at the top
+    let touchStartTime = 0;
+    let isTouching = false;
+    let activeNode = null; // Track which node we're growing
 
-                        const pieChart = createPieChart(data);
-                        document.getElementById('pie-container').innerHTML = '';
-                        document.getElementById('pie-container').appendChild(pieChart);
-                        
-                        console.log("\nFinal values:");
-                        console.log("Node points:", d.data.points);
-                        console.log("Node value:", d.value);
-                        console.log("Hierarchy value:", hierarchy.value);
-                    }, GROWTH_TICK);
+    node.filter(d => true)
+        .attr("cursor", "pointer")
+        .on("mousedown touchstart", (event, d) => {
+            event.preventDefault();
+            
+            // Clear any existing growth state
+            if (growthInterval) clearInterval(growthInterval);
+            if (growthTimeout) clearTimeout(growthTimeout);
+            isGrowing = false;
+            
+            // Set new touch state
+            isTouching = true;
+            touchStartTime = Date.now();
+            activeNode = d;
+
+            if (d !== root) {
+                growthTimeout = setTimeout(() => {
+                    // Only start growing if still touching the same node
+                    if (isTouching && activeNode === d) {
+                        isGrowing = true;
+                        growthInterval = setInterval(() => {
+                            // Only grow if still touching
+                            if (!isTouching) {
+                                clearInterval(growthInterval);
+                                growthInterval = null;
+                                isGrowing = false;
+                                return;
+                            }
+                            
+                            // Existing growth logic
+                            const growthAmount = GROWTH_RATE(d);
+                            d.data.setPoints(d.data.points + growthAmount);
+                            
+                            // Recompute hierarchy ensuring values match points
+                            hierarchy.sum(node => node.data.points)
+                                .each(node => {
+                                    // Force value to exactly match points
+                                    node.value = node.data.points || 0;
+                                });
+                            
+                            // Apply treemap
+                            const treemap = d3.treemap().tile(tile);
+                            treemap(hierarchy);
+                            
+                            // Update visualization
+                            const nodes = group.selectAll("g")
+                                .filter(node => node !== root);
+                            
+                            // Transition positions
+                            nodes.transition()
+                                .duration(GROWTH_TICK)
+                                .attr("transform", d => d === root ? 
+                                    `translate(0,-50)` : 
+                                    `translate(${x(d.x0)},${y(d.y0)})`);
+                            
+                            // Transition rectangles
+                            nodes.select("rect")
+                                .transition()
+                                .duration(GROWTH_TICK)
+                                .attr("width", d => d === root ? 
+                                    width : 
+                                    Math.max(0, x(d.x1) - x(d.x0)))
+                                .attr("height", d => d === root ? 
+                                    50 : 
+                                    Math.max(0, y(d.y1) - y(d.y0)));
+                            
+                            // Update text positions
+                            nodes.select("text")
+                                .transition()
+                                .duration(GROWTH_TICK)
+                                .attr("transform", d => {
+                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                    return `translate(${rectWidth / 2},${rectHeight / 2})`;
+                                })
+                                .style("font-size", d => {
+                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                    return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
+                                });
+                                
+                            console.log("\nFinal values:");
+                            console.log("Node points:", d.data.points);
+                            console.log("Node value:", d.value);
+                            console.log("Hierarchy value:", hierarchy.value);
+
+                            const pieChart = createPieChart(data);
+                            document.getElementById('pie-container').innerHTML = '';
+                            document.getElementById('pie-container').appendChild(pieChart);
+                            
+                            console.log("\nFinal values:");
+                            console.log("Node points:", d.data.points);
+                            console.log("Node value:", d.value);
+                            console.log("Hierarchy value:", hierarchy.value);
+                        }, GROWTH_TICK);
+                    }
                 }, GROWTH_DELAY);
             }
         })
-        .on("mouseup mouseleave", () => {
+        .on("mouseup mouseleave touchend touchcancel touchleave", (event) => {
+            event.preventDefault();
+            
+            // Clear all states
+            isTouching = false;
+            activeNode = null;
+            
+            // Stop growth
             if (growthTimeout) clearTimeout(growthTimeout);
             if (growthInterval) clearInterval(growthInterval);
             growthInterval = null;
-            
-            setTimeout(() => {
-                isGrowing = false;
-            }, 50);
+            isGrowing = false;
         })
-        .on("click", (event, d) => {
-            if (!isGrowing) {
+        .on("click touchend", (event, d) => {
+            event.preventDefault();
+            
+            const touchDuration = Date.now() - touchStartTime;
+            
+            // Handle zoom only on quick taps
+            if (touchDuration < GROWTH_DELAY && !isGrowing) {
                 if (d === root && d.parent) {
-                    zoomout(root);  // Allow zoom out when root has parent
+                    zoomout(root);
                 } else if (d !== root) {
-                    zoomin(d);      // Allow zoom in for non-root nodes
+                    zoomin(d);
                 }
             }
+            
+            // Clear all states
+            isTouching = false;
+            activeNode = null;
+            isGrowing = false;
         });
 
     }
@@ -645,7 +677,7 @@ function createTreemap(data) {
       const popup = document.createElement('div');
       popup.className = 'node-popup';
       popup.innerHTML = `
-          <div class="node-popup-content">
+          <div class="node-popup-content" style="user-select: none; -webkit-user-select: none;">
               <!-- Add Node Form -->
               <form id="addNodeForm" class="popup-form">
                   <h2>Add New Node</h2>
