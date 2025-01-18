@@ -48,8 +48,6 @@ This means that while we allow multiple types (including multiple contributors) 
 The root node can propose groupings, but cannot enforce them against the reality of mutual recognition and concrete collaboration. This is a powerful example of how the system naturally tends toward truth in social relations!
 
 
-
-
 # So we can make the addContributor to be adhoc on the fly! What kind of interaction?
 */
 

@@ -180,170 +180,115 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="index.js"></script>
     <script>
+        const environmentalist = new D3Node('environmentalist');  // most abstract
+        const activist = new D3Node('activist', null, [environmentalist]);  // type of environmentalist
+        const researcher = new D3Node('researcher', null, [environmentalist]);  // another type
+        const educator = new D3Node('educator', null, [environmentalist]);  // another type
 
+        // Our main nodes with multiple types
+        const whalewatch = new D3Node('whalewatch', null, [activist], true);  // is a contributor
+        const greenpeace = new D3Node('greenpeace', null, [researcher], true);  // is a contributor
 
-const environmentalist = new D3Node('environmentalist');  // most abstract
-const activist = new D3Node('activist', null, [environmentalist]);  // type of environmentalist
-const researcher = new D3Node('researcher', null, [environmentalist]);  // another type
-const educator = new D3Node('educator', null, [environmentalist]);  // another type
+        const player = new D3Node('Player', null, [], true);
 
-// Our main nodes with multiple types
-const whalewatch = new D3Node('whalewatch', null, [activist], true);  // is a contributor
-const greenpeace = new D3Node('greenpeace', null, [researcher], true);  // is a contributor
+        // Adding each value as children of the player node
+        const replacingUsedUpMeansOfProduction = player.addChild("Replacing Used-up Means of Production", 80)
 
-const player = new D3Node('player', null, [], true);
+        const expansionOfProduction = player.addChild("Expanding Production", 60)
 
-// Adding each value as children of the player node
-const replacingUsedUpMeansOfProduction = player.addChild("Replacing Used-up Means of Production", 80)
-// [
-//     'economic necessity', 
-//     'determined by available means', 
-//     'not calculable by equity'
-// ]
-// .addOperation("maintains productive capacity")
-//  .addOperation("ensures continuous operation");
+        const insuranceReserves = player.addChild("Hedging Risks", 90)
 
-const expansionOfProduction = player.addChild("Expanding Production", 60)
-// [
-//     'economic necessity', 
-//     'determined by available means', 
-//     'future-oriented'
-// ]
-// .addOperation("enables growth")
-// .addOperation("increases productive capacity");
+        const socialServices = player.addChild("Common Satisfaction of Needs", 70)
 
-const insuranceReserves = player.addChild("Hedging Risks", 90)
-// [
-//     'based on probability computation', 
-//     'risk management', 
-//     'collective security'
-// ]
-// .addOperation("provides resilience")
-// .addOperation("protects against disruptions");
+        const welfare = player.addChild("Welfare", 65)
 
-//const administration = player.addChild("Administration", 30)
-// [
-//     'minimized overhead', 
-//     'efficiency-seeking', 
-//     'decreases over time'
-// ]
-// .addOperation("enables coordination")
-// .addOperation("reduces bureaucracy");
+        const consumption = player.addChild("Individual Means of Consumption", 40)
 
-const socialServices = player.addChild("Common Satisfaction of Needs", 70)
-// [
-//     'collective provision', 
-//     'growing importance', 
-//     'social investment'
-// ]
-// .addOperation("builds social capacity")
-// .addOperation("increases collective capabilities");
+        console.log(player);
 
-const welfare = player.addChild("Welfare", 65)
-// [
-//     'social necessity', 
-//     'collective responsibility', 
-//     'universal security'
-// ]
+        // 1. Replacing used up Means of Production (Basic Reproduction)
+        const naturalMaterials = replacingUsedUpMeansOfProduction.addChild("Natural Materials", 30);
+        const machineMaintenance = replacingUsedUpMeansOfProduction.addChild("Machine Maintenance", 25);
+        const infrastructureRepair = replacingUsedUpMeansOfProduction.addChild("Infrastructure Repair", 25);
+        const energyResources = replacingUsedUpMeansOfProduction.addChild("Energy Resources", 20);
 
-// .addOperation("ensures dignity")
-// .addOperation("maintains social cohesion");
+        // 2. Expansion of Production (Extended Reproduction)
+        const newTechnologies = expansionOfProduction.addChild("New Technologies", 15);
+        const additionalFacilities = expansionOfProduction.addChild("Additional Facilities", 12);
+        const researchAndDevelopment = expansionOfProduction.addChild("Research and Development", 13);
+        const trainingPrograms = expansionOfProduction.addChild("Training Programs", 10);
 
-const consumption = player.addChild("Individual Means of Consumption", 40)
-// [
-//     'final distribution', 
-//     'individual allocation', 
-//     'based on contribution'
-// ]
+        // 3. Insurance / Reserves
+        const naturalDisasters = insuranceReserves.addChild("Natural Disasters", 25);
+        const emergencySupplies = insuranceReserves.addChild("Emergency Supplies", 25);
+        const equipmentReplacement = insuranceReserves.addChild("Equipment Replacement", 25);
+        const strategicReserves = insuranceReserves.addChild("Strategic Reserves", 25);
 
-//.addOperation("enables reproduction of labor")
-// .addOperation("satisfies individual needs");
+        // 5. Common Satisfaction of Needs
+        const healthcare = socialServices.addChild("Healthcare", 15);
+        const education = socialServices.addChild("Education", 15);
+        const publicTransport = socialServices.addChild("Public Transport", 12);
+        const culturalFacilities = socialServices.addChild("Cultural Facilities", 11);
 
-// Example: Displaying the player node and its children
-console.log(player);
+        // 6. Welfare
+        const disabilitySupport = welfare.addChild("Disability Support", 15);
+        const elderCare = welfare.addChild("Elder Care", 13);
+        const childSupport = welfare.addChild("Child Support", 13);
+        const emergencyAid = welfare.addChild("Emergency Aid", 12);
 
-// 1. Replacing used up Means of Production (Basic Reproduction)
-replacingUsedUpMeansOfProduction.addChild("Natural Materials", 30);
-replacingUsedUpMeansOfProduction.addChild("Machine Maintenance", 25);
-replacingUsedUpMeansOfProduction.addChild("Infrastructure Repair", 25);
-replacingUsedUpMeansOfProduction.addChild("Energy Resources", 20);
+        // 7. Consumption
+        const basicNecessities = consumption.addChild("Basic Necessities", 8);
+        const housing = consumption.addChild("Housing", 5);
+        const personalDevelopment = consumption.addChild("Personal Development", 4);
+        const leisureActivities = consumption.addChild("Leisure Activities", 3);
 
-// 2. Expansion of Production (Extended Reproduction)
-expansionOfProduction.addChild("New Technologies", 15);
-expansionOfProduction.addChild("Additional Facilities", 12);
-expansionOfProduction.addChild("Research and Development", 13);
-expansionOfProduction.addChild("Training Programs", 10);
+        // Under Common Satisfaction of Needs (Education)
+        const whalewatchPrograms = education.addChild("Whalewatch Programs", 5, [whalewatch, educator])
+        const greenpeaceWorkshops = education.addChild("Greenpeace Workshops", 9, [greenpeace, educator]);
 
-// 3. Insurance / Reserves
-insuranceReserves.addChild("Natural Disasters", 25);
-insuranceReserves.addChild("Emergency Supplies", 25);
-insuranceReserves.addChild("Equipment Replacement", 25);
-insuranceReserves.addChild("Strategic Reserves", 25);
+        // Under Research and Development (within Expansion of Production)
+        const marineResearch = expansionOfProduction.addChild("Marine Research", 7, [whalewatch, researcher])
+        const environmentalImpactStudies = expansionOfProduction.addChild("Environmental Impact Studies", 6, [greenpeace, researcher]);
 
-// 5. Common Satisfaction of Needs
-socialServices.addChild("Healthcare", 15);
-const education = socialServices.addChild("Education", 15);
-socialServices.addChild("Public Transport", 12);
-socialServices.addChild("Cultural Facilities", 11);
+        // Under Emergency Supplies (within Insurance/Reserves)
+        const marineEmergencyResponse = insuranceReserves.addChild("Marine Emergency Response", 10, [whalewatch, activist])
+        const environmentalCrisisResponse = insuranceReserves.addChild("Environmental Crisis Response", 15, [greenpeace, activist]);
 
-// 6. Welfare
-welfare.addChild("Disability Support", 15);
-welfare.addChild("Elder Care", 13);
-welfare.addChild("Child Support", 13);
-welfare.addChild("Emergency Aid", 12);
+        const communitySupportedAgriculture = welfare.addChild("Community Supported Agriculture", 49, [whalewatch, activist]);
 
-// 7. Consumption
-consumption.addChild("Basic Necessities", 8);
-consumption.addChild("Housing", 5);
-consumption.addChild("Personal Development", 4);
-consumption.addChild("Leisure Activities", 3);
+        const cooperativeGroceryStores = basicNecessities.addChild("Cooperative Grocery Stores", 39, [greenpeace]);
 
-// Under Common Satisfaction of Needs (Education)
-const whalewatchPrograms = education.addChild("Whalewatch Programs", 5, [whalewatch, educator])
-const greenpeaceWorkshops = education.addChild("Greenpeace Workshops", 9, [greenpeace, educator]);
+        const fillingPotholes = infrastructureRepair.addChild("Filling Potholes", 25, [activist]);
 
-// Under Research and Development (within Expansion of Production)
-expansionOfProduction.addChild("Marine Research", 7, [whalewatch, researcher])
-expansionOfProduction.addChild("Environmental Impact Studies", 6, [greenpeace, researcher]);
+        // whalewatch's recognition of player
+        const whalewatchgive = whalewatch.addChild('🌳 give', 80);
+        const whalewatchpotential = whalewatchgive.addChild('🔮 potential', 40);
+        const playerInwhalewatchpotential = whalewatchpotential.addChild('player', 15, [player]);
 
-// Under Emergency Supplies (within Insurance/Reserves)
-insuranceReserves.addChild("Marine Emergency Response", 10, [whalewatch, activist])
-insuranceReserves.addChild("Environmental Crisis Response", 15, [greenpeace, activist]);
+        // greenpeace's recognition of player
+        const greenpeacegive = greenpeace.addChild('🌳 give', 80);
+        const greenpeacepotential = greenpeacegive.addChild('🔮 potential', 40);
+        const playerIngreenpeacepotential = greenpeacepotential.addChild('player', 15, [player]);
 
+        const activistgive = activist.addChild('🌳 give', 80);
+        const activistpotential = activistgive.addChild('🔮 potential', 40);
+        const playerInactivistpotential = activistpotential.addChild('player', 15, [player]);
 
+        // Calculate shares at different type levels
+        console.log('\nShares by type level:');
+        console.log('Environmentalist share:', player.shareOfGeneralContribution(environmentalist));
+        console.log('Activist share:', player.shareOfGeneralContribution(activist));
+        console.log('Educator share:', player.shareOfGeneralContribution(educator));
+        console.log('Researcher share:', player.shareOfGeneralContribution(researcher));
+        console.log('whalewatch specific share:', player.shareOfGeneralContribution(whalewatch));
+        console.log('greenpeace specific share:', player.shareOfGeneralContribution(greenpeace));
 
-    // whalewatch's recognition of player
-    const whalewatchgive = whalewatch.addChild('🌳 give', 80);
-    const whalewatchpotential = whalewatchgive.addChild('🔮 potential', 40);
-    const playerInwhalewatchpotential = whalewatchpotential.addChild('player', 15, [player]);
-
-    // greenpeace's recognition of player
-    const greenpeacegive = greenpeace.addChild('🌳 give', 80);
-    const greenpeacepotential = greenpeacegive.addChild('🔮 potential', 40);
-    const playerIngreenpeacepotential = greenpeacepotential.addChild('player', 15, [player]);
-
-    const activistgive = activist.addChild('🌳 give', 80);
-    const activistpotential = activistgive.addChild('🔮 potential', 40);
-    const playerInactivistpotential = activistpotential.addChild('player', 15, [player]);
-
-// thus what distinguishes a type from a contributor is mutual-recognition!
-
-
-    // Calculate shares at different type levels
-    console.log('\nShares by type level:');
-    console.log('Environmentalist share:', player.shareOfGeneralContribution(environmentalist));
-    console.log('Activist share:', player.shareOfGeneralContribution(activist));
-    console.log('Educator share:', player.shareOfGeneralContribution(educator));
-    console.log('Researcher share:', player.shareOfGeneralContribution(researcher));
-    console.log('whalewatch specific share:', player.shareOfGeneralContribution(whalewatch));
-    console.log('greenpeace specific share:', player.shareOfGeneralContribution(greenpeace));
-
-    // Calculate mutual recognition and generalMutualContribution
-    console.log('\nMutual Recognition:');
-    console.log('With whalewatch:', player.mutualShareOfGeneralContribution(whalewatch));
-    console.log('\nFinal mutualGeneralContribution:');
-    console.log(player.mutualGeneralContribution());
-    console.log(player);
+        // Calculate mutual recognition and generalMutualContribution
+        console.log('\nMutual Recognition:');
+        console.log('With whalewatch:', player.mutualShareOfGeneralContribution(whalewatch));
+        console.log('\nFinal mutualGeneralContribution:');
+        console.log(player.mutualGeneralContribution());
+        console.log(player);
         const treemap = createTreemap(player);
         document.getElementById('treemap-container').appendChild(treemap);
     </script>

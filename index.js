@@ -1,5 +1,3 @@
-// 
-
 class Node {
     constructor(name, parent = null, types = [], isContributor = false) {
         this.name = name;
