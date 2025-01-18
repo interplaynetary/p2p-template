@@ -656,9 +656,11 @@ function createTreemap(data) {
 
       const menuBar = document.createElement('div');
       menuBar.className = 'menu-bar';
+      menuBar.style.userSelect = 'none';
+      menuBar.style.webkitUserSelect = 'none';
       menuBar.innerHTML = `
-          <button class="menu-button cycle-text" data-form="addNode">${addNodeTexts[0]}</button>
-          <button class="menu-button" data-form="revealQR">Add Contributor</button>
+          <button class="menu-button cycle-text" data-form="addNode" style="user-select: none; -webkit-user-select: none;">${addNodeTexts[0]}</button>
+          <button class="menu-button" data-form="revealQR" style="user-select: none; -webkit-user-select: none;">Add Contributor</button>
       `;
       container.appendChild(menuBar);
 
@@ -679,33 +681,33 @@ function createTreemap(data) {
       popup.innerHTML = `
           <div class="node-popup-content" style="user-select: none; -webkit-user-select: none;">
               <!-- Add Node Form -->
-              <form id="addNodeForm" class="popup-form">
+              <form id="addNodeForm" class="popup-form" style="user-select: none; -webkit-user-select: none;">
                   <h2>Add New Node</h2>
                   <div class="form-group">
-                      <label for="nodeName">Name:</label>
+                      <label for="nodeName" style="user-select: none; -webkit-user-select: none;">Name:</label>
                       <input type="text" id="nodeName" required>
                   </div>
                   <div id="percentageGroup" class="form-group" style="display: none;">
-                      <label for="nodePercentage">Desired Percentage:</label>
+                      <label for="nodePercentage" style="user-select: none; -webkit-user-select: none;">Desired Percentage:</label>
                       <input type="range" id="nodePercentage" min="1" max="100" value="50">
-                      <output for="nodePercentage">50%</output>
+                      <output for="nodePercentage" style="user-select: none; -webkit-user-select: none;">50%</output>
                   </div>
                   <div class="form-buttons">
-                      <button type="submit" class="primary">Add Node</button>
-                      <button type="button" class="cancel">Cancel</button>
+                      <button type="submit" class="primary" style="user-select: none; -webkit-user-select: none;">Add Node</button>
+                      <button type="button" class="cancel" style="user-select: none; -webkit-user-select: none;">Cancel</button>
                   </div>
               </form>
 
               <!-- Reveal QR Form -->
               <form id="revealQRForm" class="popup-form" style="display: none;">
-                  <h2>Your Public Key</h2>
+                  <h2 style="user-select: none; -webkit-user-select: none;">Your Public Key</h2>
                   <div class="qr-display">
                       <div id="qr-code"></div>
                       <div id="public-key-text"></div>
                   </div>
                   <div class="form-buttons">
-                      <button type="button" class="copy-key">Copy Key</button>
-                      <button type="button" class="cancel">Close</button>
+                      <button type="button" class="copy-key" style="user-select: none; -webkit-user-select: none;">Copy Key</button>
+                      <button type="button" class="cancel" style="user-select: none; -webkit-user-select: none;">Close</button>
                   </div>
               </form>
           </div>
