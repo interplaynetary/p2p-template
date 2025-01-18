@@ -1,0 +1,29 @@
+
+# Treemap
+[✅] - make text scale to fit
+[✅] - remove multiple types
+[✅] - descriptions on nodes
+[✅] - make contributor a special node?
+[✅] - make contributor instances last node (can't go further down in tree)
+[✅] - Make calcualtions more efficient? using contributor-map?
+[] - How to remove nodes? 
+[] - How to unallocate points? 
+[] - How to manually reorder them? (by dragging?)
+[] - How do we show mutuality directly in the structure? (Showing max min and overlap? Of colors? Of self and other?)
+[] - Add a new intermediary class? For networking / persistence?
+[] - Add description to Nodes (and maybe other things?)
+[] - node.makeContributor (retroactively) turns type into contributor
+[] - Display Descriptions to Nodes if they exist! 
+[] - Make contributor have special outline
+[] - "Add Contributor" button should reveal tabs: known (including self), add new contributor (reveal QR of self to others)
+[] - clicking contributor makes it the new root 
+    (so you can see the tree from their perspective)
+    (but your perspective is retained (your perspective of their perspective))
+
+# P2P
+refer to [docs/p2p.md](docs/p2p.md)
+
+# Inventory & Associations
+[] - add a button to distribute surplus
+[] - integrate with inventory.html
+[] - make inventory.html more user-friendly
