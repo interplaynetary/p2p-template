@@ -45,7 +45,7 @@ Associations are relations where:
 - Real = True
 - Playing = Active-Participation
 - Desire = Will-to-Play
-- Total Recognition = True Recognition + False Recognition
+- **Total Recognition = True Recognition + False Recognition**
 
 **For any participant:**
 - ∴ ↑False Recognition = ↓True Recognition

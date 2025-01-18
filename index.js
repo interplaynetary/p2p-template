@@ -924,19 +924,13 @@ function createPieChart(data) {
     // Can we add a distribute-surplus? button here?
 
     centerGroup.append("text")
-        .attr("dy", -fontSize*1.3)  // Center it
+        .attr("dy", -fontSize/1.6)  // Center it
         .attr("font-size", fontSize)
         .attr("font-weight", "bold")
         .text("Mutual");
 
     centerGroup.append("text")
-    .attr("dy", 0)  // Center it
-    .attr("font-size", fontSize)
-    .attr("font-weight", "bold")
-    .text("General");
-
-    centerGroup.append("text")
-        .attr("dy", fontSize*1.3)  // Move down by one full font size
+        .attr("dy", fontSize/1.6)  // Move down by one full font size
         .attr("font-size", fontSize)
         .attr("font-weight", "bold")
         .text("Contribution");
