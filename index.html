@@ -186,10 +186,10 @@
         const educator = new D3Node('educator', null, [environmentalist]);  // another type
 
         // Our main nodes with multiple types
-        const whalewatch = new D3Node('whalewatch', null, [activist], true);  // is a contributor
-        const greenpeace = new D3Node('greenpeace', null, [researcher], true);  // is a contributor
+        const whalewatch = new D3Node('whalewatch', null, [activist]);  // is a contributor
+        const greenpeace = new D3Node('greenpeace', null, [researcher]);  // is a contributor
 
-        const player = new D3Node('Player', null, [], true);
+        const player = new D3Node('Player', null, []);
 
         // Adding each value as children of the player node
         const replacingUsedUpMeansOfProduction = player.addChild("Replacing Used-up Means of Production", 80)

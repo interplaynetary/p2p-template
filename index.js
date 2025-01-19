@@ -1,11 +1,11 @@
 class Node {
-    constructor(name, parent = null, types = [], isContributor = false) {
+    constructor(name, parent = null, types = []) {
         this.name = name;
         this.parent = parent;
         this.points = 0;
         this.children = new Map();  // Node -> Map(contributor -> points)
         this.totalChildPoints = 0;
-        this.isContributor = isContributor;
+        this.isContributor = this.parent ? false : true;
         
         // Map of type -> Set of instances
         this.typeIndex = parent ? parent.getRoot().typeIndex : new Map();
@@ -176,8 +176,8 @@ class Node {
 }
 
 class D3Node extends Node {
-    constructor(name, parent = null, types = [], isContributor = false) {
-        super(name, parent, types, isContributor);
+    constructor(name, parent = null, types = []) {
+        super(name, parent, types);
     }
 
     // Override addChild to create D3Nodes instead of regular Nodes
@@ -263,7 +263,7 @@ function createTreemap(data) {
     // Add state variables at the top
     let growthInterval = null;
     let growthTimeout = null;
-    const GROWTH_RATE = (d) => d.data.points * 0.1;    // 50% of current points
+    const GROWTH_RATE = (d) => d.data.points * 0.05;
     const GROWTH_TICK = 50;      // Milliseconds between growth
     const GROWTH_DELAY = 500;    // Delay before growth starts
     let isGrowing = false;  // Track if we're in a growth operation
@@ -469,8 +469,9 @@ function createTreemap(data) {
                 if (d === root) return "#fff";
                 return getColorForName(d.data.name);
             })
-            .attr("stroke", "#fff");
-      node.append("clipPath")
+            .attr("stroke", "#fff")
+            .attr("stroke-width", "5")
+        node.append("clipPath")
           .attr("id", d => (d.clipUid = uid("clip")).id)
         .append("use")
           .attr("xlink:href", d => d.leafUid.href);
@@ -638,7 +639,9 @@ function createTreemap(data) {
             if (touchDuration < GROWTH_DELAY && !isGrowing) {
                 if (d === root && d.parent) {
                     zoomout(root);
-                } else if (d !== root) {
+                } else if (d !== root && !d.data.isContributor) {  // Check isContributor directly
+                    console.log('Node:', d.data.name);
+                    console.log('Is Contributor:', d.data.isContributor);
                     zoomin(d);
                 }
             }
@@ -649,6 +652,19 @@ function createTreemap(data) {
             isGrowing = false;
         });
 
+        if (root.data.children.size === 0 && root !== data) {  // Check if view is empty and not root
+            group.append("text")
+                .attr("class", "helper-text")
+                .attr("text-anchor", "middle")
+                .attr("dominant-baseline", "middle")
+                .attr("x", width / 2)
+                .attr("y", height / 2)
+                .style("font-size", "24px")
+                .style("fill", "#666")
+                .style("pointer-events", "none")
+                .style("user-select", "none")
+                .text("Add Values / Contributors");
+        }
     }
       // Add menu bar with cycling text
       const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
@@ -689,8 +705,8 @@ function createTreemap(data) {
                   </div>
                   <div id="percentageGroup" class="form-group" style="display: none;">
                       <label for="nodePercentage" style="user-select: none; -webkit-user-select: none;">Desired Percentage:</label>
-                      <input type="range" id="nodePercentage" min="1" max="100" value="50">
-                      <output for="nodePercentage" style="user-select: none; -webkit-user-select: none;">50%</output>
+                      <input type="range" id="nodePercentage" min="1" max="100" value="10">
+                      <output for="nodePercentage" style="user-select: none; -webkit-user-select: none;">10%</output>
                   </div>
                   <div class="form-buttons">
                       <button type="submit" class="primary" style="user-select: none; -webkit-user-select: none;">Add Node</button>
@@ -933,7 +949,7 @@ function createPieChart(data) {
         })
         .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .style("font-size", "10px")  // Adjust the font size here
+        .style("font-size", "15px")  // Adjust the font size here
         .text(d => `${d.data[0].name}`);
 
     // Add center text

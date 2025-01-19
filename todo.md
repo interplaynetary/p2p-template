@@ -1,9 +1,16 @@
-
 # Treemap
 [✅] - make text scale to fit
 [✅] - descriptions on nodes
 [✅] - make contributor instances last node (can't go further down in tree)
 [✅] - Make calculations more efficient? using contributor-map?
+[✅] - It should be clearly possible to make a node a contributor simply if it doesnt have a parent!
+[] - Lets simplify isContributor logic!
+
+
+
+
+
+[] - We are clearly capable of doing mutual-recognition with a node without the contributor flag!
 [] - allow for choosing your own name!
 [] - Allow adding multiple types/contributors to nodes
 [] - How to unallocate points? (when points = 0, remove node)

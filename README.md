@@ -1,29 +1,28 @@
 # The Realization of Social-Material-Truth in Free Association: A Proof of a Truly Free Association of Producers
-Version 1.0.1
+Version 1.0.2
 
 **Definitions:**
-- Direct Relation: A → B (A is directly connected to B)
-- Transitive Relation: A → B → C (A is transitively connected to C via B)
-- Mutualistic-Relation: D ↔ E (D and E both contribute to each other's self-actualization)
-- Social-Material-Coordination: D ↔ E (D and E socially-coordinate their material-production)
+- Direct Mutual Contribution: A ↔ B (A and B directly contribute to each other)
+- Transitive Mutual Contribution: A ↔ B ↔ C (A and B transitively contribute to each other via B)
+- Social-Material-Coordination: D ↔ E (D and E socially-coordinate their social and or material-production)
 
-**Let us finally imagine, for a change, a directly/transitively mutualistic free association of free individuals, carrying on their social-material-coordination without any centralized control or planning. Without the need for private-property or the state.**
+**Let us finally imagine, for a change, a directly/transitively mutualistic free association of free individuals, coordinating their social and or material production without any centralized control or planning. Without the need for private-property or the state.**
 
-Such coordination requires more than mere abstract agreement or forced cooperation - it demands real mutual-contribution to each other's self-actualization (contributions towards needs, values, goals, social and or material dependencies etc.). 
+Such coordination requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and or material dependencies etc.). 
 
 **In this free association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
 
-In this proof, we demonstrate how social-material-truth is realized through free association: surplus flows according to mutual recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures. The mathematics reveals how the production of social-material-truth through free association makes false recognition/relations naturally decay while strengthening true recognition/relations - showing how recognition and social-relations organized on the basis of this free-association necessarily tend towards social-material-truth.
+In this proof, we demonstrate how social-material-truth is realized through free association: surplus flows according to mutual recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures. Simple math reveals how in free association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free-association necessarily tend towards social-material-truth.
 
-**Definitions:**
-- Recognition = one's acknowledgment of contributions towards one's own conditions of self-actualization (contributions towards one's needs, values, goals, social and or material dependencies etc.)
+**Let:**
+- Recognition = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and or material dependencies etc.)
 
 **For any participants A and B:**
 1. A can (re)-attribute to B a share of A's total recognition of contribution towards A's self-actualization
 2. B can (re)-attribute to A a share of B's total recognition of contribution towards B's self-actualization
 
 **Let:**
-- Mutual-Recognition(A, B) = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution towards the self-actualization of eachother (contributions towards one's needs, values, goals, social and or material dependencies etc.)
+- Mutual-Recognition(A, B) = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution towards the self-actualization of each other (contributions towards each others needs, values, goals, social and or material dependencies etc.)
 
 Associations are relations where:
 1. Each relation consists of (Provider-Role, User-Role)
@@ -37,31 +36,27 @@ Associations are relations where:
 
 **Let:**
 - Surplus = Roles one holds but does not desire
-- Surplus can be distributed directly/transitively via Mutual Recognition Distributions
+- Surplus can be distributed directly/transitively via Mutual Recognition Distributions: **The share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
 
 "From each according to his ability, to each according to his needs!"
 
 **Let:**
-- Real = True
-- Playing = Active-Participation
-- Desire = Will-to-Play
 - **Total Recognition = True Recognition + False Recognition**
 
 **For any participant:**
 - ∴ ↑False Recognition = ↓True Recognition
 - ∴ ↓Mutual Recognition with Real Producers
-- ∴ ↓Real Associations with Real Producers
-- ∴ ↓Access to Real Social-Material Coordination via Real Associations
+- ∴ ↓Associations with Real Producers
+- ∴ ↓Access to Real Social-Material Coordination via Associations with Real Producers
 
 **For any Association between A and B:**
-- Playing(A↔B) = Desire(A→B) ∧ Desire(B→A) ∧ Active(A) ∧ Active(B)
+- Playing(A↔B) = Desire(A→B) ∧ Desire(B→A) ∧ Playing(A) ∧ Playing(B)
 
 **Let:**
 - Total Desire = True Desire + False Desire
 - Total Playing = True Playing + False Playing
 
 **Therefore:**
-- ↑False Recognition = ↓True Recognition
 - ↑False Desire = ↓True Desire
 - ↑False Playing = ↓True Playing
 
@@ -80,7 +75,7 @@ Associations are relations where:
 - ↓Real Mutual Recognition → ↓Real Mutual Desire
 - ↓Real Mutual Desire → ↓Real Mutual Playing
 - ↓Real Mutual Playing → ↓Free Association
-- ↓Free Association → ↓Real Social-Material Coordination via Real Associations
+- ↓Free Association → ↓Real Social-Material Coordination via Associations with Real Producers
 
 ---
 
@@ -93,10 +88,8 @@ With shared esteem & love,
 ---
 
 # What is being done:
-- Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards oneÄs needs, values, goals, social and or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof.  
-**The interface is almost complete but help is requested:**
-- **making user-interactions more intuitive and user-friendly.**
-- **supporting me during the development of the interface (housing, food, financial support etc.).**
+- Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards one's needs, values, goals, social and or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof.  
+**The interface is almost complete but I am seeking support to continue my efforts in the development of the interface (housing, food, financial support etc.).**
 
 # How to contribute to free-association:
 
@@ -107,13 +100,6 @@ With shared esteem & love,
 - Suggest improvements based on practical experience
 - Implement code in other programming languages
 - Translate materials into different languages
-
-**Theoretical Development:**
-- Help develop and refine the mathematical proofs
-- Connect these ideas to other theoretical frameworks
-- Write explanations and educational materials
-- Document real-world applications and case studies
-- Research historical examples of free association
 
 **Community Building:**
 - Share and discuss these ideas with others
