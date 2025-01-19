@@ -143,7 +143,11 @@ With shared esteem & love,
 
 "In a higher phase of communist society, after the enslaving subordination of the individual to the division of labor, and therewith also the antithesis between mental and physical labor, has vanished; after labor has become not only a means of life but life's prime desire; after the productive forces have also increased with the all-around development of the individual, and all the springs of co-operative wealth flow more abundantly—only then can the narrow horizon of bourgeois right be crossed in its entirety and society inscribe on its banners: From each according to his ability, to each according to his needs!" (Marx)
 
-*Freedom* and *necessity* are not opposed but united in the free association of producers. When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual recognition of real contributions, when relations activate only through genuine desire and participation - then we have finally found the form in which the free development of each is the condition for the free development of all! 
+***Freedom* and *necessity* are not opposed but united in the free association of producers.**
+
+**When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual recognition of real contributions, when relations activate only through genuine desire and participation - then we have finally a form in which the free development of each is the condition for the free development of all!**
+
+"Communism as the positive transcendence of private property as human self-estrangement, and therefore as the real appropriation of the human essence by and for man; communism therefore as the complete return of man to himself as a social (i.e., human) being – a return accomplished consciously and embracing the entire wealth of previous development. This communism, as fully developed naturalism, equals humanism, and as fully developed humanism equals naturalism; it is the genuine resolution of the conflict between man and nature and between man and man – the true resolution of the strife between existence and essence, between objectification and self-confirmation, between freedom and necessity, between the individual and the species. Communism is the riddle of history solved, and it knows itself to be this solution." (Marx)
 
 ---
 
