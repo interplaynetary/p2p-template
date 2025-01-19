@@ -182,7 +182,7 @@ With shared esteem & love,
    - Strengthen direct producer relationships
    - Develop surplus sharing mechanisms
    - Create tools for complex coordination
-   - Support material needs of contributors
+   - Support social-material needs of contributors
 
 3. Expanding Common Means of Production:
    - ↑Dissolution of capitalist organization into free association
