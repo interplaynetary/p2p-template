@@ -1,5 +1,4 @@
 # Proof and Strategy for a Truly Free Association of Free Individuals
-Version 1.0.3
 
 We present a formulation of a legitimate alternative to capitalism that allows for the spontaneous self-actualization of each individual through all others without any centralized control, planning, private-property or the state!
 
