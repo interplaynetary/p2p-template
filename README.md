@@ -2,43 +2,45 @@
 
 We present a formulation of a legitimate alternative to capitalism that allows for the spontaneous self-actualization of each individual through all others without any centralized control, planning, private-property or the state!
 
-Such coordination requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and/or material dependencies etc.). 
+This requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and/or material dependencies etc.). 
 
 **In this free-association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
 
 **Surplus flows according to mutual recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures.**
 
-Simple math reveals how in free-association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free-association necessarily tend towards social-material-truth.
+Simple math will reveal how in free-association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free-association necessarily tend towards social-material-truth.
 
 ---
 
 **Let:**
-- One's Recognition = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.)
+- One's *Recognition* = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.)
 
 **For any participants A and B:**
-1. A can (re)-attribute to B a share of A's total recognition of contribution towards A's self-actualization
-2. B can (re)-attribute to A a share of B's total recognition of contribution towards B's self-actualization
+1. A can (re)-attribute to B a share of A's total recognition
+2. B can (re)-attribute to A a share of B's total recognition
 
 **Let:**
-- Mutual-Recognition(A, B) = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution towards the self-actualization of each other (contributions towards each others needs, values, goals, social and/or material dependencies etc.)
+- *Mutual-Recognition(A, B)* = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution
 
-Association = a set of relations where:
-1. Each relation consists of (*Provider-Role*, *User-Role*)
+*Taking the minimum of both shares ensures reciprocity in proportion*
+
+*Association* = a set of relations where:
+1. Each *Relation* consists of (*Provider-Role*, *User-Role*)
 2. Each *Role* has a *Holder* who can:
    - Express *Desire* (Will to Play)
    - Express *Playing* (Active-Participation)
 3. Relations become Active only when:
    - Both *Role-Holders* express *Desire*
    - Both *Role-Holders* express *Playing*
-4. Relations can be composed into larger structures while maintaining these properties
+4. *Relations* can be composed into larger structures while maintaining these properties
 
 **Let:**
-- Surplus = Roles one holds but does not desire
+- *Surplus* = Roles one holds but does not desire
 - Surplus can be distributed directly/transitively via Mutual Recognition Distributions: **The share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
 
-"From each according to his ability, to each according to his needs!"
+*"From each according to his ability, to each according to his needs!"*
 
-The distribution of surplus-roles through networks of mutual-contribution is a form of distributed-peer-discovery/matching! Finding collaborators who directly/transitively contribute to your self-actualization!
+*The distribution of surplus-roles through networks of mutual-contribution is a form of distributed-peer-discovery/matching! Finding collaborators who directly/transitively contribute to your self-actualization!*
 
 **Let:**
 - **Total Recognition = True Recognition + False Recognition**
@@ -79,7 +81,7 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
 - ↓Real Mutual Playing → ↓Free Association
 - ↓Free Association → ↓Real Social-Material Coordination via Associations with Real Producers
 
-**On Capital Relations (and Power Relations in General) within Free Association:**
+**On Capital Relations (and Coercive Relations in General) within Free Association:**
 
 **Let:**
 - Capital-Mediated Production = Production coordinated via buying labor rather than direct Free Association
@@ -153,17 +155,15 @@ With shared esteem & love,
 - Develop and test the p2p interface for mutual recognition
 - Create documentation in multiple languages
 - Build tools for tracking real contributions and dependencies
-- Establish initial communities of practice
 - Focus on making tools accessible and easy to use
 
 **Phase 2: Practical Implementation & Documentation**
 - Start with small-scale experiments in existing projects
 - Document real experiences meticulously
 - Identify and solve practical challenges
-- Create educational materials based on real experiences
-- Build network of mutual support between implementations
+- Build mutual support between implementations
 
-**Phase 3: Expanding Producer Networks**
+**Phase 3: Expanding Playnets**
 - Connect different communities using free association
 - Help producers recognize their mutual dependencies
 - Support transition from capital relations to direct association
@@ -174,18 +174,9 @@ With shared esteem & love,
 1. Within Capital-Mediated Production:
    - Help workers recognize mutual dependencies
    - Support organization on basis of free association
-   - Document how commodity fetish breaks down
    - Build tools for direct producer coordination
 
-2. Within Free Association Networks:
+2. Within Free Associations:
    - Strengthen direct producer relationships
    - Develop surplus sharing mechanisms
-   - Create tools for complex coordination
    - Support social-material needs of contributors
-
-3. Expanding Common Means of Production:
-   - ↑Dissolution of capitalist organization into free association
-   - → ↓Force of capitalist limits on common production
-   - → ↑Means of production in common
-   - → ↑Capacity for free association
-   - → ↑Further dissolution of capitalist organization
