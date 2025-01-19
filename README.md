@@ -1,37 +1,36 @@
-# The Realization of Social-Material-Truth in Free Association: A Proof of a Truly Free Association of Producers
+# Proof and Strategy for a Truly Free Association of Free Individuals
 Version 1.0.3
 
-**Definitions:**
-- Direct Mutual Contribution: A ↔ B (A and B directly contribute to each other)
-- Transitive Mutual Contribution: A ↔ B ↔ C (A and B transitively contribute to each other via B)
-- Social-Material-Coordination: D ↔ E (D and E socially-coordinate their social and or material-production)
+We present a formulation of a legitimate alternative to capitalism that allows for the spontaneous self-actualization of each individual through all others without any centralized control, planning, private-property or the state!
 
-**Let us finally imagine, for a change, a directly/transitively mutualistic free-association of free individuals, coordinating their social and or material production without any centralized control or planning. Without the need for private-property or the state.**
-
-Such coordination requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and or material dependencies etc.). 
+Such coordination requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and/or material dependencies etc.). 
 
 **In this free-association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
 
-In this proof, we demonstrate how social-material-truth is realized through free-association: surplus flows according to mutual recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures. Simple math reveals how in free-association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free-association necessarily tend towards social-material-truth.
+Surplus flows according to mutual recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures. 
+
+Simple math reveals how in free-association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free-association necessarily tend towards social-material-truth.
+
+---
 
 **Let:**
-- Recognition = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and or material dependencies etc.)
+- Recognition = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.)
 
 **For any participants A and B:**
 1. A can (re)-attribute to B a share of A's total recognition of contribution towards A's self-actualization
 2. B can (re)-attribute to A a share of B's total recognition of contribution towards B's self-actualization
 
 **Let:**
-- Mutual-Recognition(A, B) = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution towards the self-actualization of each other (contributions towards each others needs, values, goals, social and or material dependencies etc.)
+- Mutual-Recognition(A, B) = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution towards the self-actualization of each other (contributions towards each others needs, values, goals, social and/or material dependencies etc.)
 
-Associations are relations where:
-1. Each relation consists of (Provider-Role, User-Role)
-2. Each Role has a Holder who can:
-   - Express Desire (Will to Play)
-   - Express Playing (Active-Participation)
+Association = a set of relations where:
+1. Each relation consists of (*Provider-Role*, *User-Role*)
+2. Each *Role* has a *Holder* who can:
+   - Express *Desire* (Will to Play)
+   - Express *Playing* (Active-Participation)
 3. Relations become Active only when:
-   - Both Role-Holders express Desire
-   - Both Role-Holders express Playing
+   - Both *Role-Holders* express *Desire*
+   - Both *Role-Holders* express *Playing*
 4. Relations can be composed into larger structures while maintaining these properties
 
 **Let:**
@@ -50,6 +49,7 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
 - ∴ ↓Mutual Recognition with Real Producers
 - ∴ ↓Associations with Real Producers
 - ∴ ↓Access to Real Social-Material Coordination via Associations with Real Producers
+- ∴ social-material-truth is realized through Free Association
 
 **For any Association between A and B:**
 - Playing(A↔B) = Desire(A→B) ∧ Desire(B→A) ∧ Playing(A) ∧ Playing(B)
@@ -66,6 +66,7 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
 1. Mutual Recognition > 0
 2. Mutual Desire (both parties genuinely desire the relation)
 3. Mutual Playing (both parties actively participate)
+4. Access to Material basis of Playing
 
 - ∴ ↓True Recognition → ↓Mutual Recognition
 - ∴ ↓True Desire → ↓Mutual Desire
@@ -82,7 +83,7 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
 **On Capital Relations (and Power Relations in General) within Free Association:**
 
 **Let:**
-- Capital-Mediated Production = Production coordinated via buying labor rather than direct free-association
+- Capital-Mediated Production = Production coordinated via buying labor rather than direct Free Association
 - Capital-Simulated-Production = Production appearing to come from capitalist but actually from bought labor
 - Commodity Fetish = The masking of social-material relations of production behind the veil of the product as commodity (market-relations) - the objective social-forgetting of the social-origin of things.
 - Second-Order-False-Recognition = False recognition given to obtain capital for buying labor
@@ -100,7 +101,7 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
    - Social relations appear as relations between things
    - Real production relations remain hidden
 
-2. As A, B begin organizing on basis of free-association:
+2. As A, B begin organizing on basis of Free Association:
    - ↑Recognition of mutual dependencies in production
    - ↑Recognition of potential direct association (A↔B)
    - ↑Pressure on C to explain their contribution
@@ -109,25 +110,31 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
      - Need to justify role to freely associating producers
 
 3. This contradiction intensifies as:
-   - ↑Labour Purchased → ↑Potential for that Labour to organize on the basis of free-association
-   - ↑Formation of direct producer associations
+   - ↑Labour Purchased → ↑Potential for that Labour to organize on the basis of Free Association
+   - ↑Formation of Direct Producer Associations
    - ↑Visibility of real production dependencies
    - ↓Effectiveness of commodity fetish in masking relations
 
 **Therefore:**
-- ↑Organization of bought labor via free-association
+- ↑Organization of bought labor via Free Association
 - → ↑Internal pressure to reveal real internal production relations
 - → ↓Internal recognition of Capitalist's claim surplus-production/distribution
 - → ↑Recognition of direct producer dependencies
-- ∴ Capital relations become increasingly unstable as bought labor organizes via free-association
+- ∴ Capital relations become increasingly unstable as bought labor organizes via Free Association
 
 **In other words:**
-The commodity fetish cannot persist when the labor power being purchased begins organizing on the basis of free-association, as this creates pressure to reveal real production relations. The commodity fetish, which normally masks social relations of production, cannot be maintained within free-association because free-association requires demonstration of real contribution, creating a contradiction that must resolve either through the loss of recognition of Capitalist-Simulated-Production or its dissolution into Free-Association.
+The commodity fetish cannot persist when the labor power being purchased begins organizing on the basis of Free Association, as this creates pressure to reveal real production relations. The commodity fetish, which normally masks social relations of production, cannot be maintained within Free Association because Free Association requires demonstration of real contribution, creating a contradiction that must resolve either through the loss of recognition of Capitalist-Simulated-Production or its dissolution into Free Association.
 
-∴ ↑Dissolution of capitalist organization into free-association → ↓Force of the limits imposed by capitalist organizational-forms on the utilization of means of production in common by the free-association of producers
-∴ ↑Means of production in common
+- ∴ ↑Dissolution of capitalist organization into Free Association → ↓Force of the limits imposed by capitalist organizational-forms on the utilization of means of production in common by Free Association
+- ∴ ↑Means of production in common
+- ∴ ↑Truly Free Association (both socially, and materially)
 
 ---
+**Definitions:**
+- Direct Mutual Contribution: A ↔ B (A and B directly contribute to each other)
+- Transitive Mutual Contribution: A ↔ B ↔ C (A and B transitively contribute to each other via B)
+
+**Let us imagine, for a change, a directly/transitively mutualistic free-association of free individuals, spontaneously coordinating their social-material production with the means of production in common, without any centralized control or planning. Without the need for private-property or the state.**
 
 With shared esteem & love,
 - Ruzgar Imski & Free Association
@@ -138,7 +145,7 @@ With shared esteem & love,
 ---
 
 # What is being done:
-- Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards one's needs, values, goals, social and or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof. It is available at [interplaynetary-github](https://github.com/interplaynetary/free-association) but is additionally available p2p on [radicl](https://link-needed).
+- Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof. It is available at [interplaynetary-github](https://github.com/interplaynetary/free-association) but is additionally available p2p on [radicl](https://link-needed).
 **A basic interface for free-association is almost complete but I am seeking support (housing, food, financial support etc.) to continue its development.**
 
 # Revolutionary Strategy for Free Association
