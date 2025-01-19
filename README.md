@@ -40,6 +40,8 @@ Associations are relations where:
 
 "From each according to his ability, to each according to his needs!"
 
+The distribution of surplus-roles through networks of mutual-contribution is a form of distributed-peer-discovery/matching! Finding collaborators who directly/transitively contribute to your self-actualization!
+
 **Let:**
 - **Total Recognition = True Recognition + False Recognition**
 
