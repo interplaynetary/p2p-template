@@ -66,7 +66,7 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
 1. Mutual Recognition > 0
 2. Mutual Desire (both parties genuinely desire the relation)
 3. Mutual Playing (both parties actively participate)
-4. Access to Material basis of Playing
+4. Access to Materials Necessary for Playing
 
 - ∴ ↓True Recognition → ↓Mutual Recognition
 - ∴ ↓True Desire → ↓Mutual Desire
@@ -126,7 +126,7 @@ The distribution of surplus-roles through networks of mutual-contribution is a f
 The commodity fetish cannot persist when the labor power being purchased begins organizing on the basis of Free Association, as this creates pressure to reveal real production relations. The commodity fetish, which normally masks social relations of production, cannot be maintained within Free Association because Free Association requires demonstration of real contribution, creating a contradiction that must resolve either through the loss of recognition of Capitalist-Simulated-Production or its dissolution into Free Association.
 
 - ∴ ↑Dissolution of capitalist organization into Free Association → ↓Force of the limits imposed by capitalist organizational-forms on the utilization of means of production in common by Free Association
-- ∴ ↑Means of production in common
+- ∴ ↑Means of production in common → ↑Access to Materials Necessary for Playing Associations
 - ∴ ↑Truly Free Association (both socially, and materially)
 
 ---
