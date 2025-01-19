@@ -6,14 +6,14 @@ Such coordination requires more than mere abstract agreement or forced cooperati
 
 **In this free-association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
 
-Surplus flows according to mutual recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures. 
+**Surplus flows according to mutual recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures.**
 
 Simple math reveals how in free-association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free-association necessarily tend towards social-material-truth.
 
 ---
 
 **Let:**
-- Recognition = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.)
+- One's Recognition = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.)
 
 **For any participants A and B:**
 1. A can (re)-attribute to B a share of A's total recognition of contribution towards A's self-actualization
