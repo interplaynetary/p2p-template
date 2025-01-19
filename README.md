@@ -14,10 +14,11 @@ Simple math will reveal how in free-association: false recognition/relations nat
 
 **Let:**
 - One's *Recognition* = one's acknowledgment of contributions towards one's own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.)
+- One's *Total-Recognition* = 100%
 
 **For any participants A and B:**
-1. A can (re)-attribute to B a share of A's total recognition
-2. B can (re)-attribute to A a share of B's total recognition
+1. A can (re)-attribute to B a share of A's total-recognition
+2. B can (re)-attribute to A a share of B's total-recognition
 
 **Let:**
 - *Mutual-Recognition(A, B)* = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution
@@ -36,7 +37,7 @@ Simple math will reveal how in free-association: false recognition/relations nat
 
 **Let:**
 - *Surplus* = Roles one holds but does not desire
-- Surplus can be distributed directly/transitively via Mutual Recognition Distributions: **The share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
+- Surplus can be distributed directly/transitively via Mutual Recognition Distributions: **The share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contributions towards their own self-actualization (self-actualization of the other)!**
 
 *"From each according to his ability, to each according to his needs!"*
 
