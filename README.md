@@ -143,40 +143,10 @@ With shared esteem & love,
 
 "In a higher phase of communist society, after the enslaving subordination of the individual to the division of labor, and therewith also the antithesis between mental and physical labor, has vanished; after labor has become not only a means of life but life's prime desire; after the productive forces have also increased with the all-around development of the individual, and all the springs of co-operative wealth flow more abundantly—only then can the narrow horizon of bourgeois right be crossed in its entirety and society inscribe on its banners: From each according to his ability, to each according to his needs!" (Marx)
 
+*Freedom* and *necessity* are not opposed but united in the free association of producers. When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual recognition of real contributions, when relations activate only through genuine desire and participation - then we have finally found the form in which the free development of each is the condition for the free development of all! 
+
 ---
 
 # What is being done:
 - Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof. It is available at [interplaynetary-github](https://github.com/interplaynetary/free-association) but is additionally available p2p on [radicl](https://link-needed).
 **A basic interface for free-association is almost complete but I am seeking support (housing, food, financial support etc.) to continue its development.**
-
-# Revolutionary Strategy for Free Association
-
-**Phase 1: Building the Infrastructure of Free Association**
-- Develop and test the p2p interface for mutual recognition
-- Create documentation in multiple languages
-- Build tools for tracking real contributions and dependencies
-- Focus on making tools accessible and easy to use
-
-**Phase 2: Practical Implementation & Documentation**
-- Start with small-scale experiments in existing projects
-- Document real experiences meticulously
-- Identify and solve practical challenges
-- Build mutual support between implementations
-
-**Phase 3: Expanding Playnets**
-- Connect different communities using free association
-- Help producers recognize their mutual dependencies
-- Support transition from capital relations to direct association
-- Document and share successful transitions
-- Build infrastructure for larger-scale coordination
-
-**Phase 4: Strategic Acceleration**
-1. Within Capital-Mediated Production:
-   - Help workers recognize mutual dependencies
-   - Support organization on basis of free association
-   - Build tools for direct producer coordination
-
-2. Within Free Associations:
-   - Strengthen direct producer relationships
-   - Develop surplus sharing mechanisms
-   - Support social-material needs of contributors
