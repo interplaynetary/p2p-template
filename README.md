@@ -2,7 +2,7 @@
 
 We present a formulation of a legitimate alternative to capitalism that allows for the *spontaneous self-actualization of all through each other* without any centralized control, planning, private-property or the state!
 
-This requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and/or material dependencies etc.). 
+This requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and/or material dependencies etc.).
 
 **In this free association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of contribution towards their own self-actualization (self-actualization of the other)!**
 
@@ -183,10 +183,6 @@ With shared esteem & love,
 **When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual-recognition of real contributions, when relations activate only through genuine desire and participation - then we have finally a form in which the free development of each is the condition for the free development of all!**
 
 *"Communism as the positive transcendence of private property as human self-estrangement, and therefore as the real appropriation of the human essence by and for man; communism therefore as the complete return of man to himself as a social (i.e., human) being – a return accomplished consciously and embracing the entire wealth of previous development. This communism, as fully developed naturalism, equals humanism, and as fully developed humanism equals naturalism; it is the genuine resolution of the conflict between man and nature and between man and man – the true resolution of the strife between existence and essence, between objectification and self-confirmation, between freedom and necessity, between the individual and the species. Communism is the riddle of history solved, and it knows itself to be this solution."* (Marx)
-
-*"The interference of the state power in social relations becomes superfluous in one sphere after another, and then ceases of itself. The government of persons is replaced by the administration of things and the direction of the processes of production. The state is not "abolished", it withers away."* (Engels)
-
-*"The society which organizes production anew on the basis of free and equal association of the producers will put the whole state machinery where it will then belong—into the museum of antiquities, next to the spinning wheel and the bronze axe."* (Engels)
 
 *"Only at this stage does self-activity coincide with material life, which corresponds to the development of individuals into complete individuals and the casting-off of all natural limitations."* (Marx)
 
