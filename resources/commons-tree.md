@@ -32,7 +32,7 @@ The total product of our community is a social product.
                 - A part of its immediate parent branch
                 - A part of the whole social product      
         - This recursive proportion would then play a double part:
-            - Its apportionment in accordance with a definite social plan maintains the proper proportion between the different kinds of work to be done and the various wants of the community. 
+            - Its apportionment in accordance with a definite social plan (which is the commons-tree itsef) maintains the proper proportion between the different kinds of work to be done and the various wants of the community. 
             - On the other hand, it also serves as a measure of the portion of the common labour borne by each individual, and of his share in the part of the total product destined for individual consumption. 
 
 All the relations between Society and the objects that form this wealth of our own creation, are here so simple and clear as to be intelligible without exertion.
@@ -48,4 +48,3 @@ Let us now picture to ourselves, by way of change, a community of free individua
 in which the labour power of all the different individuals is consciously applied as the combined labour power of the community.
 
 --- Apportionment of social-product between means-of-production and means-of-subsistence
-
