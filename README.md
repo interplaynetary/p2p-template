@@ -41,7 +41,8 @@ You can interact with an interface implementing this logic [here](https://interp
 3. Relations become Active only when:
    - Both Role-Holders express Desire
    - Both Role-Holders express Playing
-4. Relations can be composed into larger structures while maintaining these properties
+4. Players can change their expressions of Desire and Playing at any time
+5. Relations can be composed into larger structures while maintaining these properties
 
 **Let:**
 - **Surplus** = Roles one holds but does not desire
