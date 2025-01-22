@@ -233,7 +233,7 @@
         const society = new D3Node('society', null, []);
 
         // Adding each value as children of the society node
-        const replacingUsedUpMeansOfProduction = society.addChild("Replacing Used-up Means of Production", 80)
+        const replenishingUsedUpMeansOfProduction = society.addChild("Replenishing Used-up Means of Production", 80)
 
         const expansionOfProduction = society.addChild("Expanding Production", 60)
 
@@ -247,11 +247,11 @@
 
         console.log(society);
 
-        // 1. Replacing used up Means of Production (Basic Reproduction)
-        const naturalMaterials = replacingUsedUpMeansOfProduction.addChild("Natural Materials", 30);
-        const machineMaintenance = replacingUsedUpMeansOfProduction.addChild("Machine Maintenance", 25);
-        const infrastructureRepair = replacingUsedUpMeansOfProduction.addChild("Infrastructure Repair", 25);
-        const energyResources = replacingUsedUpMeansOfProduction.addChild("Energy Resources", 20);
+        // 1. Replenishing used up Means of Production (Basic Reproduction)
+        const naturalMaterials = replenishingUsedUpMeansOfProduction.addChild("Natural Materials", 30);
+        const machineMaintenance = replenishingUsedUpMeansOfProduction.addChild("Machine Maintenance", 25);
+        const infrastructureRepair = replenishingUsedUpMeansOfProduction.addChild("Infrastructure Repair", 25);
+        const energyResources = replenishingUsedUpMeansOfProduction.addChild("Energy Resources", 20);
 
         // 2. Expansion of Production (Extended Reproduction)
         const newTechnologies = expansionOfProduction.addChild("New Technologies", 15);

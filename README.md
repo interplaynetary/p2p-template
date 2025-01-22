@@ -25,6 +25,12 @@ Simple math will reveal how in free association: false recognition/relations nat
 
 *Taking the minimum of both shares ensures reciprocity in proportion* 
 
+*Mutual-recognition is the peer-2-peer social-validation of eachother's labor-time as well as the social-validation of use-values."
+
+*Interestingly  we don't have to keep a ledger of objects whose definitions are centrally defined, there is no universal definition of object-hood (of what constitutes objects), but a distributed recognition of the social-utility of contributions (verbs - not objects)!*
+
+*In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
+
 - **Association** = a set of relations where:
 1. Each Relation consists of (Provider-Role, User-Role)
 2. Each Role has a Holder who can:

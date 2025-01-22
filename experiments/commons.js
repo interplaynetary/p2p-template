@@ -35,11 +35,15 @@ The total product of our community is a social product.
             - Its apportionment in accordance with a definite social plan maintains the proper proportion between the different kinds of work to be done and the various wants of the community. 
             - On the other hand, it also serves as a measure of the portion of the common labour borne by each individual, and of his share in the part of the total product destined for individual consumption. 
 
-All the relations between Society and the objects that form this wealth of our own creation, are here so simple and clear as to be intelligible without exertion.
+All the relations between Society and the objects that form this wealth of our own creation, 
+are here so simple and clear as to be intelligible without exertion.
 
 And yet those relations contain all that is essential to the determination of value.
 
-The social relations of the individual producers, with regard both to their labour and to its products, are in this case perfectly simple and intelligible, and that with regard not only to production but also to distribution.
+The social relations of the individual producers, 
+with regard both to their labour and to its products, 
+are in this case perfectly simple and intelligible,
+and that with regard not only to production but also to distribution.
 
 ---- Why time?
 The labour power of each individual, by its very nature, operates in this case merely  as a definite portion of the whole labour power of society, 
@@ -61,13 +65,28 @@ All the branches of the commons-tree are the branches of production from the abs
 We live in time! And by giving a form to our own labor-time we sculpt the labor-power of humanity.
 */
 
-class UsefulThing {
-    constructor(name,  ) {
+class UsefulTypeOfThing {
+    constructor(name, typeProperties, unitsOfMeasure = []) {
         this.name = name;
-        this.parent = parent;
-        this.commons = this.parent ? this.parent.commons : this;
+        this.typeProperties = typeProperties;
+        this.unitsOfMeasure = unitsOfMeasure;
+        this.depreciation = new Map(); // Map(user -> %depreciationPerUse)
     }
 }
+
+class UsefulThing {
+    constructor(name, type, instanceProperties) {
+        this.name = name;
+        this.type = type;
+        this.instanceProperties = instanceProperties;
+        this.uses = new Map();
+    }
+    recordUse(user) {
+        this.uses.set(user, this.uses.get(user) + 1);
+    }
+}
+
+// new Map() type -> instances
 
 class Commons {
     constructor(name, parent = null, individualWorkingDayHours = 0, usefulObject = undefined, definiteQuantity = undefined) {
@@ -81,7 +100,7 @@ class Commons {
         // stockBook is a map of objects of utility that belong to us, 
         this.stockBook = this.commons === this ? new Map() : this.commons.stockBook;
         
-        // If Commons is a usefulObject of a definite quantity, we can refer to it in our stockBook as having a supply (that can be drawn down on!)
+        // If Commons is a type of usefulObject of a definite quantity, we can refer to it in our stockBook as having a supply (that can be drawn down on!)
         this.usefulObject = usefulObject;
         this.definiteQuantity = definiteQuantity; 
         // the costs of a usefulObject in the stockBook, is based on this node's (determinate quantity of a useful-object's) shareOfCommonsProduction
@@ -92,8 +111,8 @@ class Commons {
         // therefore the determinate quantities are themselves the definite-quantities of the total-social-product
         // Some portion of the stockBook is meansOfProduction, some is meansOfSubsistence
 
-        // some childrens are meansOfProduction, some are labor-power
-        // means of production is in common! And compositions are the share in that meansOfProduction!
+        // some childrens are DeterminateQuantities of Types of UsefulThings, some are labor-power
+        // means of production is in common! And compositions are the share in that DeterminateQuantities of Types of UsefulThings!
         // some labor-power is composed! Others are not!
 
         // Rest of the initialization
