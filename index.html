@@ -171,18 +171,6 @@
         .popup-form {
             padding: 0 16px;
         }
-
-        #total-social-labor-time {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            text-align: center;
-            font-size: 24px;
-            font-weight: 500;
-            color: #333;
-            font-family: inherit;
-            z-index: 999;  /* Just below menu bar */
-        }
     </style>
 </head>
 <body>
@@ -195,9 +183,6 @@
     <!-- Main visualization containers -->
     <div id="treemap-container"></div>
     <div id="pie-container">
-        <div id="total-social-labor-time">
-            Total Social Labor Time: <span id="total-time-value">0</span>
-        </div>
         <!-- pie chart will render here -->
     </div>
 
@@ -332,10 +317,6 @@
         console.log(playnet);
         const treemap = createTreemap(playnet);
         document.getElementById('treemap-container').appendChild(treemap);
-
-        // Update the total social labor time display
-        const totalTime = playnet.root.averageSocialLaborTime || playnet.root.averageTime;
-        document.getElementById('total-time-value').textContent = totalTime;
     </script>
 </body>
 </html> 
