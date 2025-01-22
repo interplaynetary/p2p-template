@@ -57,4 +57,4 @@ We are not think about how we allocate our time in terms of product/object produ
 
 All the branches of the commons-tree are the branches of production from the abstract-universal of abstract labor-time to be distributed into concrete-particular labor-time. Abstract-time to concrete-time.
 
-We live in time! And by giving a form to our own labor-time we sculpt the labor-power of humanity.
+We live in time! And by giving a form to social-labor-time we sculpt social-labor-power.
