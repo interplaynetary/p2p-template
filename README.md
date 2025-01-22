@@ -46,13 +46,13 @@ Simple math will reveal how in free association: false recognition/relations nat
 **Let:**
 - **Total Recognition = 100%**
 - **Total Recognition = True Recognition + False Recognition**
-- **Real Producers** = Those that actually perform the operations necessary to *transform* social-material reality in concrete-particular ways.
+- **Real Contributors** = Those that actually perform the operations necessary to *transform* social-material reality in concrete-particular ways.
 
 **For any participant:**
 - ∴ ↑False Recognition = ↓True Recognition
-- ∴ ↓Mutual-Recognition with Real Producers
-- ∴ ↓Surplus-Associations from Real Producers
-- ∴ ↓Access to Real Social-Material Coordination via Surplus-Associations from Real Producers
+- ∴ ↓Mutual-Recognition with Real Contributors
+- ∴ ↓Surplus-Associations from Real Contributors
+- ∴ ↓Access to Real Social-Material Coordination via Surplus-Associations from Real Contributors
 - ∴ social-material-truth is realized through Free Association
 
 **For any Association between A and B:**
@@ -70,15 +70,15 @@ Simple math will reveal how in free association: false recognition/relations nat
 - ↓Real Mutual-Recognition → ↓Real Mutual-Desire
 - ↓Real Mutual-Desire → ↓Real Mutual-Playing
 - ↓Real Mutual-Playing → ↓Free Association
-- ↓Free Association → ↓Real Social-Material Coordination via Associations with Real Producers
+- ↓Free Association → ↓Real Social-Material Coordination via Associations with Real Contributors
 
 ---
 
 **On Capital Relations (and Coercive Relations in General) within Free Association:**
 
 **Let:**
-- Capitalist-Simulated-Production = Production appearing to come from capitalist but actually produced by producers!
-- Commodity Fetish = The masking of social-material relations of production behind the veil of the product as commodity (market-relations) - the objective social-forgetting of the social-origin of things
+- Capitalist-Simulated-Production = Production appearing to come from capitalist but actually produced by contributors!
+- Commodity Fetish = The masking of social-material relations of contribution behind the veil of the product as commodity (market-relations) - the objective social-forgetting of the social-origin of things
 - Second-Order-False-Recognition = False recognition given to obtain capital for buying labor-power
 
 **For any participant C attempting capital accumulation via Second-Order-False-Recognition:**
@@ -88,39 +88,39 @@ Simple math will reveal how in free association: false recognition/relations nat
 4. ↑Capitalist-Simulated-Production → ↑Real Products
 5. ↑Real Products → ↑Potential for Real Recognition from Others
 
-**However, for Real Producers (A, B) whose labor-power has been bought by C:**
+**However, for Real Contributors (A, B) whose labor-power has been bought by C:**
 1. As A, B begin organizing on basis of Free Association:
-   - ↑Recognition of mutual dependencies in production
+   - ↑Recognition of mutual dependencies in contribution
    - ↑Recognition of potential direct association (A↔B)
-   - ↑Pressure on C participate in production and make real-contributions
+   - ↑Pressure on C participate in contribution and make real-contributions
    - ↑Contradiction between:
-     - C's need to maintain capitalist claim to ownership of surplus and means of production
-     - C's need to have contributions recognized by freely associating producers
+     - C's need to maintain capitalist claim to ownership of surplus and means of contribution
+     - C's need to have contributions recognized by freely associating contributors
 
 2. This contradiction intensifies as:
    - ↑Labor-Power Purchased → ↑Potential for that Labor-Power to organize on the basis of Free Association
-   - ↑Formation of Direct Producer Associations
-   - ↑Visibility of real production dependencies
+   - ↑Formation of Direct Contributor Associations
+   - ↑Visibility of real contribution dependencies
    - ↓Effectiveness of commodity fetish in masking relations
 
 **Therefore:**
 - ↑Organization of bought labor-power via Free Association
-- → ↑Internal pressure to reveal real internal production relations
-- → ↓Internal recognition of Capitalist's claim surplus-production/distribution
-- → ↑Recognition of direct producer dependencies
+- → ↑Internal pressure to reveal real internal contribution relations
+- → ↓Internal recognition of Capitalist's claim surplus-contribution/distribution
+- → ↑Recognition of direct contributor dependencies
 - ∴ Capital relations become increasingly unstable as bought labor-power organizes via Free Association
 
 **In other words:**
-The commodity fetish cannot persist when the labor-power being purchased begins organizing on the basis of Free Association, as this creates pressure to reveal real production relations. The commodity fetish, which normally masks social relations of production, cannot be maintained within Free Association because Free Association requires demonstration of real contribution, creating a contradiction that must resolve either through the loss of recognition of Capitalist-Simulated-Production or its dissolution into Free Association.
+The commodity fetish cannot persist when the labor-power being purchased begins organizing on the basis of Free Association, as this creates pressure to reveal real contribution relations. The commodity fetish, which normally masks social relations of contribution, cannot be maintained within Free Association because Free Association requires demonstration of real contribution, creating a contradiction that must resolve either through the loss of recognition of Capitalist-Simulated-Production or its dissolution into Free Association.
 
 **On Free Association and State Power:**
 
 **Let:**
-- State-Power = The organized force appearing separate from and above producers
+- State-Power = The organized force appearing separate from and above contributors
 - State-Mediated Governance = Coordination via state apparatus rather than direct free association
-- State-Simulated-Coordination = Coordination appearing to come from state but actually from producer self-organization
-- State Fetish = The masking of real social-coordination behind the veil of state authority - the objective social-forgetting of the self-organizing capacity of producers
-- Property Relations = Legal framework enforcing exclusive control over means of production
+- State-Simulated-Coordination = Coordination appearing to come from state but actually from contributor self-organization
+- State Fetish = The masking of real social-coordination behind the veil of state authority - the objective social-forgetting of the self-organizing capacity of contributors
+- Property Relations = Legal framework enforcing exclusive control over means of contribution
 - Bourgoise Legal Fetish = The masking of class relations behind formal equality before the law
 
 **For any state apparatus S attempting to maintain property relations:**
@@ -132,36 +132,36 @@ The commodity fetish cannot persist when the labor-power being purchased begins 
 
 2. However, as free association expands:
    - ↑Scale of free association
-   - ↑Number of producers organizing via free association
+   - ↑Number of contributors organizing via free association
    - ↑Practical common utilization despite formal property relations
    - ↑Contradiction between:
      - Legal property framework
-     - Actual production relations
+     - Actual contribution relations
 
 3. This contradiction intensifies as:
    - ↑Gap between formal ownership and real utilization
-   - ↑Material power of associated producers
-   - ↑Self-Coordination of Producers → ↓Need for State-Mediated-Governance
+   - ↑Material power of associated contributors
+   - ↑Self-Coordination of Contributors → ↓Need for State-Mediated-Governance
    - ↑Difficulty of enforcing private-property relations
 
 **Therefore:**
 - ↑Organization via Free Association
 - → ↑Visibility of real coordination capabilities
 - → ↓Recognition of state's claim to necessary coordination role
-- → ↑Recognition of producer self-organization capacity
-- ∴ State power becomes increasingly superfluous as producers organize via Free Association
+- → ↑Recognition of contributor self-organization capacity
+- ∴ State power becomes increasingly superfluous as contributors organize via Free Association
 
 **In other words:**
-The state fetish cannot persist when producers organize via Free Association, as this demonstrates their real capacity for self-coordination. State power, which normally appears as necessary external force, reveals itself as superfluous when Free Association shows producers' capacity to coordinate their own social-material production.
+The state fetish cannot persist when contributors organize via Free Association, as this demonstrates their real capacity for self-coordination. State power, which normally appears as necessary external force, reveals itself as superfluous when Free Association shows contributors' capacity to coordinate their own social-material contribution.
 
 **Therefore:**
 - ∴ State power isn't abolished but withers away as its functions are increasingly rendered unnecessary in Free Association
 - ∴ The social-coordination of things replaces the government of persons
-- ∴ Free Association realizes both social and material self-governance of producers
+- ∴ Free Association realizes both social and material self-governance of contributors
 
 **Therefore**
-- ∴ (↑Dissolution of capitalist organization into Free Association ∧ ↓Effectiveness of state power in maintaining private-property relations) → ↓Force of the limits imposed by organizational-forms-based-on-class-division on the utilization of means of production in common by Freely Associating Producers
-- ∴ ↑Means of production in common → ↑Access to Materials Necessary for Playing Associations
+- ∴ (↑Dissolution of capitalist organization into Free Association ∧ ↓Effectiveness of state power in maintaining private-property relations) → ↓Force of the limits imposed by organizational-forms-based-on-class-division on the utilization of means of contribution in common by Freely Associating Contributors
+- ∴ ↑Means of contribution in common → ↑Access to Materials Necessary for Playing Associations
 - ∴ ↑Truly Free Association (both socially and materially)
 
 ---
@@ -170,7 +170,7 @@ The state fetish cannot persist when producers organize via Free Association, as
 - Direct Mutual Contribution: A ↔ B (A and B directly contribute to each other)
 - Transitive Mutual Contribution: A ↔ B ↔ C (A and B transitively contribute to each other via B)
 
-**Let us imagine, for a change, a directly/transitively mutualistic truly free association of free individuals, spontaneously coordinating their social-material production with the means of production in common, without any centralized control or planning. Without the need for private-property or the state.**
+**Let us imagine, for a change, a directly/transitively mutualistic truly free association of free individuals, spontaneously coordinating their social-material contribution with the means of contribution in common, without any centralized control or planning. Without the need for private-property or the state.**
 
 With shared esteem & love,
 - Ruzgar Imski & Free Association
@@ -178,7 +178,7 @@ With shared esteem & love,
 
 *"In a higher phase of communist society, after the enslaving subordination of the individual to the division of labor, and therewith also the antithesis between mental and physical labor, has vanished; after labor has become not only a means of life but life's prime desire; after the productive forces have also increased with the all-around development of the individual, and all the springs of co-operative wealth flow more abundantly—only then can the narrow horizon of bourgeois right be crossed in its entirety and society inscribe on its banners: From each according to his ability, to each according to his needs!"* (Marx)
 
-***Freedom* and *necessity* are not opposed but united in the free association of producers.**
+***Freedom* and *necessity* are not opposed but united in the free association of contributors.**
 
 **When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual-recognition of real contributions, when relations activate only through genuine desire and participation - then we have finally a form in which the free development of each is the condition for the free development of all!**
 

@@ -1,7 +1,7 @@
 # Interplaynetary Commons
-My dear comrades in the struggle for universal human emancipation!
-
-What we have before us is not merely a question of organizing this or that sector of contribution, but of uniting ALL contributors - all who transform social and material reality through their labor - into a truly free association that transcends the narrow limits imposed by capital and state power!
+# Contributor Interface
+# Commons Interface
+# Common Sense
 
 **The Union of All Contributors:**
 1. **Definition of Contributor:**
@@ -21,12 +21,14 @@ This includes:
 
 **Strategic Phases of Universal Emancipation:**
 
-1. **Initial Phase - Building the Infrastructure of Freedom:**
+1. **Initial Phase - Building Commons Infrastructure:**
    - Develop p2p tools for mutual recognition
    - Create networks of material support
    - Document and share successful practices
    - Connect existing contributor associations
    - Build capacity for larger-scale coordination
+
+// talk more with the move you can do with the interface
 
 2. **Expansion Phase - Growing the Network:**
    - Link different sectors of contribution
@@ -80,9 +82,3 @@ Link/QR Code: Sign up
 playnet.lol
 
 Signal Communication Group :
-
-The philosophers have only interpreted the world in various ways; the point is to change it - through free association!
-
-
-
-Add Goals and (Goals, number of contributors)

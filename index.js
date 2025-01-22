@@ -1,6 +1,7 @@
 class Node {
-    constructor(name, parent = null, types = []) {
+    constructor(name, parent = null,  scalarQuantity, types = []) {
         this.name = name;
+        this.scalarQuantity = scalarQuantity // - Node quantity: indicates the absolute number scale of the proportions! Nodes become templates of product composition and recursive-proportions (shareOfGeneralContribution)! The tree is a tree of contribution of proportions of the root's scalar quantity! Although what happens if our childrens node have their own quantities?
         this.parent = parent;
         this.points = 0;
         this.children = new Map();  // Node -> Map(contributor -> points)
@@ -41,12 +42,12 @@ class Node {
 
     
 
-    addChild(name, points = 0, types = []) {
+    addChild(name, points = 0, scalarQuantity, types = []) {
         if (this.parent && this.isContributor) {
             throw new Error(`Node ${this.name} is an instance of a contributor and cannot have children.`);
         }
 
-        const child = new Node(name, this);
+        const child = new Node(name, this, scalarQuantity);
         
         // Ensure types are properly added
         if (Array.isArray(types)) {
@@ -666,8 +667,8 @@ function createTreemap(data) {
                 .text("Add Values / Contributors");
         }
     }
-      // Add menu bar with cycling text
-      const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
+      // Add menu bar with proper z-index that doesn't overlap content
+      const addNodeTexts = ['Add Context', 'Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
       let currentTextIndex = 0;
 
       const menuBar = document.createElement('div');
@@ -675,10 +676,12 @@ function createTreemap(data) {
       menuBar.style.userSelect = 'none';
       menuBar.style.webkitUserSelect = 'none';
       menuBar.innerHTML = `
-          <button class="menu-button cycle-text" data-form="addNode" style="user-select: none; -webkit-user-select: none;">${addNodeTexts[0]}</button>
-          <button class="menu-button" data-form="revealQR" style="user-select: none; -webkit-user-select: none;">Add Contributor</button>
+          <div class="menu-bar" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+              <button class="menu-button cycle-text" data-form="addNode" style="user-select: none; -webkit-user-select: none;">${addNodeTexts[0]}</button>
+              <button class="menu-button" data-form="revealQR" style="user-select: none; -webkit-user-select: none;">Add Contributor</button>
+          </div>
       `;
-      container.appendChild(menuBar);
+      document.body.appendChild(menuBar);
 
       // Add cycling functionality
       const cycleButton = menuBar.querySelector('.cycle-text');
