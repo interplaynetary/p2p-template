@@ -230,22 +230,22 @@
         const whalewatch = new D3Node('whalewatch', null, [activist]);  // is a contributor
         const greenpeace = new D3Node('greenpeace', null, [researcher]);  // is a contributor
 
-        const society = new D3Node('society', null, []);
+        const playnet = new D3Node('playnet', null, []);
 
-        // Adding each value as children of the society node
-        const replenishingUsedUpMeansOfProduction = society.addChild("Replenishing Used-up Means of Production", 80)
+        // Adding each value as children of the playnet node
+        const replenishingUsedUpMeansOfProduction = playnet.addChild("Replenishing Used-up Means of Production", 80)
 
-        const expansionOfProduction = society.addChild("Expanding Production", 60)
+        const expansionOfProduction = playnet.addChild("Expanding Production", 60)
 
-        const insuranceReserves = society.addChild("Hedging Risks", 90)
+        const insuranceReserves = playnet.addChild("Hedging Risks", 90)
 
-        const socialServices = society.addChild("Common Satisfaction of Needs", 70)
+        const socialServices = playnet.addChild("Common Satisfaction of Needs", 70)
 
-        const welfare = society.addChild("Welfare", 65)
+        const welfare = playnet.addChild("Welfare", 65)
 
-        const consumption = society.addChild("Individual Means of Consumption", 40)
+        const consumption = playnet.addChild("Individual Means of Consumption", 40)
 
-        console.log(society);
+        console.log(playnet);
 
         // 1. Replenishing used up Means of Production (Basic Reproduction)
         const naturalMaterials = replenishingUsedUpMeansOfProduction.addChild("Natural Materials", 30);
@@ -301,40 +301,40 @@
 
         const fillingPotholes = infrastructureRepair.addChild("Filling Potholes", 25, [activist]);
 
-        // whalewatch's recognition of society
+        // whalewatch's recognition of playnet
         const whalewatchgive = whalewatch.addChild('🌳 give', 80);
         const whalewatchpotential = whalewatchgive.addChild('🔮 potential', 40);
-        const societyInwhalewatchpotential = whalewatchpotential.addChild('society', 15, [society]);
+        const playnetInwhalewatchpotential = whalewatchpotential.addChild('playnet', 15, [playnet]);
 
-        // greenpeace's recognition of society
+        // greenpeace's recognition of playnet
         const greenpeacegive = greenpeace.addChild('🌳 give', 80);
         const greenpeacepotential = greenpeacegive.addChild('🔮 potential', 40);
-        const societyIngreenpeacepotential = greenpeacepotential.addChild('society', 15, [society]);
+        const playnetIngreenpeacepotential = greenpeacepotential.addChild('playnet', 15, [playnet]);
 
         const activistgive = activist.addChild('🌳 give', 80);
         const activistpotential = activistgive.addChild('🔮 potential', 40);
-        const societyInactivistpotential = activistpotential.addChild('society', 15, [society]);
+        const playnetInactivistpotential = activistpotential.addChild('playnet', 15, [playnet]);
 
         // Calculate shares at different type levels
         console.log('\nShares by type level:');
-        console.log('Environmentalist share:', society.shareOfGeneralContribution(environmentalist));
-        console.log('Activist share:', society.shareOfGeneralContribution(activist));
-        console.log('Educator share:', society.shareOfGeneralContribution(educator));
-        console.log('Researcher share:', society.shareOfGeneralContribution(researcher));
-        console.log('whalewatch specific share:', society.shareOfGeneralContribution(whalewatch));
-        console.log('greenpeace specific share:', society.shareOfGeneralContribution(greenpeace));
+        console.log('Environmentalist share:', playnet.shareOfGeneralContribution(environmentalist));
+        console.log('Activist share:', playnet.shareOfGeneralContribution(activist));
+        console.log('Educator share:', playnet.shareOfGeneralContribution(educator));
+        console.log('Researcher share:', playnet.shareOfGeneralContribution(researcher));
+        console.log('whalewatch specific share:', playnet.shareOfGeneralContribution(whalewatch));
+        console.log('greenpeace specific share:', playnet.shareOfGeneralContribution(greenpeace));
 
         // Calculate mutual recognition and generalMutualContribution
         console.log('\nMutual Recognition:');
-        console.log('With whalewatch:', society.mutualShareOfGeneralContribution(whalewatch));
+        console.log('With whalewatch:', playnet.mutualShareOfGeneralContribution(whalewatch));
         console.log('\nFinal mutualGeneralContribution:');
-        console.log(society.mutualGeneralContribution());
-        console.log(society);
-        const treemap = createTreemap(society);
+        console.log(playnet.mutualGeneralContribution());
+        console.log(playnet);
+        const treemap = createTreemap(playnet);
         document.getElementById('treemap-container').appendChild(treemap);
 
         // Update the total social labor time display
-        const totalTime = society.root.averageSocialLaborTime || society.root.averageTime;
+        const totalTime = playnet.root.averageSocialLaborTime || playnet.root.averageTime;
         document.getElementById('total-time-value').textContent = totalTime;
     </script>
 </body>
