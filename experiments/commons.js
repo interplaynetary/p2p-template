@@ -61,7 +61,13 @@ All the branches of the commons-tree are the branches of production from the abs
 We live in time! And by giving a form to our own labor-time we sculpt the labor-power of humanity.
 */
 
-
+class UsefulThing {
+    constructor(name,  ) {
+        this.name = name;
+        this.parent = parent;
+        this.commons = this.parent ? this.parent.commons : this;
+    }
+}
 
 class Commons {
     constructor(name, parent = null, individualWorkingDayHours = 0, usefulObject = undefined, definiteQuantity = undefined) {

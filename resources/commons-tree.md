@@ -3,9 +3,11 @@
 Our commons-tree is has a root representing the whole of socially-necessary-production.
 Each branch of the tree is a particular branch of production.
 
-The tree is a composition of labor and definite quantities of useful-objects necessary for their activities; (compositions of labor/means of production)
+The tree is a composition of labor and labor required to provision definite quantities of useful-objects as means-of-production from the social-stock.
 
-The proportions in the tree represents the social-labour time that are required to (re)produce:
+(compositions of labor/means of production)
+
+The proportions in the tree represents the the proportion of total-social-labour that are required to (re)produce:
 - composed-labor 
 - the appearence of useful-objects in a production-process: this is the social-labor-required to provision those definite quantities of useful objects for use in the act of production when they are needed! (Means of Production, held in common! These objects come that portion of the social-stock that serves as fresh-means-of-production)
 
@@ -39,21 +41,11 @@ And yet those relations contain all that is essential to the determination of va
 
 The social relations of the individual producers, with regard both to their labour and to its products, are in this case perfectly simple and intelligible, and that with regard not only to production but also to distribution.
 
----- Why time?
 The labour power of each individual, by its very nature, operates in this case merely  as a definite portion of the whole labour power of society, 
 and therefore, the measure of the expenditure of individual labour power by its duration, appears here by its very nature as a social character of their labour.
 
 Let us now picture to ourselves, by way of change, a community of free individuals, carrying on their work with the means of production in common, 
 in which the labour power of all the different individuals is consciously applied as the combined labour power of the community.
 
-It is of great interest that this form of recursive scalar and proportional composition - which necessarily gets smaller as one descends further into the tree of compositions of operations - is only a Universal pattern with respect to time, as not all compositions of operations have diminishing scalar quantities when one calculates the recursive-proportions with recursive-absolute-values attempting to view them as units of concrete resources!
+--- Apportionment of social-product between means-of-production and means-of-subsistence
 
-The key insight is that time has a unique mathematical property: its subdivisions always maintain their proportional relationship to the whole, which makes it the perfect universal measure for social production. 
-
-This is why we use time (both concrete and socially validated) as the basis for our system rather than tracking physical resources or ownership.
-
-We are not think about how we allocate our time in terms of product/object production but in terms concrete-time spent in concrete-particular activities so as to fulfill all needs in the whole of socially-necessary-production.
-
-All the branches of the commons-tree are the branches of production from the abstract-universal of abstract labor-time to be distributed into concrete-particular labor-time. Abstract-time to concrete-time.
-
-We live in time! And by giving a form to social-labor-time we sculpt social-labor-power.
