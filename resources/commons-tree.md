@@ -28,8 +28,7 @@ The total product of our community is a social product.
             - Until we reach the total social labor at the root
             - Thus each share is simultaneously:
                 - A part of its immediate parent branch
-                - A part of the whole social product
-                
+                - A part of the whole social product      
         - This recursive proportion would then play a double part:
             - Its apportionment in accordance with a definite social plan maintains the proper proportion between the different kinds of work to be done and the various wants of the community. 
             - On the other hand, it also serves as a measure of the portion of the common labour borne by each individual, and of his share in the part of the total product destined for individual consumption. 
