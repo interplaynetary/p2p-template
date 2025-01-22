@@ -10,6 +10,8 @@ This requires more than mere abstract agreement or forced cooperation - it deman
 
 Simple math will reveal how in free association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free association necessarily tend towards social-material-truth.
 
+You can interact with an interface implementing this logic [here](https://interplaynetary.github.io/free-association/) (still in active development).
+
 ---
 
 **Let:**
@@ -27,7 +29,7 @@ Simple math will reveal how in free association: false recognition/relations nat
 
 *Mutual-recognition is the peer-2-peer social-validation of eachother's labor-time as well as the social-validation of use-values."
 
-*Interestingly  we don't have to keep a ledger of objects whose definitions are centrally defined, there is no universal definition of object-hood (of what constitutes objects), but a distributed recognition of the social-utility of contributions (verbs - not objects)!*
+*Interestingly  we don't have to keep a ledger of objects whose definitions are centrally defined, there is no universal definition of object-hood (of what constitutes objects), but a distributed recognition of the social-utility of contributions!*
 
 *In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
 
