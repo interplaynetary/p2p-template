@@ -218,7 +218,7 @@
         const playnet = new D3Node('playnet', null, []);
 
         // Adding each value as children of the playnet node
-        const replenishingUsedUpMeansOfProduction = playnet.addChild("Replenishing Used-up Means of Production", 80)
+        const replenishingMeansOfProduction = playnet.addChild("Replenishing Means of Production", 80)
 
         const expansionOfProduction = playnet.addChild("Expanding Production", 60)
 
@@ -232,11 +232,11 @@
 
         console.log(playnet);
 
-        // 1. Replenishing used up Means of Production (Basic Reproduction)
-        const naturalMaterials = replenishingUsedUpMeansOfProduction.addChild("Natural Materials", 30);
-        const machineMaintenance = replenishingUsedUpMeansOfProduction.addChild("Machine Maintenance", 25);
-        const infrastructureRepair = replenishingUsedUpMeansOfProduction.addChild("Infrastructure Repair", 25);
-        const energyResources = replenishingUsedUpMeansOfProduction.addChild("Energy Resources", 20);
+        // 1. Replenishing  Means of Production (Basic Reproduction)
+        const naturalMaterials = replenishingMeansOfProduction.addChild("Natural Materials", 30);
+        const machineMaintenance = replenishingMeansOfProduction.addChild("Machine Maintenance", 25);
+        const infrastructureRepair = replenishingMeansOfProduction.addChild("Infrastructure Repair", 25);
+        const energyResources = replenishingMeansOfProduction.addChild("Energy Resources", 20);
 
         // 2. Expansion of Production (Extended Reproduction)
         const newTechnologies = expansionOfProduction.addChild("New Technologies", 15);
