@@ -242,7 +242,7 @@ We see how subjectivity and objectivity, spirituality and materiality, activity 
 
 ---
 
-# What is being done:
+# Interface:
 - Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof. 
 
 It is being developed open-source at [interplaynetary-github](https://github.com/interplaynetary/free association) but is additionally available p2p on [radicl](https://link-needed).
@@ -250,3 +250,10 @@ It is being developed open-source at [interplaynetary-github](https://github.com
 **A basic interface for free association is almost complete but we are seeking support in user-interface-development as well as support in the form of housing, food etc.**
 
 **Support Financially:** [opencollective.com/playnet](https://opencollective.com/playnet)
+
+## (Re)-Compose/Import Templates
+- Drag and drop templates as children to the parent!
+
+### AI Agents
+- Neural-Networks in the browser
+- Truth Recognition and AI Training

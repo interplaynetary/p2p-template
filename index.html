@@ -207,107 +207,138 @@
     <script src="index.js"></script>
     <script>
         const environmentalist = new D3Node('environmentalist');  // most abstract
-        const activist = new D3Node('activist', null, [environmentalist]);  // type of environmentalist
+        const clownsWithoutBorders = new D3Node('clowns4all', null, [environmentalist]);  // type of environmentalist
         const researcher = new D3Node('researcher', null, [environmentalist]);  // another type
         const educator = new D3Node('educator', null, [environmentalist]);  // another type
 
         // Our main nodes with multiple types
-        const whalewatch = new D3Node('whalewatch', null, [activist]);  // is a contributor
-        const greenpeace = new D3Node('greenpeace', null, [researcher]);  // is a contributor
+        const whalewatch = new D3Node('whalewatch', null, [clownsWithoutBorders]);  // is a contributor
+        const alice = new D3Node('alice', null, [researcher]);  // is a contributor
 
         const playnet = new D3Node('playnet', null, []);
 
-        // Adding each value as children of the playnet node
-        const replenishingMeansOfProduction = playnet.addChild("Replenishing Means of Production", 80)
+        // 1. Material Needs & Dependencies
+        const space = playnet.addChild("Space & Environment", 25);
 
-        const expansionOfProduction = playnet.addChild("Expanding Production", 60)
-
-        const insuranceReserves = playnet.addChild("Hedging Risks", 90)
-
-        const socialServices = playnet.addChild("Common Satisfaction of Needs", 70)
-
-        const welfare = playnet.addChild("Welfare", 65)
-
-        const consumption = playnet.addChild("Individual Means of Consumption", 40)
+        // Space & Environment children
+        const indoorSpace = space.addChild("Indoor/Outdoor Space", 15);
+        const seating = space.addChild("Comfortable Seating", 15);
+        const lighting = space.addChild("Lighting", 12);
+        const temperature = space.addChild("Temperature Control", 12);
+        const bathroom = space.addChild("Bathroom Access", 12);
+        const waterAccess = space.addChild("Water Access", 12);
+        const cleaning = space.addChild("Cleaning Supplies", 11);
+        const waste = space.addChild("Trash/Recycling", 11);
 
         console.log(playnet);
+        
+        const hosts = indoorSpace.addChild("Space Providers/Hosts", 14);
 
-        // 1. Replenishing  Means of Production (Basic Reproduction)
-        const naturalMaterials = replenishingMeansOfProduction.addChild("Natural Materials", 30);
-        const machineMaintenance = replenishingMeansOfProduction.addChild("Machine Maintenance", 25);
-        const infrastructureRepair = replenishingMeansOfProduction.addChild("Infrastructure Repair", 25);
-        const energyResources = replenishingMeansOfProduction.addChild("Energy Resources", 20);
+        // Main Categories with their percentage weights
+        const infrastructure = playnet.addChild("Infra(de)structure & Bottom-secret Spaces", 25);
+        const magicalTech = playnet.addChild("Magical Technologies & Systems", 25);
+        const substances = playnet.addChild("Transformative Substances", 20);
+        const realityHacking = playnet.addChild("Reality Hacking & Manifestation", 20);
+        const loreSystem = playnet.addChild("Lore & Knowledge Systems", 10);
 
-        // 2. Expansion of Production (Extended Reproduction)
-        const newTechnologies = expansionOfProduction.addChild("New Technologies", 15);
-        const additionalFacilities = expansionOfProduction.addChild("Additional Facilities", 12);
-        const researchAndDevelopment = expansionOfProduction.addChild("Research and Development", 13);
-        const trainingPrograms = expansionOfProduction.addChild("Training Programs", 10);
+        // Underground Networks contributions
+        const secretStairs = infrastructure.addChild("Secret stairways", 10, [alice, researcher]);
+        const wellsTunnels = infrastructure.addChild("Wells & tunnels", 8, [whalewatch, clownsWithoutBorders]);
+        const basements = infrastructure.addChild("Basements", 7, [alice, educator]);
+        const subLakes = infrastructure.addChild("Subterranean lakes", 6, [whalewatch, researcher]);
 
-        // 3. Insurance / Reserves
-        const naturalDisasters = insuranceReserves.addChild("Natural Disasters", 25);
-        const emergencySupplies = insuranceReserves.addChild("Emergency Supplies", 25);
-        const equipmentReplacement = insuranceReserves.addChild("Equipment Replacement", 25);
-        const strategicReserves = insuranceReserves.addChild("Strategic Reserves", 25);
+        // Hidden Passages contributions
+        const alleysRoots = infrastructure.addChild("Alleys & Roots", 9, [alice, researcher]);
+        const trapDoors = infrastructure.addChild("Trap-doors", 8, [whalewatch, clownsWithoutBorders]);
+        const warpZones = infrastructure.addChild("Warp zones", 7, [alice, educator]);
 
-        // 5. Common Satisfaction of Needs
-        const healthcare = socialServices.addChild("Healthcare", 15);
-        const education = socialServices.addChild("Education", 15);
-        const publicTransport = socialServices.addChild("Public Transport", 12);
-        const culturalFacilities = socialServices.addChild("Cultural Facilities", 11);
+        // Alternative Venues contributions
+        const driveIns = infrastructure.addChild("Liberation Drive-ins", 8, [alice, researcher]);
+        const trainYards = infrastructure.addChild("Train-yards", 7, [whalewatch, clownsWithoutBorders]);
+        const fleaMarkets = infrastructure.addChild("Flea Markets", 6, [alice, educator]);
+        const roofs = infrastructure.addChild("Roofs", 5, [whalewatch, researcher]);
+        const ufoLanding = infrastructure.addChild("*ufo* Landing Pads", 5, [alice, clownsWithoutBorders]);
 
-        // 6. Welfare
-        const disabilitySupport = welfare.addChild("Disability Support", 15);
-        const elderCare = welfare.addChild("Elder Care", 13);
-        const childSupport = welfare.addChild("Child Support", 13);
-        const emergencyAid = welfare.addChild("Emergency Aid", 12);
+        // Reality Manipulation contributions
+        const cloudBusting = magicalTech.addChild("Cloud Busting", 9, [alice, researcher]);
+        const cameraAbatement = magicalTech.addChild("Camera Abatement", 8, [whalewatch, clownsWithoutBorders]);
+        const systemOfframp = magicalTech.addChild("System (off/out)-ramp Drive-thrus", 7, [alice, educator]);
 
-        // 7. Consumption
-        const basicNecessities = consumption.addChild("Basic Necessities", 8);
-        const housing = consumption.addChild("Housing", 5);
-        const personalDevelopment = consumption.addChild("Personal Development", 4);
-        const leisureActivities = consumption.addChild("Leisure Activities", 3);
+        // Mystical Operations contributions
+        const bioSlimes = magicalTech.addChild("Bioluminescent Slimes", 8, [alice, researcher]);
+        const butterflyWings = magicalTech.addChild("Butterfly-wing-iridescence Materiality", 8, [whalewatch, clownsWithoutBorders]); 
+        const eventHorizons = magicalTech.addChild("Event Horizons & Vanishing Points", 7, [alice, educator]);
 
-        // Under Common Satisfaction of Needs (Education)
-        const whalewatchPrograms = education.addChild("Whalewatch Programs", 5, [whalewatch, educator])
-        const greenpeaceWorkshops = education.addChild("Greenpeace Workshops", 9, [greenpeace, educator]);
+        // Sacred Knowledge contributions
+        const libraryStacks = magicalTech.addChild("Library Stacks", 8, [alice, researcher]);
+        const saunaLore = magicalTech.addChild("Pagan Sauna Lore", 7, [whalewatch, clownsWithoutBorders]);
+        const ritualSpaces = magicalTech.addChild("Ritual Spaces", 6, [alice, educator]);
+        const candyWisdom = magicalTech.addChild("Candy Store Wisdom", 6, [whalewatch, educator]);
 
-        // Under Research and Development (within Expansion of Production)
-        const marineResearch = expansionOfProduction.addChild("Marine Research", 7, [whalewatch, researcher])
-        const environmentalImpactStudies = expansionOfProduction.addChild("Environmental Impact Studies", 6, [greenpeace, researcher]);
+        // Magical Materials contributions
+        const pixieDust = substances.addChild("Pixie Dust & Silly Powders", 9, [alice, researcher]);
+        const oozeSlimes = substances.addChild("Oozes & slimes", 8, [whalewatch, clownsWithoutBorders]);
+        const potionsBalms = substances.addChild("Potions & Balms", 7, [alice, educator]);
 
-        // Under Emergency Supplies (within Insurance/Reserves)
-        const marineEmergencyResponse = insuranceReserves.addChild("Marine Emergency Response", 10, [whalewatch, activist])
-        const environmentalCrisisResponse = insuranceReserves.addChild("Environmental Crisis Response", 15, [greenpeace, activist]);
+        // Alchemical Mixtures contributions
+        const veganWaters = substances.addChild("Vegan & Non-vegan Waters", 8, [alice, researcher]);
+        const mistsSprays = substances.addChild("Mists & Sprays", 7, [whalewatch, clownsWithoutBorders]);
+        const lozengesBonbons = substances.addChild("Lozenges & Bonbons", 6, [alice, educator]);
 
-        const communitySupportedAgriculture = welfare.addChild("Community Supported Agriculture", 49, [whalewatch, activist]);
+        // Special Effects contributions
+        const pheromones = substances.addChild("Pheromonal Inflection Points", 8, [alice, researcher]);
+        const darkMatter = substances.addChild("Dark Matter Manipulation", 7, [whalewatch, clownsWithoutBorders]);
+        const globulation = substances.addChild("Nebulatory Coagular Globulation", 6, [alice, educator]);
 
-        const cooperativeGroceryStores = basicNecessities.addChild("Cooperative Grocery Stores", 39, [greenpeace]);
+        // Reality Scripts contributions
+        const trueFakes = realityHacking.addChild("TrueFakes & FakeUntruths", 9, [alice, researcher]);
+        const memeDrives = realityHacking.addChild("MemeDrives & GeneEngines", 8, [whalewatch, clownsWithoutBorders]);
+        const cosmicBabble = realityHacking.addChild("Cosmic Psychobabble", 7, [alice, educator]);
 
-        const fillingPotholes = infrastructureRepair.addChild("Filling Potholes", 25, [activist]);
+        // Dimensional Engineering contributions
+        const dimPortals = realityHacking.addChild("Interdimensional portals", 8, [alice, researcher]);
+        const infinityPools = realityHacking.addChild("Infinity Pools", 7, [whalewatch, clownsWithoutBorders]);
+        const deprivationTanks = realityHacking.addChild("Sensory Deprivation Tankage", 6, [alice, educator]);
+
+        // Mathematical Magic contributions
+        const girlMath = realityHacking.addChild("GirlMath", 8, [alice, researcher]);
+        const moonMath = realityHacking.addChild("Moonlight Mathematicians", 7, [whalewatch, clownsWithoutBorders]);
+        const angelicNums = realityHacking.addChild("Angelic Numbers", 6, [alice, educator]);
+
+        // Narrative Crafting contributions
+        const comicBooks = loreSystem.addChild("Comic Books & Stories", 8, [alice, researcher]);
+        const poemsAndMaps = loreSystem.addChild("Poems & Maps", 7, [whalewatch, clownsWithoutBorders]);
+
+        // Wisdom Keepers contributions
+        const priestesses = loreSystem.addChild("Interdimensional Priestesses", 8, [alice, researcher]);
+        const crimeLords = loreSystem.addChild("Alien Crime Lords", 7, [whalewatch, clownsWithoutBorders]);
+        const ballerinas = loreSystem.addChild("Sci-fi Ballerinas", 6, [alice, educator]);
+
+
 
         // whalewatch's recognition of playnet
         const whalewatchgive = whalewatch.addChild('🌳 give', 80);
         const whalewatchpotential = whalewatchgive.addChild('🔮 potential', 40);
         const playnetInwhalewatchpotential = whalewatchpotential.addChild('playnet', 15, [playnet]);
 
-        // greenpeace's recognition of playnet
-        const greenpeacegive = greenpeace.addChild('🌳 give', 80);
-        const greenpeacepotential = greenpeacegive.addChild('🔮 potential', 40);
-        const playnetIngreenpeacepotential = greenpeacepotential.addChild('playnet', 15, [playnet]);
+        // alice's recognition of playnet
+        const alicegive = alice.addChild('🌳 give', 80);
+        const alicepotential = alicegive.addChild('🔮 potential', 40);
+        const playnetInalicepotential = alicepotential.addChild('playnet', 15, [playnet]);
 
-        const activistgive = activist.addChild('🌳 give', 80);
-        const activistpotential = activistgive.addChild('🔮 potential', 40);
-        const playnetInactivistpotential = activistpotential.addChild('playnet', 15, [playnet]);
+        // clownsWithoutBorders's recognition of playnet
+        const clownsWithoutBordersgive = clownsWithoutBorders.addChild('🌳 give', 80);
+        const clownsWithoutBorderspotential = clownsWithoutBordersgive.addChild('🔮 potential', 40);
+        const playnetInclownsWithoutBorderspotential = clownsWithoutBorderspotential.addChild('playnet', 15, [playnet]);
 
         // Calculate shares at different type levels
         console.log('\nShares by type level:');
         console.log('Environmentalist share:', playnet.shareOfGeneralContribution(environmentalist));
-        console.log('Activist share:', playnet.shareOfGeneralContribution(activist));
+        console.log('clownsWithoutBorders share:', playnet.shareOfGeneralContribution(clownsWithoutBorders));
         console.log('Educator share:', playnet.shareOfGeneralContribution(educator));
         console.log('Researcher share:', playnet.shareOfGeneralContribution(researcher));
         console.log('whalewatch specific share:', playnet.shareOfGeneralContribution(whalewatch));
-        console.log('greenpeace specific share:', playnet.shareOfGeneralContribution(greenpeace));
+        console.log('alice specific share:', playnet.shareOfGeneralContribution(alice));
 
         // Calculate mutual recognition and generalMutualContribution
         console.log('\nMutual Recognition:');

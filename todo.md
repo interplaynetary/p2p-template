@@ -5,7 +5,8 @@
 [✅] - Make calculations more efficient? using contributor-map?
 [✅] - It should be clearly possible to make a node a contributor simply if it doesnt have a parent!
 [] - Lets simplify isContributor logic!
-
+[] - Lets simplify getShareOfGeneralContribution logic! And generalize to traversal of any note, default is general.
+[] - Allow for distributing surplus to any branch
 
 
 
@@ -33,3 +34,17 @@ refer to [docs/p2p.md](docs/p2p.md)
 [] - add a button to distribute surplus
 [] - integrate with inventory.html
 [] - make inventory.html more user-friendly
+
+
+# Interface
+[] - Create React interface!
+[] - + Node button (big) (Import sub-treefrom Library)
+[] - - Node button (big) (Drop sub-tree into Library)
+[] - Allow for touching multiple nodes at once
+[] - Allow for dragging nodes around
+[] - Allow for composing nodes (dragging nodes to other nodes)
+[] - Allow for changing speed of growth
+[] - Allow for changing speed of growth
+[] - Menubuttons instead of text for add value
+[] - Distribute surplus to any branch
+[] - AI Integration!
