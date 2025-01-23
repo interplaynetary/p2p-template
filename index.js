@@ -514,165 +514,143 @@ function createTreemap(data) {
   
       group.call(position, root);
 
-    // Replace single touch state tracking with a Map to track multiple touches
-    let activeNodes = new Map(); // Map of nodeId -> {node, interval, timeout, startTime}
+    // Add touch state tracking at the top
+    let touchStartTime = 0;
+    let isTouching = false;
+    let activeNode = null; // Track which node we're growing
 
     node.filter(d => true)
         .attr("cursor", "pointer")
         .on("mousedown touchstart", (event, d) => {
             event.preventDefault();
             
-            // Handle both mouse and touch events
-            const touches = event.touches ? Array.from(event.touches) : [event];
+            // Clear any existing growth state
+            if (growthInterval) clearInterval(growthInterval);
+            if (growthTimeout) clearTimeout(growthTimeout);
+            isGrowing = false;
             
-            touches.forEach(touch => {
-                const nodeId = d.data.name; // Use node name as identifier
-                
-                // Clear existing growth state for this node if it exists
-                if (activeNodes.has(nodeId)) {
-                    const existing = activeNodes.get(nodeId);
-                    if (existing.interval) clearInterval(existing.interval);
-                    if (existing.timeout) clearTimeout(existing.timeout);
-                }
-                
-                // Set up new growth state for this node
-                const nodeState = {
-                    node: d,
-                    startTime: Date.now(),
-                    isGrowing: false
-                };
-                
-                if (d !== root) {
-                    nodeState.timeout = setTimeout(() => {
-                        // Only start growing if node is still active
-                        if (activeNodes.has(nodeId)) {
-                            nodeState.isGrowing = true;
-                            nodeState.interval = setInterval(() => {
-                                // Only grow if node is still active
-                                if (!activeNodes.has(nodeId)) {
-                                    clearInterval(nodeState.interval);
-                                    return;
-                                }
+            // Set new touch state
+            isTouching = true;
+            touchStartTime = Date.now();
+            activeNode = d;
+
+            if (d !== root) {
+                growthTimeout = setTimeout(() => {
+                    // Only start growing if still touching the same node
+                    if (isTouching && activeNode === d) {
+                        isGrowing = true;
+                        growthInterval = setInterval(() => {
+                            // Only grow if still touching
+                            if (!isTouching) {
+                                clearInterval(growthInterval);
+                                growthInterval = null;
+                                isGrowing = false;
+                                return;
+                            }
+                            
+                            // Existing growth logic
+                            const growthAmount = GROWTH_RATE(d);
+                            d.data.setPoints(d.data.points + growthAmount);
+                            
+                            // Recompute hierarchy ensuring values match points
+                            hierarchy.sum(node => node.data.points)
+                                .each(node => {
+                                    // Force value to exactly match points
+                                    node.value = node.data.points || 0;
+                                });
+                            
+                            // Apply treemap
+                            const treemap = d3.treemap().tile(tile);
+                            treemap(hierarchy);
+                            
+                            // Update visualization
+                            const nodes = group.selectAll("g")
+                                .filter(node => node !== root);
+                            
+                            // Transition positions
+                            nodes.transition()
+                                .duration(GROWTH_TICK)
+                                .attr("transform", d => d === root ? 
+                                    `translate(0,-50)` : 
+                                    `translate(${x(d.x0)},${y(d.y0)})`);
+                            
+                            // Transition rectangles
+                            nodes.select("rect")
+                                .transition()
+                                .duration(GROWTH_TICK)
+                                .attr("width", d => d === root ? 
+                                    width : 
+                                    Math.max(0, x(d.x1) - x(d.x0)))
+                                .attr("height", d => d === root ? 
+                                    50 : 
+                                    Math.max(0, y(d.y1) - y(d.y0)));
+                            
+                            // Update text positions
+                            nodes.select("text")
+                                .transition()
+                                .duration(GROWTH_TICK)
+                                .attr("transform", d => {
+                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                    return `translate(${rectWidth / 2},${rectHeight / 2})`;
+                                })
+                                .style("font-size", d => {
+                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                    return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
+                                });
                                 
-                                // Existing growth logic
-                                const growthAmount = GROWTH_RATE(d);
-                                d.data.setPoints(d.data.points + growthAmount);
-                                
-                                // Recompute hierarchy ensuring values match points
-                                hierarchy.sum(node => node.data.points)
-                                    .each(node => {
-                                        node.value = node.data.points || 0;
-                                    });
-                                
-                                // Apply treemap
-                                const treemap = d3.treemap().tile(tile);
-                                treemap(hierarchy);
-                                
-                                // Update visualization
-                                const nodes = group.selectAll("g")
-                                    .filter(node => node !== root);
-                                
-                                // Transition positions
-                                nodes.transition()
-                                    .duration(GROWTH_TICK)
-                                    .attr("transform", d => d === root ? 
-                                        `translate(0,-50)` : 
-                                        `translate(${x(d.x0)},${y(d.y0)})`);
-                                
-                                // Transition rectangles
-                                nodes.select("rect")
-                                    .transition()
-                                    .duration(GROWTH_TICK)
-                                    .attr("width", d => d === root ? 
-                                        width : 
-                                        Math.max(0, x(d.x1) - x(d.x0)))
-                                    .attr("height", d => d === root ? 
-                                        50 : 
-                                        Math.max(0, y(d.y1) - y(d.y0)));
-                                
-                                // Update text positions
-                                nodes.select("text")
-                                    .transition()
-                                    .duration(GROWTH_TICK)
-                                    .attr("transform", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                        return `translate(${rectWidth / 2},${rectHeight / 2})`;
-                                    })
-                                    .style("font-size", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                        return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
-                                    });
-                                
-                                // Update pie chart
-                                const pieChart = createPieChart(data);
-                                document.getElementById('pie-container').innerHTML = '';
-                                document.getElementById('pie-container').appendChild(pieChart);
-                                
-                            }, GROWTH_TICK);
-                        }
-                    }, GROWTH_DELAY);
-                }
-                
-                activeNodes.set(nodeId, nodeState);
-            });
+                            console.log("\nFinal values:");
+                            console.log("Node points:", d.data.points);
+                            console.log("Node value:", d.value);
+                            console.log("Hierarchy value:", hierarchy.value);
+
+                            const pieChart = createPieChart(data);
+                            document.getElementById('pie-container').innerHTML = '';
+                            document.getElementById('pie-container').appendChild(pieChart);
+                            
+                            console.log("\nFinal values:");
+                            console.log("Node points:", d.data.points);
+                            console.log("Node value:", d.value);
+                            console.log("Hierarchy value:", hierarchy.value);
+                        }, GROWTH_TICK);
+                    }
+                }, GROWTH_DELAY);
+            }
         })
         .on("mouseup mouseleave touchend touchcancel touchleave", (event) => {
             event.preventDefault();
             
-            // Handle both mouse and touch events for removal
-            const touches = event.changedTouches ? Array.from(event.changedTouches) : [event];
+            // Clear all states
+            isTouching = false;
+            activeNode = null;
             
-            touches.forEach(touch => {
-                // Find the node under this touch point
-                const element = document.elementFromPoint(
-                    touch.clientX || touch.pageX,
-                    touch.clientY || touch.pageY
-                );
-                
-                if (element) {
-                    const nodeId = d3.select(element).datum()?.data?.name;
-                    if (nodeId && activeNodes.has(nodeId)) {
-                        const nodeState = activeNodes.get(nodeId);
-                        if (nodeState.interval) clearInterval(nodeState.interval);
-                        if (nodeState.timeout) clearTimeout(nodeState.timeout);
-                        activeNodes.delete(nodeId);
-                    }
-                }
-            });
-            
-            // If no more active touches, clear everything
-            if (event.type === 'mouseleave' || !activeNodes.size) {
-                activeNodes.forEach(nodeState => {
-                    if (nodeState.interval) clearInterval(nodeState.interval);
-                    if (nodeState.timeout) clearTimeout(nodeState.timeout);
-                });
-                activeNodes.clear();
-            }
+            // Stop growth
+            if (growthTimeout) clearTimeout(growthTimeout);
+            if (growthInterval) clearInterval(growthInterval);
+            growthInterval = null;
+            isGrowing = false;
         })
         .on("click touchend", (event, d) => {
             event.preventDefault();
             
-            const nodeId = d.data.name;
-            const nodeState = activeNodes.get(nodeId);
-            const touchDuration = nodeState ? Date.now() - nodeState.startTime : 0;
+            const touchDuration = Date.now() - touchStartTime;
             
             // Handle zoom only on quick taps
-            if (touchDuration < GROWTH_DELAY && (!nodeState || !nodeState.isGrowing)) {
+            if (touchDuration < GROWTH_DELAY && !isGrowing) {
                 if (d === root && d.parent) {
                     zoomout(root);
-                } else if (d !== root && !d.data.isContributor) {
+                } else if (d !== root && !d.data.isContributor) {  // Check isContributor directly
+                    console.log('Node:', d.data.name);
+                    console.log('Is Contributor:', d.data.isContributor);
                     zoomin(d);
                 }
             }
             
-            // Clear this node's state
-            if (nodeState) {
-                if (nodeState.interval) clearInterval(nodeState.interval);
-                if (nodeState.timeout) clearTimeout(nodeState.timeout);
-                activeNodes.delete(nodeId);
-            }
+            // Clear all states
+            isTouching = false;
+            activeNode = null;
+            isGrowing = false;
         });
 
         if (root.data.children.size === 0 && root !== data) {  // Check if view is empty and not root
@@ -1012,3 +990,40 @@ function createPieChart(data) {
 
     return svg.node();
 }
+
+// Space & Environment contributions - now with more dimensional play
+const aliceSpace = indoorSpace.addChild("Alice's Interdimensional Garden Portal", 10, [alice, researcher]);
+const whalewatchPatio = indoorSpace.addChild("Whalewatch's Moonlit Levitation Deck", 8, [whalewatch, clownsWithoutBorders]);
+const aliceLighting = lighting.addChild("Alice's Bioluminescent Fairy Lights", 8, [alice, researcher]);
+const whalewatchCooling = temperature.addChild("Whalewatch's Cloud-Gathering Breeze System", 7, [whalewatch, clownsWithoutBorders]);
+const aliceWaterStation = waterAccess.addChild("Alice's Unicorn-Blessed Water Spring", 6, [alice, educator]);
+const whalewatchRecycling = waste.addChild("Whalewatch's Transmutation Circle", 6, [whalewatch, educator]);
+const aliceSeating = seating.addChild("Alice's Floating Cloud Cushions", 7, [alice, educator]);
+const whalewatchBathroom = bathroom.addChild("Whalewatch's Pocket Dimension Powder Room", 6, [whalewatch, clownsWithoutBorders]);
+const aliceCleaning = cleaning.addChild("Alice's Quantum Purification Kit", 5, [alice, researcher]);
+
+// Food & Drinks contributions - now with more alchemical flair
+const aliceCatering = foodCoords.addChild("Alice's Time-Traveling Tea Party", 12, [alice, researcher]);
+const whalewatchSnacks = foodCoords.addChild("Whalewatch's Levitating Snack Nebulae", 10, [whalewatch, clownsWithoutBorders]);
+const aliceTea = food.addChild("Alice's Reality-Bending Brew Station", 8, [alice, educator]);
+const whalewatchDrinks = food.addChild("Whalewatch's Cosmic Juice Vortex", 7, [whalewatch, clownsWithoutBorders]);
+const aliceComposting = food.addChild("Alice's Multiversal Waste Reclamation", 6, [alice, researcher]);
+
+// Creative Materials contributions - now with more magical manifestation
+const aliceArtSupplies = creative.addChild("Alice's Dreamcatcher Creation Kit", 8, [alice, educator]);
+const whalewatchProjector = creative.addChild("Whalewatch's Reality Projection Engine", 7, [whalewatch, clownsWithoutBorders]);
+const aliceCrafts = creative.addChild("Alice's Dimensional Folding Station", 6, [alice, educator]);
+const whalewatchPaints = creative.addChild("Whalewatch's Aurora Paint Portal", 5, [whalewatch, clownsWithoutBorders]);
+
+// Music & Sound contributions - now with more ethereal resonance
+const aliceSoundSystem = musicFacilitators.addChild("Alice's Harmonic Convergence Array", 10, [alice, researcher]);
+const whalewatchInstruments = musicFacilitators.addChild("Whalewatch's Cosmic Frequency Circle", 8, [whalewatch, clownsWithoutBorders]);
+const alicePlaylist = music.addChild("Alice's Interdimensional Soundscape", 6, [alice, researcher]);
+const whalewatchDrums = music.addChild("Whalewatch's Timeline Percussion Portal", 7, [whalewatch, clownsWithoutBorders]);
+const aliceAcoustics = music.addChild("Alice's Quantum Resonance Chamber", 5, [alice, educator]);
+
+// Host & Coordination contributions - now with more mystical facilitation
+const aliceHosting = hosts.addChild("Alice's Astral Welcome Gateway", 7, [alice, educator]);
+const whalewatchCoordination = hosts.addChild("Whalewatch's Synchronicity Flow", 8, [whalewatch, clownsWithoutBorders]);
+const aliceGuide = hosts.addChild("Alice's Multiversal Navigation Service", 6, [alice, researcher]);
+const whalewatchGames = hosts.addChild("Whalewatch's Reality-Bending Games", 7, [whalewatch, educator]);

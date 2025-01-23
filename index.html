@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>playnet</title>
+    <title>ruzgar</title>
     <style>
         html, body {
             margin: 0;
@@ -215,10 +215,10 @@
         const whalewatch = new D3Node('whalewatch', null, [clownsWithoutBorders]);  // is a contributor
         const alice = new D3Node('alice', null, [researcher]);  // is a contributor
 
-        const playnet = new D3Node('playnet', null, []);
+        const ruzgar = new D3Node('ruzgar', null, []);
 
         // 1. Material Needs & Dependencies
-        const space = playnet.addChild("Space & Environment", 25);
+        const space = ruzgar.addChild("Space & Environment", 25);
 
         // Space & Environment children
         const indoorSpace = space.addChild("Indoor/Outdoor Space", 15);
@@ -230,16 +230,16 @@
         const cleaning = space.addChild("Cleaning Supplies", 11);
         const waste = space.addChild("Trash/Recycling", 11);
 
-        console.log(playnet);
+        console.log(ruzgar);
         
         const hosts = indoorSpace.addChild("Space Providers/Hosts", 14);
 
         // Main Categories with their percentage weights
-        const infrastructure = playnet.addChild("Infra(de)structure & Bottom-secret Spaces", 25);
-        const magicalTech = playnet.addChild("Magical Technologies & Systems", 25);
-        const substances = playnet.addChild("Transformative Substances", 20);
-        const realityHacking = playnet.addChild("Reality Hacking & Manifestation", 20);
-        const loreSystem = playnet.addChild("Lore & Knowledge Systems", 10);
+        const infrastructure = ruzgar.addChild("Infra(de)structure & Bottom-secret Spaces", 25);
+        const magicalTech = ruzgar.addChild("Magical Technologies & Systems", 25);
+        const substances = ruzgar.addChild("Transformative Substances", 20);
+        const realityHacking = ruzgar.addChild("Reality Hacking & Manifestation", 20);
+        const loreSystem = ruzgar.addChild("Lore & Knowledge Systems", 10);
 
         // Underground Networks contributions
         const secretStairs = infrastructure.addChild("Secret stairways", 10, [alice, researcher]);
@@ -316,37 +316,37 @@
 
 
 
-        // whalewatch's recognition of playnet
+        // whalewatch's recognition of ruzgar
         const whalewatchgive = whalewatch.addChild('🌳 give', 80);
         const whalewatchpotential = whalewatchgive.addChild('🔮 potential', 40);
-        const playnetInwhalewatchpotential = whalewatchpotential.addChild('playnet', 15, [playnet]);
+        const ruzgarInwhalewatchpotential = whalewatchpotential.addChild('ruzgar', 15, [ruzgar]);
 
-        // alice's recognition of playnet
+        // alice's recognition of ruzgar
         const alicegive = alice.addChild('🌳 give', 80);
         const alicepotential = alicegive.addChild('🔮 potential', 40);
-        const playnetInalicepotential = alicepotential.addChild('playnet', 15, [playnet]);
+        const ruzgarInalicepotential = alicepotential.addChild('ruzgar', 15, [ruzgar]);
 
-        // clownsWithoutBorders's recognition of playnet
+        // clownsWithoutBorders's recognition of ruzgar
         const clownsWithoutBordersgive = clownsWithoutBorders.addChild('🌳 give', 80);
         const clownsWithoutBorderspotential = clownsWithoutBordersgive.addChild('🔮 potential', 40);
-        const playnetInclownsWithoutBorderspotential = clownsWithoutBorderspotential.addChild('playnet', 15, [playnet]);
+        const ruzgarInclownsWithoutBorderspotential = clownsWithoutBorderspotential.addChild('ruzgar', 15, [ruzgar]);
 
         // Calculate shares at different type levels
         console.log('\nShares by type level:');
-        console.log('Environmentalist share:', playnet.shareOfGeneralContribution(environmentalist));
-        console.log('clownsWithoutBorders share:', playnet.shareOfGeneralContribution(clownsWithoutBorders));
-        console.log('Educator share:', playnet.shareOfGeneralContribution(educator));
-        console.log('Researcher share:', playnet.shareOfGeneralContribution(researcher));
-        console.log('whalewatch specific share:', playnet.shareOfGeneralContribution(whalewatch));
-        console.log('alice specific share:', playnet.shareOfGeneralContribution(alice));
+        console.log('Environmentalist share:', ruzgar.shareOfGeneralContribution(environmentalist));
+        console.log('clownsWithoutBorders share:', ruzgar.shareOfGeneralContribution(clownsWithoutBorders));
+        console.log('Educator share:', ruzgar.shareOfGeneralContribution(educator));
+        console.log('Researcher share:', ruzgar.shareOfGeneralContribution(researcher));
+        console.log('whalewatch specific share:', ruzgar.shareOfGeneralContribution(whalewatch));
+        console.log('alice specific share:', ruzgar.shareOfGeneralContribution(alice));
 
         // Calculate mutual recognition and generalMutualContribution
         console.log('\nMutual Recognition:');
-        console.log('With whalewatch:', playnet.mutualShareOfGeneralContribution(whalewatch));
+        console.log('With whalewatch:', ruzgar.mutualShareOfGeneralContribution(whalewatch));
         console.log('\nFinal mutualGeneralContribution:');
-        console.log(playnet.mutualGeneralContribution());
-        console.log(playnet);
-        const treemap = createTreemap(playnet);
+        console.log(ruzgar.mutualGeneralContribution());
+        console.log(ruzgar);
+        const treemap = createTreemap(ruzgar);
         document.getElementById('treemap-container').appendChild(treemap);
     </script>
 </body>
