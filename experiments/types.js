@@ -114,13 +114,7 @@ class Node {
         // Use indexed lookup instead of tree traversal
         const instances = this.getRoot().typeIndex.get(node) || new Set();
         return Array.from(instances).reduce((sum, instance) => {
-            // Count only contributor types
-            const contributorTypesCount = instance.types.filter(type => type.isContributor).length;
-            // Divide the instance's weight by its number of contributor types
-            const weightShare = contributorTypesCount > 0 ? 
-                instance.getWeight() / contributorTypesCount : 
-                instance.getWeight();
-            return sum + weightShare;
+            return sum + instance.getWeight();
         }, 0);
     }
 
@@ -271,7 +265,7 @@ function createTreemap(data) {
     let growthInterval = null;
     let growthTimeout = null;
     const GROWTH_RATE = (d) => d.data.points * 0.05;
-    const GROWTH_TICK = 50;      // Milliseconds between growth
+    const GROWTH_TICK = 50;      // Milliseconds between growth updates
     const GROWTH_DELAY = 500;    // Delay before growth starts
     let isGrowing = false;  // Track if we're in a growth operation
 
@@ -368,28 +362,43 @@ function createTreemap(data) {
     }
   
     function position(group, root) {
+        // Create a shared transition for smoother animation
+        const t = group.transition()
+            .duration(750);
+
+        // Base group transition
         group.selectAll("g")
+            .transition(t)
             .attr("transform", d => {
                 if (!d || typeof d.x0 === 'undefined') return '';
                 return d === root ? `translate(0,-50)` : `translate(${x(d.x0)},${y(d.y0)})`;
             });
 
+        // Rectangle transition with interpolation
         group.selectAll("rect")
-            .attr("width", d => {
-                if (!d || typeof d.x0 === 'undefined') return 0;
-                return d === root ? width : x(d.x1) - x(d.x0);
+            .transition(t)
+            .attrTween("width", function(d) {
+                const current = this.getAttribute("width") || 0;
+                const target = (!d || typeof d.x0 === 'undefined') ? 0 :
+                              (d === root ? width : x(d.x1) - x(d.x0));
+                return d3.interpolate(+current, target);
             })
-            .attr("height", d => {
-                if (!d || typeof d.y0 === 'undefined') return 0;
-                return d === root ? 50 : y(d.y1) - y(d.y0);
+            .attrTween("height", function(d) {
+                const current = this.getAttribute("height") || 0;
+                const target = (!d || typeof d.y0 === 'undefined') ? 0 :
+                              (d === root ? 50 : y(d.y1) - y(d.y0));
+                return d3.interpolate(+current, target);
             });
 
-        // Update type indicators along with other elements
+        // Type indicators transition with interpolation
         group.selectAll(".type-indicators")
-            .attr("transform", d => {
-                if (!d || typeof d.x0 === 'undefined') return '';
-                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                return `translate(${rectWidth - 10}, 10)`;
+            .transition(t)
+            .attrTween("transform", function(d) {
+                const current = this.getAttribute("transform") || "translate(0,0)";
+                const target = (!d || typeof d.x0 === 'undefined') ? "translate(0,0)" :
+                              `translate(${(d === root ? width : x(d.x1) - x(d.x0)) - 10}, 10)`;
+                // Use d3.interpolate directly for transform strings
+                return d3.interpolate(current, target);
             });
     }
   
@@ -428,39 +437,42 @@ function createTreemap(data) {
     function zoomin(d) {
         currentView = d;
         const group0 = group.attr("pointer-events", "none");
+        const group1 = group = svg.insert("g", "*")
+            .call(render, d);
+    
+        // Use consistent transition timing
+        const t = svg.transition().duration(750);
         
-        // Update domains first
         x.domain([d.x0, d.x1]);
         y.domain([d.y0, d.y1]);
-        
-        const group1 = group = svg.append("g").call(render, d);
-        
-        svg.transition()
-            .duration(750)
-            .call(t => group0.transition(t).remove()
+    
+        svg.transition(t)
+            .call(t => group0.transition(t)
+                .remove()
                 .call(position, d.parent))
             .call(t => group1.transition(t)
                 .attrTween("opacity", () => d3.interpolate(0, 1))
                 .call(position, d));
     }
-  
-    // When zooming out, draw the old nodes on top, and fade them out.
+    
     function zoomout(d) {
         currentView = d.parent;
         const group0 = group.attr("pointer-events", "none");
+        const group1 = group = svg.insert("g", "*")
+            .call(render, d.parent);
+    
+        // Use consistent transition timing
+        const t = svg.transition().duration(750);
         
-        // Update domains first
         x.domain([d.parent.x0, d.parent.x1]);
         y.domain([d.parent.y0, d.parent.y1]);
-        
-        const group1 = group = svg.insert("g", "*").call(render, d.parent);
-        
-        svg.transition()
-            .duration(750)
-            .call(t => group0.transition(t).remove()
-                .attrTween("opacity", () => d3.interpolate(1, 0))
+    
+        svg.transition(t)
+            .call(t => group0.transition(t)
+                .remove()
                 .call(position, d))
             .call(t => group1.transition(t)
+                .attrTween("opacity", () => d3.interpolate(0, 1))
                 .call(position, d.parent));
     }
 
@@ -586,88 +598,29 @@ function createTreemap(data) {
                     if (isTouching && activeNode === d) {
                         isGrowing = true;
                         growthInterval = setInterval(() => {
-                            // Only grow if still touching
                             if (!isTouching) {
                                 clearInterval(growthInterval);
                                 growthInterval = null;
                                 isGrowing = false;
                                 return;
                             }
-                            
-                            // Existing growth logic
-                            const growthAmount = GROWTH_RATE(d);
-                            d.data.setPoints(d.data.points + growthAmount);
-                            
-                            // Recompute hierarchy ensuring values match points
+                        
+                            // Update hierarchy and apply treemap
                             hierarchy.sum(node => node.data.points)
-                                .each(node => {
-                                    // Force value to exactly match points
-                                    node.value = node.data.points || 0;
-                                });
+                                .each(node => { node.value = node.data.points || 0; });
                             
-                            // Apply treemap
                             const treemap = d3.treemap().tile(tile);
                             treemap(hierarchy);
-                            
+                        
                             // Update visualization including type indicators
                             const nodes = group.selectAll("g")
-                                .filter(node => node !== root);
-                            
-                            // Existing transitions
-                            nodes.transition()
-                                .duration(GROWTH_TICK)
-                                .attr("transform", d => d === root ? 
-                                    `translate(0,-50)` : 
-                                    `translate(${x(d.x0)},${y(d.y0)})`);
-                            
-                            // Transition rectangles
-                            nodes.select("rect")
-                                .transition()
-                                .duration(GROWTH_TICK)
-                                .attr("width", d => d === root ? 
-                                    width : 
-                                    Math.max(0, x(d.x1) - x(d.x0)))
-                                .attr("height", d => d === root ? 
-                                    50 : 
-                                    Math.max(0, y(d.y1) - y(d.y0)));
-                            
-                            // Update text positions
-                            nodes.select("text")
-                                .transition()
-                                .duration(GROWTH_TICK)
-                                .attr("transform", d => {
-                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                    return `translate(${rectWidth / 2},${rectHeight / 2})`;
-                                })
-                                .style("font-size", d => {
-                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                    return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
+                                .filter(node => {
+                                    return node !== root && 
+                                           node.value > 0 && 
+                                           node.parent === currentView;
                                 });
-                                
-                            // Add type indicator updates here
-                            nodes.select(".type-indicators")
-                                .transition()
-                                .duration(GROWTH_TICK)
-                                .attr("transform", d => {
-                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                    return `translate(${rectWidth - 10}, 10)`;
-                                });
-
-                            console.log("\nFinal values:");
-                            console.log("Node points:", d.data.points);
-                            console.log("Node value:", d.value);
-                            console.log("Hierarchy value:", hierarchy.value);
-
-                            const pieChart = createPieChart(data);
-                            document.getElementById('pie-container').innerHTML = '';
-                            document.getElementById('pie-container').appendChild(pieChart);
-                            
-                            console.log("\nFinal values:");
-                            console.log("Node points:", d.data.points);
-                            console.log("Node value:", d.value);
-                            console.log("Hierarchy value:", hierarchy.value);
+                        
+                            updateDuringGrowth(nodes);
                         }, GROWTH_TICK);
                     }
                 }, GROWTH_DELAY);
@@ -940,11 +893,47 @@ function createTreemap(data) {
         svg.attr("viewBox", [0.5, -50.5, newWidth, newHeight + 50]);
         
         // Recompute the treemap layout
-        const newRoot = d3.treemap().tile(tile)(hierarchy);
+        const treemap = d3.treemap().tile(tile);
+        const newRoot = treemap(hierarchy);
         
-        // Update the visualization
-        group.call(render, newRoot);
+        // Update with smooth transitions
+        const t = d3.transition().duration(750);
+        group.transition(t).call(position, newRoot);
     });
+    
+// Update the growth interval to use the new update function
+function updateDuringGrowth(nodes) {
+    const t = d3.transition()
+        .duration(GROWTH_TICK)
+        .ease(d3.easeLinear);
+
+    nodes.transition(t)
+        .attr("transform", d => d === root ? 
+            `translate(0,-50)` : 
+            `translate(${x(d.x0)},${y(d.y0)})`);
+
+    nodes.select("rect")
+        .transition(t)
+        .attrTween("width", function(d) {
+            const current = this.getAttribute("width") || 0;
+            const target = d === root ? width : Math.max(0, x(d.x1) - x(d.x0));
+            return d3.interpolate(+current, target);
+        })
+        .attrTween("height", function(d) {
+            const current = this.getAttribute("height") || 0;
+            const target = d === root ? 50 : Math.max(0, y(d.y1) - y(d.y0));
+            return d3.interpolate(+current, target);
+        });
+
+    nodes.select(".type-indicators")
+        .transition(t)
+        .attrTween("transform", function(d) {
+            const current = this.getAttribute("transform") || "translate(0,0)";
+            const target = `translate(${(d === root ? width : x(d.x1) - x(d.x0)) - 10}, 10)`;
+            // Use d3.interpolate directly for transform strings
+            return d3.interpolate(current, target);
+        });
+}
     
         // Create and append pie chart
     const pieChart = createPieChart(data);

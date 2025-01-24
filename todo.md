@@ -1,3 +1,6 @@
+# General Code Orgnization
+[] - Break code into modules
+ 
 # Treemap
 [✅] - make text scale to fit
 [✅] - descriptions on nodes
@@ -11,6 +14,7 @@
 
 # Node
 [] - Are we properly accounting for the share of an instance in a node? (especially when it has multiple types which are contributors) (split the share of that instance between the types)?
+[] - Make type-circles on nodes transition more smoothly
 
 
 
