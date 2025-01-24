@@ -31,10 +31,9 @@ You can interact with an interface implementing this logic [here](https://interp
 
 *Interestingly  we don't have to keep a ledger of objects whose definitions are centrally defined, there is no universal definition of object-hood (of what constitutes objects), but a distributed recognition of the social-utility of contributions!*
 
-**Social-Material-Needs:** *In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
+*In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
 
-* I love you is a relation between two contributors (subject-verb-object). Love is the verb*
-
+**Let:**
 - **Association** = a set of relations where:
 1. Each Relation consists of (Provider-Role, User-Role)
 2. Each Role has a Holder who can:
