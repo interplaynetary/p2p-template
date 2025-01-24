@@ -9,9 +9,12 @@
 [] - Allow for distributing surplus to any branch
 
 
+# Node
+[] - Are we properly accounting for the share of an instance in a node? (especially when it has multiple types which are contributors) (split the share of that instance between the types)?
 
 
-[] - We are clearly capable of doing mutual-recognition with a node without the contributor flag!
+
+
 [] - allow for choosing your own name!
 [] - Allow adding multiple types/contributors to nodes
 [] - How to unallocate points? (when points = 0, remove node)

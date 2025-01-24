@@ -1,13 +1,13 @@
 class Node {
-    constructor(name, parent = null,  scalarQuantity, types = []) {
+    constructor(name, parent = null, types = []) {
         this.name = name;
-        this.scalarQuantity = scalarQuantity // - Node quantity: indicates the absolute number scale of the proportions! Nodes become templates of product composition and recursive-proportions (shareOfGeneralContribution)! The tree is a tree of contribution of proportions of the root's scalar quantity! Although what happens if our childrens node have their own quantities?
         this.parent = parent;
         this.points = 0;
         this.children = new Map();  // Node -> Map(contributor -> points)
         this.totalChildPoints = 0;
         this.isContributor = this.parent ? false : true;
-        
+
+        this.types = types;
         // Map of type -> Set of instances
         this.typeIndex = parent ? parent.getRoot().typeIndex : new Map();
         
@@ -42,12 +42,12 @@ class Node {
 
     
 
-    addChild(name, points = 0, scalarQuantity, types = []) {
+    addChild(name, points = 0, types = []) {
         if (this.parent && this.isContributor) {
             throw new Error(`Node ${this.name} is an instance of a contributor and cannot have children.`);
         }
 
-        const child = new Node(name, this, scalarQuantity);
+        const child = new Node(name, this);
         
         // Ensure types are properly added
         if (Array.isArray(types)) {
@@ -362,19 +362,29 @@ function createTreemap(data) {
     }
   
     function position(group, root) {
-      group.selectAll("g")
-          .attr("transform", d => d === root ? `translate(0,-50)` : `translate(${x(d.x0)},${y(d.y0)})`)
-        .select("rect")
-          .attr("width", d => d === root ? width : x(d.x1) - x(d.x0))
-          .attr("height", d => d === root ? 50 : y(d.y1) - y(d.y0));
-      
-      // Update text positions
-      group.selectAll("text")
-          .attr("transform", d => {
-              const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-              const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-              return `translate(${rectWidth / 2},${rectHeight / 2})`;
-          });
+        group.selectAll("g")
+            .attr("transform", d => {
+                if (!d || typeof d.x0 === 'undefined') return '';
+                return d === root ? `translate(0,-50)` : `translate(${x(d.x0)},${y(d.y0)})`;
+            });
+
+        group.selectAll("rect")
+            .attr("width", d => {
+                if (!d || typeof d.x0 === 'undefined') return 0;
+                return d === root ? width : x(d.x1) - x(d.x0);
+            })
+            .attr("height", d => {
+                if (!d || typeof d.y0 === 'undefined') return 0;
+                return d === root ? 50 : y(d.y1) - y(d.y0);
+            });
+
+        // Update type indicators along with other elements
+        group.selectAll(".type-indicators")
+            .attr("transform", d => {
+                if (!d || typeof d.x0 === 'undefined') return '';
+                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                return `translate(${rectWidth - 10}, 10)`;
+            });
     }
   
     // Create the scales first
@@ -471,48 +481,78 @@ function createTreemap(data) {
                 return getColorForName(d.data.name);
             })
             .attr("stroke", "#fff")
-            .attr("stroke-width", "5")
+            .attr("stroke-width", "5");
+
         node.append("clipPath")
-          .attr("id", d => (d.clipUid = uid("clip")).id)
-        .append("use")
-          .attr("xlink:href", d => d.leafUid.href);
-  
-      node.append("text")
-          .attr("clip-path", d => d.clipUid)
-          .attr("font-weight", d => d === root ? "bold" : null)
-          .style("user-select", "none")
-          .style("-webkit-user-select", "none")
-          .style("-moz-user-select", "none")
-          .style("-ms-user-select", "none")
-          .attr("transform", d => {
-              const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-              const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-              return `translate(${rectWidth / 2},${rectHeight / 2})`;
-          })
-          .style("text-anchor", "middle")
-          .style("dominant-baseline", "middle")
-          .style("font-size", d => {
-              const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-              const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-              return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
-          })
-          .selectAll("tspan")
-          .data(d => {
-              if (d === root) return [name(d)];
-              return d.data.name.split(/(?=[A-Z][^A-Z])/g);
-          })
-          .join("tspan")
-          .attr("x", 0)
-          .attr("dy", (d, i, nodes) => {
-              if (i === 0) {
-                  // Move first line up by half the total height of all lines
-                  return `${-(nodes.length - 1) * 1.2 / 2}em`;
-              }
-              return "1.2em";  // Standard line spacing for subsequent lines
-          })
-          .text(d => d);
+            .attr("id", d => (d.clipUid = uid("clip")).id)
+            .append("use")
+            .attr("xlink:href", d => d.leafUid.href);
+
+        node.append("text")
+            .attr("clip-path", d => d.clipUid)
+            .attr("font-weight", d => d === root ? "bold" : null)
+            .style("user-select", "none")
+            .style("-webkit-user-select", "none")
+            .style("-moz-user-select", "none")
+            .style("-ms-user-select", "none")
+            .attr("transform", d => {
+                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                return `translate(${rectWidth / 2},${rectHeight / 2})`;
+            })
+            .style("text-anchor", "middle")
+            .style("dominant-baseline", "middle")
+            .style("font-size", d => {
+                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
+            })
+            .selectAll("tspan")
+            .data(d => {
+                if (d === root) return [name(d)];
+                return d.data.name.split(/(?=[A-Z][^A-Z])/g);
+            })
+            .join("tspan")
+            .attr("x", 0)
+            .attr("dy", (d, i, nodes) => {
+                if (i === 0) {
+                    // Move first line up by half the total height of all lines
+                    return `${-(nodes.length - 1) * 1.2 / 2}em`;
+                }
+                return "1.2em";  // Standard line spacing for subsequent lines
+            })
+            .text(d => d);
   
       group.call(position, root);
+
+    // Add type circles container after the rect
+    const typeContainer = node.append("g")
+        .attr("class", "type-indicators")
+        .attr("transform", d => {
+            const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+            return `translate(${rectWidth - 10}, 10)`; // Position in top-right corner
+        });
+
+    // Add circles for each type
+    typeContainer.each(function(d) {
+        if (!d.data.types) return;
+        
+        const container = d3.select(this);
+        const circleRadius = 5;
+        const spacing = circleRadius * 2.5;
+        
+        container.selectAll("circle")
+            .data(d.data.types)
+            .join("circle")
+            .attr("cx", (_, i) => -i * spacing)
+            .attr("cy", 0)
+            .attr("r", circleRadius)
+            .attr("fill", type => getColorForName(type.name))
+            .attr("stroke", "#fff")
+            .attr("stroke-width", "1.5")
+            .append("title")
+            .text(type => type.name);
+    });
 
     // Add touch state tracking at the top
     let touchStartTime = 0;
@@ -563,11 +603,11 @@ function createTreemap(data) {
                             const treemap = d3.treemap().tile(tile);
                             treemap(hierarchy);
                             
-                            // Update visualization
+                            // Update visualization including type indicators
                             const nodes = group.selectAll("g")
                                 .filter(node => node !== root);
                             
-                            // Transition positions
+                            // Existing transitions
                             nodes.transition()
                                 .duration(GROWTH_TICK)
                                 .attr("transform", d => d === root ? 
@@ -600,6 +640,15 @@ function createTreemap(data) {
                                     return calculateFontSize(d, rectWidth, rectHeight, root) + "px";
                                 });
                                 
+                            // Add type indicator updates here
+                            nodes.select(".type-indicators")
+                                .transition()
+                                .duration(GROWTH_TICK)
+                                .attr("transform", d => {
+                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                    return `translate(${rectWidth - 10}, 10)`;
+                                });
+
                             console.log("\nFinal values:");
                             console.log("Node points:", d.data.points);
                             console.log("Node value:", d.value);
@@ -667,8 +716,8 @@ function createTreemap(data) {
                 .text("Add Values / Contributors");
         }
     }
-      // Add menu bar with proper z-index that doesn't overlap content
-      const addNodeTexts = ['Add Context', 'Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
+      // Add menu bar with cycling text
+      const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
       let currentTextIndex = 0;
 
       const menuBar = document.createElement('div');
@@ -676,12 +725,10 @@ function createTreemap(data) {
       menuBar.style.userSelect = 'none';
       menuBar.style.webkitUserSelect = 'none';
       menuBar.innerHTML = `
-          <div class="menu-bar" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
-              <button class="menu-button cycle-text" data-form="addNode" style="user-select: none; -webkit-user-select: none;">${addNodeTexts[0]}</button>
-              <button class="menu-button" data-form="revealQR" style="user-select: none; -webkit-user-select: none;">Add Contributor</button>
-          </div>
+          <button class="menu-button cycle-text" data-form="addNode" style="user-select: none; -webkit-user-select: none;">${addNodeTexts[0]}</button>
+          <button class="menu-button" data-form="revealQR" style="user-select: none; -webkit-user-select: none;">Add Contributor</button>
       `;
-      document.body.appendChild(menuBar);
+      container.appendChild(menuBar);
 
       // Add cycling functionality
       const cycleButton = menuBar.querySelector('.cycle-text');
@@ -990,40 +1037,3 @@ function createPieChart(data) {
 
     return svg.node();
 }
-
-// Space & Environment contributions - now with more dimensional play
-const aliceSpace = indoorSpace.addChild("Alice's Interdimensional Garden Portal", 10, [alice, researcher]);
-const whalewatchPatio = indoorSpace.addChild("Whalewatch's Moonlit Levitation Deck", 8, [whalewatch, clownsWithoutBorders]);
-const aliceLighting = lighting.addChild("Alice's Bioluminescent Fairy Lights", 8, [alice, researcher]);
-const whalewatchCooling = temperature.addChild("Whalewatch's Cloud-Gathering Breeze System", 7, [whalewatch, clownsWithoutBorders]);
-const aliceWaterStation = waterAccess.addChild("Alice's Unicorn-Blessed Water Spring", 6, [alice, educator]);
-const whalewatchRecycling = waste.addChild("Whalewatch's Transmutation Circle", 6, [whalewatch, educator]);
-const aliceSeating = seating.addChild("Alice's Floating Cloud Cushions", 7, [alice, educator]);
-const whalewatchBathroom = bathroom.addChild("Whalewatch's Pocket Dimension Powder Room", 6, [whalewatch, clownsWithoutBorders]);
-const aliceCleaning = cleaning.addChild("Alice's Quantum Purification Kit", 5, [alice, researcher]);
-
-// Food & Drinks contributions - now with more alchemical flair
-const aliceCatering = foodCoords.addChild("Alice's Time-Traveling Tea Party", 12, [alice, researcher]);
-const whalewatchSnacks = foodCoords.addChild("Whalewatch's Levitating Snack Nebulae", 10, [whalewatch, clownsWithoutBorders]);
-const aliceTea = food.addChild("Alice's Reality-Bending Brew Station", 8, [alice, educator]);
-const whalewatchDrinks = food.addChild("Whalewatch's Cosmic Juice Vortex", 7, [whalewatch, clownsWithoutBorders]);
-const aliceComposting = food.addChild("Alice's Multiversal Waste Reclamation", 6, [alice, researcher]);
-
-// Creative Materials contributions - now with more magical manifestation
-const aliceArtSupplies = creative.addChild("Alice's Dreamcatcher Creation Kit", 8, [alice, educator]);
-const whalewatchProjector = creative.addChild("Whalewatch's Reality Projection Engine", 7, [whalewatch, clownsWithoutBorders]);
-const aliceCrafts = creative.addChild("Alice's Dimensional Folding Station", 6, [alice, educator]);
-const whalewatchPaints = creative.addChild("Whalewatch's Aurora Paint Portal", 5, [whalewatch, clownsWithoutBorders]);
-
-// Music & Sound contributions - now with more ethereal resonance
-const aliceSoundSystem = musicFacilitators.addChild("Alice's Harmonic Convergence Array", 10, [alice, researcher]);
-const whalewatchInstruments = musicFacilitators.addChild("Whalewatch's Cosmic Frequency Circle", 8, [whalewatch, clownsWithoutBorders]);
-const alicePlaylist = music.addChild("Alice's Interdimensional Soundscape", 6, [alice, researcher]);
-const whalewatchDrums = music.addChild("Whalewatch's Timeline Percussion Portal", 7, [whalewatch, clownsWithoutBorders]);
-const aliceAcoustics = music.addChild("Alice's Quantum Resonance Chamber", 5, [alice, educator]);
-
-// Host & Coordination contributions - now with more mystical facilitation
-const aliceHosting = hosts.addChild("Alice's Astral Welcome Gateway", 7, [alice, educator]);
-const whalewatchCoordination = hosts.addChild("Whalewatch's Synchronicity Flow", 8, [whalewatch, clownsWithoutBorders]);
-const aliceGuide = hosts.addChild("Alice's Multiversal Navigation Service", 6, [alice, researcher]);
-const whalewatchGames = hosts.addChild("Whalewatch's Reality-Bending Games", 7, [whalewatch, educator]);

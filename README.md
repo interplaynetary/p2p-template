@@ -27,17 +27,13 @@ You can interact with an interface implementing this logic [here](https://interp
 
 *Taking the minimum of both shares ensures reciprocity in proportion* 
 
-*Mutual-recognition is the peer-2-peer social-validation of eachother's labor-time as well as the social-validation of use-values."
+*Mutual-recognition is the peer-2-peer social-validation of eachother's efforts as well as the social-validation of use-values/utility."
 
 *Interestingly  we don't have to keep a ledger of objects whose definitions are centrally defined, there is no universal definition of object-hood (of what constitutes objects), but a distributed recognition of the social-utility of contributions!*
 
 **Social-Material-Needs:** *In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
 
-
-**Purely Social-Needs (Human-Needs):** *When contributors compose the two sides of the relation (subject-verb-object) being recognized, then the recognizer (object) expresses their desire for an interaction (verb) from the subject (another contributor) towards them (recognizer).*
-
-aims beyond material production, a purely social-need (human-need).*
-
+* I love you is a relation between two contributors (subject-verb-object). Love is the verb*
 
 - **Association** = a set of relations where:
 1. Each Relation consists of (Provider-Role, User-Role)
