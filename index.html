@@ -4,212 +4,78 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ruzgar</title>
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-        }
-        svg {
-            width: 100% !important;
-            height: 100% !important;
-            display: block;
-        }
-        #treemap-container {
-            width: 70vw;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #pie-container {
-            width: 30vw;
-            height: 100vh;
-            position: fixed;
-            right: 0;
-            top: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            user-select: none;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;  
-        }
-
-        #qr-code {
-            width: 200px;
-            height: 200px;
-            margin-bottom: 10px;
-        }
-
-        #public-key-text {
-            font-size: 14px;
-            color: #555;
-            text-align: center;
-            word-break: break-all;
-            max-width: 80%;
-            font-family: inherit;
-        }
-        .menu-bar {
-              position: fixed;
-              top: 20px;
-              right: 20px;
-              z-index: 1000;
-          }
-
-          .menu-button {
-              padding: 8px 16px;
-              margin-left: 10px;
-              border: none;
-              border-radius: 4px;
-              background: #4CAF50;
-              color: white;
-              cursor: pointer;
-              transition: background 0.3s;
-              font-family: inherit;
-              font-size: 14px;
-              font-weight: 500;
-          }
-
-          .menu-button:hover {
-              background: #45a049;
-          }
-        .node-popup {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1001;
-        }
-
-        .node-popup.active {
-            display: flex;
-        }
-
-        .node-popup-content {
-            background: white;
-            padding: 24px;
-            border-radius: 8px;
-            min-width: 300px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            font-family: inherit;
-        }
-
-        .node-popup-content h2 {
-            font-size: 24px;
-            margin-bottom: 20px;
-            color: #333;
-            font-weight: 500;
-            text-align: center;
-            width: 100%;
-            padding: 0 0 5px;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #555;
-            font-size: 14px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: 14px;
-        }
-
-        .form-buttons {
-            display: flex;
-            gap: 8px;
-            justify-content: flex-end;
-        }
-
-        .form-buttons button {
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .form-buttons button[type="submit"] {
-            background: #2196F3;
-            color: white;
-        }
-
-        .form-buttons button.cancel {
-            background: #ddd;
-        }
-        .qr-display {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              gap: 20px;
-              margin: 20px 0;
-          }
-
-        .popup-form {
-            padding: 0 16px;
-        }
-    </style>
+    <!-- Move styles to separate CSS file -->
+    <link rel="stylesheet" href=" ./src/styles/main.css">
 </head>
 <body>
     <!-- Menu bar at document level -->
     <div class="menu-bar">
-        <button class="menu-button cycle-text" data-form="addNode">Add Context</button>
+        <button class="menu-button cycle-text" data-form="addNode">Add Value</button>
         <button class="menu-button" data-form="revealQR">Add Contributor</button>
     </div>
 
     <!-- Main visualization containers -->
     <div id="treemap-container"></div>
-    <div id="pie-container">
-        <!-- pie chart will render here -->
-    </div>
+    <div id="pie-container"></div>
 
     <!-- Popup forms container at document level -->
     <div class="node-popup">
         <div class="node-popup-content">
             <!-- Add Node Form -->
             <form id="addNodeForm" class="popup-form">
-                <!-- ... form content ... -->
+                <h2>Add New Node</h2>
+                <div class="form-group">
+                    <label for="nodeName">Name:</label>
+                    <input type="text" id="nodeName" required>
+                </div>
+                <div id="percentageGroup" class="form-group" style="display: none;">
+                    <label for="nodePercentage">Desired Percentage:</label>
+                    <input type="range" id="nodePercentage" min="1" max="100" value="10">
+                    <output for="nodePercentage">10%</output>
+                </div>
+                <div class="form-buttons">
+                    <button type="submit" class="primary">Add Node</button>
+                    <button type="button" class="cancel">Cancel</button>
+                </div>
             </form>
 
             <!-- Reveal QR Form -->
             <form id="revealQRForm" class="popup-form" style="display: none;">
-                <!-- ... form content ... -->
+                <h2>Your Public Key</h2>
+                <div class="qr-display">
+                    <div id="qr-code"></div>
+                    <div id="public-key-text"></div>
+                </div>
+                <div class="form-buttons">
+                    <button type="button" class="copy-key">Copy Key</button>
+                    <button type="button" class="cancel">Close</button>
+                </div>
             </form>
         </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- External Dependencies -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="index.js"></script>
-    <script>
-        const environmentalist = new D3Node('environmentalist');  // most abstract
-        const clownsWithoutBorders = new D3Node('clowns4all', null, [environmentalist]);  // type of environmentalist
-        const researcher = new D3Node('researcher', null, [environmentalist]);  // another type
-        const educator = new D3Node('educator', null, [environmentalist]);  // another type
+    <script type="importmap">
+    {
+        "imports": {
+            "d3": "https://cdn.jsdelivr.net/npm/d3@7/+esm"
+        }
+    }
+    </script>
+
+    <!-- Remove the old script tags for d3 and qrcode -->
+
+    <script type="module">
+        import { App } from './src/App.js';
+        import { D3Node } from './src/models/D3Node.js';
+
+        // Initialize data structure
+        const environmentalist = new D3Node('environmentalist');
+        const clownsWithoutBorders = new D3Node('clowns4all', null, [environmentalist]);
+        const researcher = new D3Node('researcher', null, [environmentalist]);
+        const educator = new D3Node('educator', null, [environmentalist]);
 
         // Our main nodes with multiple types
         const whalewatch = new D3Node('whalewatch', null, [clownsWithoutBorders]);  // is a contributor
@@ -346,8 +212,102 @@
         console.log('\nFinal mutualGeneralContribution:');
         console.log(ruzgar.mutualGeneralContribution());
         console.log(ruzgar);
-        const treemap = createTreemap(ruzgar);
-        document.getElementById('treemap-container').appendChild(treemap);
+
+        // Initialize app
+        const app = new App(ruzgar);
+
+        // Setup UI interactions
+        const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
+        let currentTextIndex = 0;
+
+        // Menu button handlers
+        $('.menu-button').on('click', function() {
+            const formId = $(this).data('form');
+            $('.popup-form').hide();
+            $(`#${formId}Form`).show();
+            $('.node-popup').addClass('active');
+
+            if (formId === 'addNode') {
+                const hasChildren = app.currentView.data.children.size > 0;
+                $('#percentageGroup').toggle(hasChildren);
+            }
+
+            if (formId === 'revealQR') {
+                generateQRCode();
+            }
+        });
+
+        // Form submission handler
+        $('#addNodeForm').on('submit', function(e) {
+            e.preventDefault();
+            const name = $('#nodeName').val();
+            const currentViewData = app.currentViewData;
+            console.log('Form submission - currentViewData:', currentViewData.name);  // Debug log
+            console.log('Form submission - currentView:', app.currentView.data.name);  // Debug log
+            
+            const hasChildren = currentViewData.children.size > 0;
+            const percentage = hasChildren ? Number($('#nodePercentage').val()) : 100;
+            
+            if (hasChildren && (percentage <= 0 || percentage >= 100)) {
+                alert('Percentage must be between 1 and 99');
+                return;
+            }
+            
+            const currentTotal = currentViewData.totalChildPoints || currentViewData.points || 100;
+            const points = hasChildren ? 
+                Math.max(1, Math.ceil(currentTotal / (1 - percentage/100)) - currentTotal) : 
+                currentTotal;
+            
+            console.log('Adding node to:', currentViewData.name);  // Debug log
+            const newChild = currentViewData.addChild(name, points);
+            
+            // Update visualizations
+            app.updateVisualizations();
+            
+            // Close and reset form
+            $('.node-popup').removeClass('active');
+            this.reset();
+        });
+
+        // Cycle text button
+        $('.cycle-text').on('click', function() {
+            currentTextIndex = (currentTextIndex + 1) % addNodeTexts.length;
+            $(this).text(addNodeTexts[currentTextIndex]);
+            $('#addNodeForm h2').text(addNodeTexts[currentTextIndex]);
+        });
+
+        // Range input handler
+        $('#nodePercentage').on('input', function() {
+            $(this).next('output').text($(this).val() + '%');
+        });
+
+        // Cancel buttons
+        $('.cancel').on('click', function() {
+            $('.node-popup').removeClass('active');
+            $('#addNodeForm')[0].reset();
+        });
+
+        // Copy key handler
+        $('.copy-key').on('click', function() {
+            const publicKey = $('#public-key-text').text();
+            navigator.clipboard.writeText(publicKey)
+                .then(() => alert('Public key copied to clipboard!'));
+        });
+
+        function generateQRCode() {
+            const mockPublicKey = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+            $('#qr-code').empty();
+            new QRCode(document.getElementById("qr-code"), {
+                text: mockPublicKey,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H,
+                useSVG: true
+            });
+            $('#public-key-text').text(mockPublicKey);
+        }
     </script>
 </body>
 </html> 
