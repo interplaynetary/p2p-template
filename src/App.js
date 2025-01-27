@@ -8,6 +8,26 @@ export class App {
         this.init();
     }
 
+    // New method to get a complete snapshot of the data state
+    getDataSnapshot() {
+        const snapshot = (node) => {
+            const result = {
+                name: node.name,
+                points: node.points,
+                types: node.types,
+            };
+            
+            // Include children if they exist
+            if (node.childrenArray) {
+                result.children = node.childrenArray.map(child => snapshot(child));
+            }
+            
+            return result;
+        };
+        
+        return JSON.stringify(snapshot(this.data));
+    }
+
     init() {
         const container = document.getElementById('treemap-container');
         const pieContainer = document.getElementById('pie-container');
@@ -22,6 +42,9 @@ export class App {
         
         console.log('Init - Treemap created');
         
+        // Store initial data state after treemap is created
+        this.lastDataState = this.getDataSnapshot();
+        
         // Create initial pie chart
         this.updatePieChart();
 
@@ -31,8 +54,17 @@ export class App {
         // Setup window resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
 
-        // Setup periodic updates for pie chart
-        setInterval(() => this.updatePieChart(), 100);  // Check for updates every 100ms
+        // Setup periodic checks for data changes
+        setInterval(() => this.checkForDataChanges(), 100);
+    }
+
+    checkForDataChanges() {
+        const currentDataState = this.getDataSnapshot();
+        if (currentDataState !== this.lastDataState) {
+            console.log('Data change detected, updating pie chart');
+            this.lastDataState = currentDataState;
+            this.updatePieChart();
+        }
     }
 
     get currentView() {
@@ -84,6 +116,9 @@ export class App {
                 this.treemap.zoomin(correspondingNode);
             }
         });
+
+        // Update last data state after visualization update
+        this.lastDataState = this.getDataSnapshot();
     }
 
     updatePieChart() {
