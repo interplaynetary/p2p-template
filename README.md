@@ -23,7 +23,7 @@ You can interact with an interface implementing this logic [here](https://interp
 2. B can (re)-attribute to A a share of B's total-recognition
 
 **Let:**
-- **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contribution
+- **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contributions towards eachother's self-actualization
 
 *Taking the minimum of both shares ensures reciprocity in proportion* 
 

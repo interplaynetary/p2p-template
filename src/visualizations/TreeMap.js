@@ -409,14 +409,17 @@ export function createTreemap(data, width, height) {
                 .call(position, d.parent));
     }
 
-    // Return public interface
+    // Return public interface with functions to get current state
     return {
         getCurrentView: () => currentView,
+        getCurrentData: () => data,
         element: svg.node(),
-        root,
+        getRoot: () => root,
         zoomin,
         zoomout,
         update: (newWidth, newHeight) => {
+            console.log('Update called with dimensions:', newWidth, height);
+            
             // Update scales
             x.rangeRound([0, newWidth]);
             y.rangeRound([0, newHeight]);
@@ -424,8 +427,12 @@ export function createTreemap(data, width, height) {
             // Update SVG viewBox
             svg.attr("viewBox", [0.5, -50.5, newWidth, newHeight + 50]);
             
-            // Update visualization
-            group.call(render, root);
+            // Clear existing content and create new group
+            group.remove();  // Remove old group
+            group = svg.append("g");  // Create new group
+            
+            // Update visualization with current view
+            group.call(render, currentView);  // Render current view instead of root
         }
     };
 }
