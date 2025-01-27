@@ -26,9 +26,11 @@ refer to [docs/p2p.md](docs/p2p.md)
 
 
 # Interface
-[] - Create React interface!
 [] - + Node button (big) (Import sub-treefrom Library)
 [] - - Node button (big) (Drop sub-tree into Library)
+
+[] - Make everything more smooth, with less sharp clicks!
+
 [] - Allow for touching multiple nodes at once
 [] - Allow for dragging nodes around
 [] - Allow for composing nodes (dragging nodes to other nodes)

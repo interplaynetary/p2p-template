@@ -8,16 +8,18 @@
     <link rel="stylesheet" href=" ./src/styles/main.css">
 </head>
 <body>
-    <!-- Menu bar at document level -->
-    <div class="menu-bar">
-        <button class="menu-button cycle-text" data-form="addNode">Add Value</button>
-        <button class="menu-button" data-form="revealQR">Add Contributor</button>
-    </div>
-
     <!-- Main visualization container -->
     <div class="visualization-container">
         <div id="treemap-container"></div>
-        <div id="pie-container"></div>
+        <div id="pie-section">
+            <div class="drop-zone top-right" data-form="addNode">
+                <span class="cycle-text">Add Value</span>
+            </div>
+            <div id="pie-container"></div>
+            <div class="drop-zone bottom-left" data-form="revealQR">
+                <span>Add Contributor</span>
+            </div>
+        </div>
     </div>
 
     <!-- Popup forms container at document level -->
@@ -218,13 +220,23 @@
         // Initialize app
         const app = new App(ruzgar);
 
-        // Setup UI interactions
+        // Define texts array
         const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
         let currentTextIndex = 0;
 
-        // Menu button handlers
-        $('.menu-button').on('click', function() {
+        // Menu button and drop-zone handlers
+        $('.menu-button, .drop-zone').on('click', function(e) {
             const formId = $(this).data('form');
+            if (!formId) return; // Skip if no form ID is set
+            
+            // If this is the add node form, cycle text first
+            if (formId === 'addNode') {
+                currentTextIndex = (currentTextIndex + 1) % addNodeTexts.length;
+                $('.cycle-text').text(addNodeTexts[currentTextIndex]);
+                $('#addNodeForm h2').text(addNodeTexts[currentTextIndex]);
+            }
+            
+            // Then open the form
             $('.popup-form').hide();
             $(`#${formId}Form`).show();
             $('.node-popup').addClass('active');
@@ -269,13 +281,6 @@
             // Close and reset form
             $('.node-popup').removeClass('active');
             this.reset();
-        });
-
-        // Cycle text button
-        $('.cycle-text').on('click', function() {
-            currentTextIndex = (currentTextIndex + 1) % addNodeTexts.length;
-            $(this).text(addNodeTexts[currentTextIndex]);
-            $('#addNodeForm h2').text(addNodeTexts[currentTextIndex]);
         });
 
         // Range input handler

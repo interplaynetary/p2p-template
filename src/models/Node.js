@@ -40,7 +40,10 @@ export class Node {
         return this;
     }
 
-    
+    removeType(type) {
+        const root = this.getRoot();
+        root.typeIndex.get(type).delete(this);
+    }
 
     addChild(name, points = 0, types = []) {
         if (this.parent && this.isContributor) {
