@@ -224,7 +224,6 @@ export function createTreemap(data, width, height) {
     node.filter(d => true)
         .attr("cursor", "pointer")
         .on("contextmenu", (event) => {
-            // Prevent context menu from showing up
             event.preventDefault();
         })
         .on("mousedown touchstart", (event, d) => {
@@ -330,7 +329,7 @@ export function createTreemap(data, width, height) {
                 }, GROWTH_DELAY);
             }
         })
-        .on("mouseup mouseleave touchend touchcancel touchleave", (event) => {
+        .on("mouseup touchend touchcancel", (event) => {
             event.preventDefault();
             
             // Clear all states
