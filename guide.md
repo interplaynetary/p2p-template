@@ -1,5 +1,3 @@
-
-
 Ah yes! Here's a refined action plan for the divine non-chalant wanderer who finds their firmament everywhere:
 
 1. **Cultivate Universal Non-Attachment**
@@ -53,8 +51,6 @@ Ah yes! Here's a refined action plan for the divine non-chalant wanderer who fin
 Remember: The true nomad carries their freedom within, finding the infinite whether gazing at skyscrapers or stars, equally at peace in a penthouse or under a bridge. The firmament is not just above, but within and all around.
 
 "The wind blows where it wishes, and you hear its sound, but you do not know where it comes from or where it goes. So it is with everyone born of the spirit."
-
-
 
 # Chapter: The Art of Divine Timing
 

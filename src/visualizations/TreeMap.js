@@ -28,7 +28,7 @@ export function createTreemap(data, width, height) {
     const y = d3.scaleLinear().rangeRound([0, height]);
 
     // Create hierarchy
-    const hierarchy = d3.hierarchy(data, d => d.childrenArray)
+    let hierarchy = d3.hierarchy(data, d => d.childrenArray)
         .sum(d => d.data.points)
         .each(d => { d.value = d.data.points || 0; });
 
@@ -96,7 +96,8 @@ export function createTreemap(data, width, height) {
     }
   
     function position(group, root) {
-        group.selectAll("g")
+        // Update all g elements except the home button
+        group.selectAll("g:not(.home-button)")
             .attr("transform", d => {
                 if (!d || typeof d.x0 === 'undefined') return '';
                 return d === root ? `translate(0,-50)` : `translate(${x(d.x0)},${y(d.y0)})`;
@@ -192,7 +193,7 @@ export function createTreemap(data, width, height) {
         .attr("class", "type-indicators")
         .attr("transform", d => {
             const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-            return `translate(${rectWidth - 10}, 10)`; // Position in top-right corner
+            return `translate(${rectWidth - 15}, 15)`; // Moved slightly more from edge
         });
 
     // Add circles for each type
@@ -200,10 +201,13 @@ export function createTreemap(data, width, height) {
         if (!d.data.types) return;
         
         const container = d3.select(this);
-        const circleRadius = 5;
+        const circleRadius = 8;
         const spacing = circleRadius * 2.5;
         
-        container.selectAll("circle")
+        // Debug the types data
+        console.log('Types for node:', d.data.name, d.data.types);
+        
+        const circles = container.selectAll("circle")
             .data(d.data.types)
             .join("circle")
             .attr("cx", (_, i) => -i * spacing)
@@ -211,9 +215,44 @@ export function createTreemap(data, width, height) {
             .attr("r", circleRadius)
             .attr("fill", type => getColorForName(type.name))
             .attr("stroke", "#fff")
-            .attr("stroke-width", "1.5")
-            .append("title")
-            .text(type => type.name);
+            .attr("stroke-width", "2")
+            .attr("cursor", "pointer")
+            .style("pointer-events", "all"); // Ensure circles receive events
+
+        // Attach click handler separately
+        circles.on("click", function(event, type) {
+            console.log('Circle clicked!');
+            event.stopPropagation();
+            
+            console.log('Loading tree for type:', type.name);
+            
+            // Update current view
+            currentView = type;
+            
+            // Clear existing content and recreate group
+            group.selectAll("*").remove();
+            
+            // Create new hierarchy using childrenArray for D3Node
+            hierarchy = d3.hierarchy(type, d => d.childrenArray)
+                .sum(d => d.points)
+                .each(node => {
+                    node.value = node.data.points || 0;
+                });
+            
+            // Apply treemap layout
+            const treemap = d3.treemap().tile(tile);
+            root = treemap(hierarchy);
+            
+            // Reset domains
+            x.domain([root.x0, root.x1]);
+            y.domain([root.y0, root.y1]);
+            
+            // Render new view
+            render(group, root);
+        });
+
+        circles.append("title")
+            .text(type => `Click to view ${type.name}'s tree`);
     });
 
     // Add touch state tracking at the top
@@ -221,147 +260,172 @@ export function createTreemap(data, width, height) {
     let isTouching = false;
     let activeNode = null; // Track which node we're growing
 
+    // Add function to check if we're in a contributor tree
+    function isInContributorTree() {
+        let temp = currentView;
+        while (temp) {
+            if (temp.data === data) {
+                return false;
+            }
+            temp = temp.parent;
+        }
+        return true;
+    }
+
     node.filter(d => true)
         .attr("cursor", "pointer")
-        .on("contextmenu", (event) => {
-            event.preventDefault();
-        })
         .on("mousedown touchstart", (event, d) => {
             event.preventDefault();
             
-            // Clear any existing growth state
-            if (growthInterval) clearInterval(growthInterval);
-            if (growthTimeout) clearTimeout(growthTimeout);
-            isGrowing = false;
-            
-            // Set new touch state
+            // Always set touch state for navigation purposes
             isTouching = true;
             touchStartTime = Date.now();
             activeNode = d;
 
-            if (d !== root) {
-                // Determine if this is a right-click or two-finger touch
-                const isShrinking = event.type === 'mousedown' ? 
-                    event.button === 2 : // right click
-                    event.touches.length === 2; // two finger touch
+            // Only proceed with growth/shrink if not in contributor tree
+            if (!isInContributorTree()) {
+                // Clear any existing growth state
+                if (growthInterval) clearInterval(growthInterval);
+                if (growthTimeout) clearTimeout(growthTimeout);
+                isGrowing = false;
+                
+                if (d !== root) {
+                    // Determine if this is a right-click or two-finger touch
+                    const isShrinking = event.type === 'mousedown' ? 
+                        event.button === 2 : // right click
+                        event.touches.length === 2; // two finger touch
 
-                growthTimeout = setTimeout(() => {
-                    // Only start growing/shrinking if still touching the same node
-                    if (isTouching && activeNode === d) {
-                        isGrowing = true;
-                        growthInterval = setInterval(() => {
-                            // Only continue if still touching
-                            if (!isTouching) {
-                                clearInterval(growthInterval);
-                                growthInterval = null;
-                                isGrowing = false;
-                                return;
-                            }
-                            
-                            // Calculate growth/shrink amount
-                            const rate = isShrinking ? SHRINK_RATE(d) : GROWTH_RATE(d);
-                            const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
-                            d.data.setPoints(newPoints);
-                            
-                            // Recompute hierarchy ensuring values match points
-                            hierarchy.sum(node => node.data.points)
-                                .each(node => {
-                                    // Force value to exactly match points
-                                    node.value = node.data.points || 0;
-                                });
-                            
-                            // Apply treemap
-                            const treemap = d3.treemap().tile(tile);
-                            treemap(hierarchy);
-                            
-                            // Update visualization including type indicators
-                            const nodes = group.selectAll("g")
-                                .filter(node => node !== root);
-                            
-                            // Existing transitions
-                            nodes.transition()
-                                .duration(GROWTH_TICK)
-                                .attr("transform", d => d === root ? 
-                                    `translate(0,-50)` : 
-                                    `translate(${x(d.x0)},${y(d.y0)})`);
-                            
-                            // Transition rectangles
-                            nodes.select("rect")
-                                .transition()
-                                .duration(GROWTH_TICK)
-                                .attr("width", d => d === root ? 
-                                    width : 
-                                    Math.max(0, x(d.x1) - x(d.x0)))
-                                .attr("height", d => d === root ? 
-                                    50 : 
-                                    Math.max(0, y(d.y1) - y(d.y0)));
-                            
-                            // Update text positions
-                            nodes.select("text")
-                                .transition()
-                                .duration(GROWTH_TICK)
-                                .attr("transform", d => {
-                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                    return `translate(${rectWidth / 2},${rectHeight / 2})`;
-                                })
-                                .style("font-size", d => {
-                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                    return calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView) + "px";
-                                });
+                    growthTimeout = setTimeout(() => {
+                        // Only start growing/shrinking if still touching the same node
+                        if (isTouching && activeNode === d) {
+                            isGrowing = true;
+                            growthInterval = setInterval(() => {
+                                // Only continue if still touching
+                                if (!isTouching) {
+                                    clearInterval(growthInterval);
+                                    growthInterval = null;
+                                    isGrowing = false;
+                                    return;
+                                }
                                 
-                            // Add type indicator updates here
-                            nodes.select(".type-indicators")
-                                .transition()
-                                .duration(GROWTH_TICK)
-                                .attr("transform", d => {
-                                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                    return `translate(${rectWidth - 10}, 10)`;
-                                });
+                                // Calculate growth/shrink amount
+                                const rate = isShrinking ? SHRINK_RATE(d) : GROWTH_RATE(d);
+                                const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
+                                d.data.setPoints(newPoints);
+                                
+                                // Recompute hierarchy ensuring values match points
+                                hierarchy.sum(node => node.data.points)
+                                    .each(node => {
+                                        // Force value to exactly match points
+                                        node.value = node.data.points || 0;
+                                    });
+                                
+                                // Apply treemap
+                                const treemap = d3.treemap().tile(tile);
+                                treemap(hierarchy);
+                                
+                                // Update visualization including type indicators
+                                const nodes = group.selectAll("g")
+                                    .filter(node => node !== root);
+                                
+                                // Existing transitions
+                                nodes.transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("transform", d => d === root ? 
+                                        `translate(0,-50)` : 
+                                        `translate(${x(d.x0)},${y(d.y0)})`);
+                                
+                                // Transition rectangles
+                                nodes.select("rect")
+                                    .transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("width", d => d === root ? 
+                                        width : 
+                                        Math.max(0, x(d.x1) - x(d.x0)))
+                                    .attr("height", d => d === root ? 
+                                        50 : 
+                                        Math.max(0, y(d.y1) - y(d.y0)));
+                                
+                                // Update text positions
+                                nodes.select("text")
+                                    .transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("transform", d => {
+                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                        return `translate(${rectWidth / 2},${rectHeight / 2})`;
+                                    })
+                                    .style("font-size", d => {
+                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                        return calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView) + "px";
+                                    });
+                                    
+                                // Add type indicator updates here
+                                nodes.select(".type-indicators")
+                                    .transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("transform", d => {
+                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        return `translate(${rectWidth - 10}, 10)`;
+                                    });
 
-                            // console.log("\nFinal values:");
-                            // console.log("Node points:", d.data.points);
-                            // console.log("Node value:", d.value);
-                            // console.log("Hierarchy value:", hierarchy.value);
-                        }, GROWTH_TICK);
-                    }
-                }, GROWTH_DELAY);
+                                // console.log("\nFinal values:");
+                                // console.log("Node points:", d.data.points);
+                                // console.log("Node value:", d.value);
+                                // console.log("Hierarchy value:", hierarchy.value);
+                            }, GROWTH_TICK);
+                        }
+                    }, GROWTH_DELAY);
+                }
             }
         })
         .on("mouseup touchend touchcancel", (event) => {
-            event.preventDefault();
-            
-            // Clear all states
-            isTouching = false;
-            activeNode = null;
-            
-            // Stop growth
-            if (growthTimeout) clearTimeout(growthTimeout);
-            if (growthInterval) clearInterval(growthInterval);
-            growthInterval = null;
-            isGrowing = false;
+            // Only handle if not in contributor tree
+            if (!isInContributorTree()) {
+                event.preventDefault();
+                
+                // Clear all states
+                isTouching = false;
+                activeNode = null;
+                
+                // Stop growth
+                if (growthTimeout) clearTimeout(growthTimeout);
+                if (growthInterval) clearInterval(growthInterval);
+                growthInterval = null;
+                isGrowing = false;
+            }
         })
         .on("click touchend", (event, d) => {
             event.preventDefault();
             
             const touchDuration = Date.now() - touchStartTime;
+            console.log('Click detected on:', d.data.name);
+            console.log('Is root?', d === root);
+            console.log('Has parent?', d.parent ? 'yes' : 'no');
+            console.log('Touch duration:', touchDuration);
+            console.log('Is growing?', isGrowing);
             
-            // Handle zoom only on quick taps
+            // Allow navigation (zooming) regardless of tree
             if (touchDuration < GROWTH_DELAY && !isGrowing) {
                 if (d === root && d.parent) {
+                    console.log('Attempting zoom out from:', d.data.name);
                     zoomout(root);
-                } else if (d !== root && !d.data.isContributor) {  // Check isContributor directly
-                    // console.log('Node:', d.data.name);
-                    // console.log('Is Contributor:', d.data.isContributor);
+                } else if (d !== root) {
+                    console.log('Attempting zoom in to:', d.data.name);
                     zoomin(d);
                 }
+            } else {
+                console.log('Navigation blocked because:',
+                    touchDuration >= GROWTH_DELAY ? 'touch too long' : 'growing active');
             }
             
-            // Clear all states
-            isTouching = false;
-            activeNode = null;
-            isGrowing = false;
+            // Clear states only if not in contributor tree
+            if (!isInContributorTree()) {
+                isTouching = false;
+                activeNode = null;
+                isGrowing = false;
+            }
         });
 
         if (root.data.children.size === 0 && root !== data) {  // Check if view is empty and not root
@@ -377,6 +441,57 @@ export function createTreemap(data, width, height) {
                 .style("user-select", "none")
                 .text("Add Values / Contributors");
         }
+
+        // After creating the node groups and before position call
+        node.filter(d => d === root)  // Only for the root navigation rectangle
+            .each(function(d) {
+                // Check if we're in a contributor tree (no path to original data)
+                let temp = d;
+                let isContributorTree = true;
+                while (temp) {
+                    if (temp.data === data) {  // data is the original root passed to createTreemap
+                        isContributorTree = false;
+                        break;
+                    }
+                    temp = temp.parent;
+                }
+
+                if (isContributorTree) {
+                    // Add home button
+                    d3.select(this)
+                        .append("g")
+                        .attr("class", "home-button")
+                        .attr("transform", "translate(20, 25)")  // 25 is 50% of the 50px height
+                        .style("cursor", "pointer")
+                        .on("click", (event) => {
+                            event.stopPropagation();
+                            // Clear existing content
+                            group.selectAll("*").remove();
+                            
+                            // Reset to original data
+                            hierarchy = d3.hierarchy(data, d => d.childrenArray)
+                                .sum(d => d.data.points)
+                                .each(d => { d.value = d.data.points || 0; });
+                            
+                            // Apply treemap layout
+                            const treemap = d3.treemap().tile(tile);
+                            root = treemap(hierarchy);
+                            currentView = root;
+                            
+                            // Reset domains
+                            x.domain([root.x0, root.x1]);
+                            y.domain([root.y0, root.y1]);
+                            
+                            // Render new view
+                            render(group, root);
+                        })
+                        .append("text")
+                        .attr("fill", "#000")
+                        .attr("font-size", "20px")
+                        .attr("dominant-baseline", "middle")  // Vertically center the text
+                        .text("🏠");  // Unicode home emoji
+                }
+            });
     }
 
     function zoomin(d) {

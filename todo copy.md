@@ -5,3 +5,7 @@
 [] - nodes as templates
 [] - allow for changing the root node!
 [] - make nodes drag and drop!
+
+[] - workout
+[] - spontenaiety
+

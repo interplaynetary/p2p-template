@@ -86,7 +86,7 @@
         const educator = new D3Node('educator', null, [environmentalist]);
 
         // Our main nodes with multiple types
-        const whalewatch = new D3Node('whalewatch', null, [clownsWithoutBorders]);  // is a contributor
+        const whalewatch = new D3Node('whalewatch', null, [researcher]);  // is a contributor
         const alice = new D3Node('alice', null, [researcher]);  // is a contributor
 
         const ruzgar = new D3Node('ruzgar', null, []);
@@ -192,6 +192,7 @@
 
         // whalewatch's recognition of ruzgar
         const whalewatchgive = whalewatch.addChild('🌳 give', 80);
+        const whalewatchrecieve = whalewatch.addChild('recieve', 80);
         const whalewatchpotential = whalewatchgive.addChild('🔮 potential', 40);
         const ruzgarInwhalewatchpotential = whalewatchpotential.addChild('ruzgar', 15, [ruzgar]);
 
