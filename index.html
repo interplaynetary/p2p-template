@@ -15,7 +15,11 @@
             <div class="drop-zone top-right" data-form="addNode">
                 <span class="cycle-text">Add Value</span>
             </div>
-            <div id="pie-container"></div>
+            <div id="pie-container">
+                <button id="viewToggle" class="view-toggle">
+                    Switch View
+                </button>
+            </div>
             <div class="drop-zone bottom-left" data-form="revealQR">
                 <span>Add Contributor</span>
             </div>
@@ -315,6 +319,29 @@
             });
             $('#public-key-text').text(mockPublicKey);
         }
+
+        // Add keyboard event listener for Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const treemap = app.treemap;  // Get treemap instance from app
+                const currentView = treemap.getCurrentView();  // Use treemap's method to get current view
+                
+                if (currentView && currentView.parent) {
+                    treemap.zoomout(currentView);  // Use treemap's zoomout method directly
+                }
+            }
+        });
+
+        $('#viewToggle').on('click', function() {
+            const pieChart = app.pieChart;
+            if (pieChart.isTreemapMode) {
+                pieChart.switchToPie();
+                $(this).text('View Tree');
+            } else {
+                pieChart.switchToTreemap();
+                $(this).text('View Pie');
+            }
+        });
     </script>
 </body>
 </html> 

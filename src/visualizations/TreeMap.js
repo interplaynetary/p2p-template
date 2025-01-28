@@ -10,6 +10,7 @@ export function createTreemap(data, width, height) {
     const GROWTH_TICK = 50;
     const GROWTH_DELAY = 500;
     let isGrowing = false;
+    const SHRINK_RATE = (d) => d.data.points * -0.05; // Negative growth rate for shrinking
 
     // Helper functions
     const uid = (function() {
@@ -222,6 +223,10 @@ export function createTreemap(data, width, height) {
 
     node.filter(d => true)
         .attr("cursor", "pointer")
+        .on("contextmenu", (event) => {
+            // Prevent context menu from showing up
+            event.preventDefault();
+        })
         .on("mousedown touchstart", (event, d) => {
             event.preventDefault();
             
@@ -236,12 +241,17 @@ export function createTreemap(data, width, height) {
             activeNode = d;
 
             if (d !== root) {
+                // Determine if this is a right-click or two-finger touch
+                const isShrinking = event.type === 'mousedown' ? 
+                    event.button === 2 : // right click
+                    event.touches.length === 2; // two finger touch
+
                 growthTimeout = setTimeout(() => {
-                    // Only start growing if still touching the same node
+                    // Only start growing/shrinking if still touching the same node
                     if (isTouching && activeNode === d) {
                         isGrowing = true;
                         growthInterval = setInterval(() => {
-                            // Only grow if still touching
+                            // Only continue if still touching
                             if (!isTouching) {
                                 clearInterval(growthInterval);
                                 growthInterval = null;
@@ -249,9 +259,10 @@ export function createTreemap(data, width, height) {
                                 return;
                             }
                             
-                            // Existing growth logic
-                            const growthAmount = GROWTH_RATE(d);
-                            d.data.setPoints(d.data.points + growthAmount);
+                            // Calculate growth/shrink amount
+                            const rate = isShrinking ? SHRINK_RATE(d) : GROWTH_RATE(d);
+                            const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
+                            d.data.setPoints(newPoints);
                             
                             // Recompute hierarchy ensuring values match points
                             hierarchy.sum(node => node.data.points)

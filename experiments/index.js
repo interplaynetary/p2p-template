@@ -259,7 +259,7 @@ function getColorForName(name) {
     return nameColors.get(name);
 }
 
-function createTreemap(data) {
+function TreeMap(data) {
     // Get the container dimensions
     const container = document.getElementById('treemap-container');
     const width = container.clientWidth;
@@ -904,7 +904,7 @@ function createTreemap(data) {
             
             // Recompute visualization
             container.innerHTML = ''; 
-            const newTreemap = createTreemap(root.data);
+            const newTreemap = TreeMap(root.data);
             container.appendChild(newTreemap);
             
             // Update pie chart separately to ensure it's not cleared

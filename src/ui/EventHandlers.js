@@ -1,4 +1,4 @@
-import { createTreemap } from '../visualizations/TreeMap.js';
+import { TreeMap } from '../visualizations/TreeMap.js';
 import { createPieChart } from '../visualizations/PieChart.js';
 import { addNodeTexts } from './Forms.js';
 
@@ -107,7 +107,7 @@ function updateVisualizations(root, currentView) {
     }
     
     $container.empty();
-    $container.append(createTreemap(root.data));
+    $container.append(TreeMap(root.data));
     
     $('#pie-container').empty()
         .append(createPieChart(root.data));
