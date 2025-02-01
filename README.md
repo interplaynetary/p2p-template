@@ -71,7 +71,7 @@ You can interact with an interface implementing this logic [here](https://interp
 <details>
   <summary>Click for Example</summary>
    
-Consider someone receiving money from a wealthy person:
+**Consider someone receiving money from a wealthy person:**
 
 **True Recognition Scenario:**
 - You need $1000 for rent
