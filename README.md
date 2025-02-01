@@ -1,6 +1,6 @@
 # Proof and Strategy for a Truly Free Association of Free Individuals
 
-We present a formulation of a legitimate alternative to capitalism that allows for the *spontaneous self-actualization of all through each other* without any centralized control, planning, private-property or the state!
+We present a formulation of a legitimate alternative to capitalism that allows for the *spontaneous self-actualization of all through each other* without any centralized control, planning, private-property or state intervention!
 
 This requires more than mere abstract agreement or forced cooperation - it demands real contribution to each other's self-actualization (contributions towards needs, values, goals, social and/or material dependencies etc.).
 
@@ -24,6 +24,8 @@ You can interact with an interface implementing this logic [here](https://interp
 
 **Let:**
 - **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contributions towards eachother's self-actualization
+
+**For example:** If you are 50% of my total-recognition, and I am 10% of your total-recognition, our mutual-recognition is 10%, the minimum of the both.
 
 *Taking the minimum of both shares ensures reciprocity in proportion* 
 
@@ -63,7 +65,51 @@ You can interact with an interface implementing this logic [here](https://interp
 - ∴ ↓Mutual-Recognition with Real Contributors
 - ∴ ↓Surplus-Associations from Real Contributors
 - ∴ ↓Access to Real Social-Material Coordination via Surplus-Associations from Real Contributors
+- ∴ ↓Real Social-Material Basis for Self-Actualization
 - ∴ social-material-truth is realized through Free Association
+
+<details>
+  <summary>Click for Example</summary>
+   
+Consider someone receiving money from a wealthy person:
+
+**True Recognition Scenario:**
+- You need $1000 for rent
+- A wealthy person provides you $1000
+- You recognize their contribution to your need for money (say 20% of your total recognition)
+- This is true recognition because they actually contributed to that specific need
+
+**False Recognition Scenario:**
+- You hope to get more money by flattering them
+- You claim they've contributed to:
+  - Environmental protection (20% recognition)
+  - Community wellbeing (20% recognition) 
+  - Cultural development (20% recognition)
+- But these were actually achieved by other contributors
+
+**Mathematical Impact:**
+- Your total recognition must sum to 100%
+- By giving 60% false recognition to the wealthy person
+- Plus 20% true recognition for money
+- Only 20% remains for all real contributors
+- Therefore:
+  - Real environmental contributors can get max 20% recognition
+  - Their mutual recognition with you decreases
+  - Their surplus (help) flows less to you
+  - Your actual needs get less fulfilled
+
+**Key Insight:**
+If you wanted more money legitimately, you could:
+1. Honestly adjust your need distribution (e.g. "Money is 40% of my needs")
+2. Give appropriate recognition for money received
+3. Maintain recognition for other real contributors
+
+This preserves your ability to receive genuine help for all needs while being truthful about what was really contributed.
+
+The mathematics naturally punishes false recognition by reducing your access to real contributions. You can't get more total value by inflating recognition - you only decrease your connection to real contributors.
+</details>
+
+---
 
 **For any Association between A and B:**
 - Mutual-Desire(A↔B) = Desire(A→B) ∧ Desire(B→A) 
