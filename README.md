@@ -69,7 +69,7 @@ You can interact with an interface implementing this logic [here](https://interp
 - ∴ social-material-truth is realized through Free Association
 
 <details>
-  <summary>Click for Example</summary>
+  <summary><b><i>Click for Example</i></b></summary>
    
 **Consider someone receiving money from a wealthy person:**
 
