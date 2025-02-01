@@ -29,7 +29,7 @@ You can interact with an interface implementing this logic [here](https://interp
 
 *Taking the minimum of both shares ensures reciprocity in proportion* 
 
-*Mutual-recognition is the peer-2-peer social-validation of eachother's efforts as well as the social-validation of use-values/utility."
+*Mutual-recognition is the peer-2-peer social-validation of eachother's efforts as well as the social-validation of use-values/utility."*
 
 *Interestingly  we don't have to keep a ledger of objects whose definitions are centrally defined, there is no universal definition of object-hood (of what constitutes objects), but a distributed recognition of the social-utility of contributions!*
 
