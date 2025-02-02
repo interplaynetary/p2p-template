@@ -114,6 +114,14 @@
         const substances = ruzgar.addChild("Transformative Substances", 20);
         const realityHacking = ruzgar.addChild("Reality Hacking & Manifestation", 20);
         const loreSystem = ruzgar.addChild("Lore & Knowledge Systems", 10);
+        const money = ruzgar.addChild("Money", 10)
+        const freeAssociation = ruzgar.addChild("Free Association", 10)
+
+        const openCollective = money.addChild("Playnet Open Collective", 10)
+        const personalDonations = money.addChild("Personal Donations", 10)
+
+        const development = freeAssociation.addChild("Development", 10)
+        const communications = freeAssociation.addChild("Communications", 10)
 
         // Underground Networks contributions
         const secretStairs = infrastructure.addChild("Secret stairways", 10, [alice]);
