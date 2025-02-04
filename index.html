@@ -16,9 +16,6 @@
                 <span class="cycle-text">Add Value</span>
             </div>
             <div id="pie-container">
-                <button id="viewToggle" class="view-toggle">
-                    Switch View
-                </button>
             </div>
             <div class="drop-zone bottom-left" data-form="revealQR">
                 <span>Add Contributor</span>
@@ -89,7 +86,7 @@
         const whalewatch = new D3Node('whalewatch', null, [researcher]);  // is a contributor
         const alice = new D3Node('alice', null, [researcher]);  // is a contributor
 
-        const ruzgar = new D3Node('ruzgar', null, []);
+        const ruzgar = new D3Node('ruzgar');
 
         // 1. Material Needs & Dependencies
         const space = ruzgar.addChild("Space & Environment", 25);
@@ -214,22 +211,6 @@
         const clownsWithoutBorderspotential = clownsWithoutBordersgive.addChild('🔮 potential', 40);
         const ruzgarInclownsWithoutBorderspotential = clownsWithoutBorderspotential.addChild('ruzgar', 15, [ruzgar]);
 
-        // Calculate shares at different type levels
-        console.log('\nShares by type level:');
-        console.log('Environmentalist share:', ruzgar.shareOfGeneralContribution(environmentalist));
-        console.log('clownsWithoutBorders share:', ruzgar.shareOfGeneralContribution(clownsWithoutBorders));
-        console.log('Educator share:', ruzgar.shareOfGeneralContribution(educator));
-        console.log('Researcher share:', ruzgar.shareOfGeneralContribution(researcher));
-        console.log('whalewatch specific share:', ruzgar.shareOfGeneralContribution(whalewatch));
-        console.log('alice specific share:', ruzgar.shareOfGeneralContribution(alice));
-
-        // Calculate mutual recognition and generalMutualContribution
-        console.log('\nMutual Recognition:');
-        console.log('With whalewatch:', ruzgar.mutualShareOfGeneralContribution(whalewatch));
-        console.log('\nFinal mutualGeneralContribution:');
-        console.log(ruzgar.mutualGeneralContribution());
-        console.log(ruzgar);
-
         // Initialize app
         const app = new App(ruzgar);
 
@@ -341,16 +322,6 @@
             }
         });
 
-        $('#viewToggle').on('click', function() {
-            const pieChart = app.pieChart;
-            if (pieChart.isTreemapMode) {
-                pieChart.switchToPie();
-                $(this).text('View Tree');
-            } else {
-                pieChart.switchToTreemap();
-                $(this).text('View Pie');
-            }
-        });
     </script>
 </body>
 </html> 
