@@ -52,21 +52,9 @@ export class Node {
           );
         }
     
-        const child = new Node(name, this);
+        const child = new Node(name, this, types);
     
-        // Ensure types are properly added
-        if (Array.isArray(types)) {
-          types.forEach(type => 
-          {
-            child.isContributor = type.isContributor;
-            child.addType(type)
-          });
-        } else if (types) {
-          // Handle single type case
-          child.addType(types);
-        }
-    
-        this.children.set(child, new Map());
+        this.children.set(name, child);
         if (points > 0) {
           child.setPoints(points);
         }
