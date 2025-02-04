@@ -411,7 +411,7 @@ export function createTreemap(data, width, height) {
                 if (d === root && d.parent) {
                     console.log('Attempting zoom out from:', d.data.name);
                     zoomout(root);
-                } else if (d !== root) {
+                } else if (d !== root && !d.data.isContributor) {  // Check isContributor directly
                     console.log('Attempting zoom in to:', d.data.name);
                     zoomin(d);
                 }
