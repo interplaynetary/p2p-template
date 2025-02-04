@@ -1,5 +1,5 @@
 import { createTreemap } from './visualizations/TreeMap.js';
-import { createPieChart } from './visualizations/PieChart.js';
+import { createPieChart } from './fullModels/PieChart.js';
 
 export class App {
     constructor(data) {
