@@ -47,24 +47,31 @@ export class Node {
 
     addChild(name, points = 0, types = []) {
         if (this.parent && this.isContributor) {
-            throw new Error(`Node ${this.name} is an instance of a contributor and cannot have children.`);
+          throw new Error(
+            `Node ${this.name} is an instance of a contributor and cannot have children.`
+          );
         }
-
+    
         const child = new Node(name, this);
-        
+    
         // Ensure types are properly added
         if (Array.isArray(types)) {
-            types.forEach(type => child.addType(type));
-        } else if (types) {  // Handle single type case
-            child.addType(types);
+          types.forEach(type => 
+          {
+            child.isContributor = type.isContributor;
+            child.addType(type)
+          });
+        } else if (types) {
+          // Handle single type case
+          child.addType(types);
         }
-        
+    
         this.children.set(child, new Map());
         if (points > 0) {
-            child.setPoints(points);
+          child.setPoints(points);
         }
         return child;
-    }
+      }
 
     removeChild(name) {
         const child = this.children.get(name);
