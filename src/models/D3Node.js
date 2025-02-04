@@ -6,21 +6,22 @@ class D3Node extends Node {
         super(name, parent, types);
     }
 
-    // Override addChild to create D3Nodes instead of regular Nodes
     addChild(name, points = 0, types = []) {
         if (this.parent && this.isContributor) {
-            throw new Error(
-              `Node ${this.name} is an instance of a contributor and cannot have children.`
-            );
-          }
+          throw new Error(
+            `Node ${this.name} is an instance of a contributor and cannot have children.`
+          );
+        }
+    
         const child = new D3Node(name, this, types);
+    
         this.children.set(name, child);
-        
         if (points > 0) {
-            child.setPoints(points);
+          child.setPoints(points);
         }
         return child;
-    }
+      }
+
     // D3 Compatibility Methods
     get value() {
         return this.points;
