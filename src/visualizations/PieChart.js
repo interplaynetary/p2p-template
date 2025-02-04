@@ -8,13 +8,14 @@ export function createPieChart(data) {
     const height = container.clientHeight;
     const radius = Math.min(width, height) / 2;
 
-    // Get mutualGeneralContribution from root node
-    const mutualGeneralContribution = data.mutualGeneralContribution();
-    console.log('mutualGeneralContribution for pie:', mutualGeneralContribution);
+    // Get mutualFulfillmentDistribution from root node
+    console.log('Creating pie chart for data:', data);
+    const mutualFulfillmentDistribution = data.mutualFulfillmentDistribution;
+    console.log('mutualFulfillmentDistribution for pie:', mutualFulfillmentDistribution);
 
     // Create pie layout
     const pie = d3.pie()
-        .value(d => d[1])  // Use the mutualGeneralContribution value
+        .value(d => d[1])  // Use the mutualFulfillmentDistribution value
         .sort(null);  // Maintain original order
 
     // Create arc generator
@@ -29,8 +30,8 @@ export function createPieChart(data) {
         .attr("viewBox", [-width/2, -height/2, width, height])
         .style("font", "12px sans-serif");
 
-    // Create pie segments from mutualGeneralContribution
-    const arcs = pie(Array.from(mutualGeneralContribution.entries()));
+    // Create pie segments from mutualFulfillmentDistribution
+    const arcs = pie(Array.from(mutualFulfillmentDistribution.entries()));
 
     // Add segments using the same color scheme as the treemap
     svg.selectAll("path")
@@ -85,7 +86,7 @@ export function createPieChart(data) {
         .attr("dy", fontSize/1.6)  // Move down by one full font size
         .attr("font-size", fontSize)
         .attr("font-weight", "bold")
-        .text("Contribution");
+        .text("Fulfillment");
 
     return svg.node();
 }
