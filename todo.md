@@ -1,7 +1,8 @@
 # Readme
 [] - Add intro on how this economy is based on gratitude! Recognize, feel, and act!
 [] - Add examples
- 
+[] - Correspondance Truth : make commodity fetish etc more discreet, focus on subject, verb object correspondence.
+
 # Treemap
 [✅] - make text scale to fit
 [✅] - descriptions on nodes

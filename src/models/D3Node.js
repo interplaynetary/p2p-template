@@ -1,7 +1,6 @@
 import { Node } from './Node.js';
 
-export 
-class D3Node extends Node {
+export class D3Node extends Node {
     constructor(name, parent = null, types = []) {
         super(name, parent, types);
     }

@@ -1,13 +1,14 @@
 export class Node {
-    constructor(name, parent = null, types = []) {
+    constructor(name, parent = null, types = [], peerId = null) {
       this.name = name;
+      this.peerId = peerId;
       this.parent = parent;
       this.points = 0;
       this.children = new Map();
       this.totalChildPoints = 0;
       this.isContributor = this.parent ? false : true;
       this._manualFulfillment = null;
-  
+      
       this.types = types;
       // Map of type -> Set of instances
       this.typeIndex = parent ? parent.root.typeIndex : new Map();
@@ -20,6 +21,8 @@ export class Node {
           }
         });
       }
+      // shareOfParent() -> how many points this node has, as fraction of totalChildPoints.
+      // used to distribute contribution/fulfillment upward or across siblings.
       this.shareOfParent = () => {
         if (!this.parent) return 1;
         return this.parent.totalChildPoints === 0
@@ -69,6 +72,14 @@ export class Node {
         );
       };
   
+      
+    // The core method: fulfilled():
+    // 1. Leaf nodes with isContributor == true → full 1.0 fulfillment
+    // 2. Leaf nodes with isContributor == false → 0
+    // 3. If _manualFulfillment is set and node has both contributor and non-contributor children:
+    //    merges the manual fulfillment for contributor children with the calculated fulfillment for non-contributor children using a weighted approach.
+    // 4. Otherwise falls back to summing child fulfillments * shareOfParent().
+
       this.fulfilled = () => {
         // For leaf nodes (no children)
         if (this.children.size === 0) {
@@ -145,7 +156,26 @@ export class Node {
   
     removeType(type) {
       const root = this.root;
-      root.typeIndex.get(type).delete(this);
+      
+      // 1. Remove the node from the typeIndex map at the root level
+      if (root.typeIndex.has(type)) {
+        root.typeIndex.get(type).delete(this);
+      }
+  
+      // 2. Also remove this type from the node's internal "types" array/set
+      //    (Assuming `this.types` is an array—otherwise adapt accordingly)
+      this.types = this.types.filter(t => t !== type);
+  
+      // 3. Recheck if this node should still be a contributor
+      //    - If no parent, automatically isContributor = true.
+      //    - Otherwise, only true if at least one type is contributor.
+      if (!this.parent) {
+        this.isContributor = true;
+      } else {
+        this.isContributor = this.types.some(t => t.isContributor);
+      }
+  
+      return this;
     }
   
     addChild(name, points = 0, types = []) {
@@ -260,37 +290,6 @@ export class Node {
     }
   }
   
-  // Create some nodes
-  const parentNode = new Node('Parent Node');
-  const contributorNode = new Node('Contributor Node', null);
-  
-  console.log(parentNode.isContributor); // true
-  console.log(contributorNode.isContributor); // true
-  
-  // Add children to parent node
-  parentNode.addChild("childNode1", 10, [contributorNode]);
-  parentNode.addChild("childNode2", 20, [contributorNode]);
-  parentNode.addChild("childNode3", 20); ;
-  
-  // Example of checking if node has direct contributor child
-  console.log(parentNode.hasDirectContributorChild()); // true or false
-  
-  // Example of checking if node has non-contributor child
-  console.log(parentNode.hasNonContributorChild()); // true or false
-  
-  // Example of calculating contributor children weight
-  console.log(parentNode.calculateContributorChildrenWeight()); // some value
-  
-  // Example of calculating contributor children fulfillment
-  console.log(parentNode.calculateContributorChildrenFulfillment()); // some value
-  
-  // Example of calculating non-contributor children fulfillment
-  console.log(parentNode.calculateNonContributorChildrenFulfillment()); // some value
-  
-  // Example of checking if node is fulfilled
-  console.log(parentNode.fulfilled()); // 1 or 0
-  
-  
   /*
   **Implications of Desire and Fulfillment at an Organizational Level in a Free Association Framework**  
   *(10-Paragraph Expert Analysis)*  
@@ -298,16 +297,16 @@ export class Node {
   ---
   
   ### **1. Organizational Legitimacy Rooted in Mutual Recognition**  
-  In traditional hierarchies, legitimacy flows from formal authority (e.g., titles, ownership). In free association, legitimacy emerges from **demonstrated contributions to others’ self-actualization**. Desire and fulfillment become the twin pillars of organizational coherence:  
+  In traditional hierarchies, legitimacy flows from formal authority (e.g., titles, ownership). In free association, legitimacy emerges from **demonstrated contributions to others' self-actualization**. Desire and fulfillment become the twin pillars of organizational coherence:  
   - **Desire** reflects unmet needs, driving individuals to seek collaborators.  
-  - **Fulfillment** quantifies how well others’ contributions satisfy those needs.  
-  This flips the capitalist logic of "control via ownership" to "validation via reciprocity." Organizations no longer rely on coercive structures (e.g., wages, contracts) but on **sustained mutual recognition**—relations persist only if both parties actively desire participation and recognize each other’s contributions.  
+  - **Fulfillment** quantifies how well others' contributions satisfy those needs.  
+  This flips the capitalist logic of "control via ownership" to "validation via reciprocity." Organizations no longer rely on coercive structures (e.g., wages, contracts) but on **sustained mutual recognition**—relations persist only if both parties actively desire participation and recognize each other's contributions.  
   
   ---
   
   ### **2. Desire as a Dynamic Feedback Mechanism**  
   Desire operates as a **self-correcting signal** in the system:  
-  - If an individual’s fulfillment is low, their desire to seek new collaborators rises.  
+  - If an individual's fulfillment is low, their desire to seek new collaborators rises.  
   - If fulfillment is high, desire shifts toward maintaining or deepening existing associations.  
   At scale, this creates **emergent prioritization**: contributors gravitate toward roles where their efforts yield the highest mutual recognition. Unlike market-driven "supply and demand," this prioritization is grounded in **intersubjective validation**—contributors organically align with roles that others *genuinely value*, not just roles that maximize profit.  
   
@@ -315,8 +314,8 @@ export class Node {
   
   ### **3. Fulfillment as a Measure of Social-Material Truth**  
   Fulfillment is not abstract—it reflects **material and social utility**. For example:  
-  - A farmer’s fulfillment depends on how many people recognize their crops as meeting nutritional needs.  
-  - A teacher’s fulfillment hinges on students’ acknowledgment of their pedagogical contributions.  
+  - A farmer's fulfillment depends on how many people recognize their crops as meeting nutritional needs.  
+  - A teacher's fulfillment hinges on students' acknowledgment of their pedagogical contributions.  
   When fulfillment is high, it signals that contributions are **materially effective** and **socially meaningful**. Conversely, low fulfillment exposes mismatches (e.g., redundant labor, misaligned priorities), prompting systemic recalibration. This creates a "truth-tracking" mechanism where **false contributions** (e.g., performative work) decay due to lack of recognition.  
   
   ---
@@ -330,16 +329,16 @@ export class Node {
   ---
   
   ### **5. Surplus Distribution as a Mirror of Social Trust**  
-  Surplus (roles one holds but does not desire) flows to those who’ve earned recognition through prior contributions. This creates a **virtuous cycle**:  
+  Surplus (roles one holds but does not desire) flows to those who've earned recognition through prior contributions. This creates a **virtuous cycle**:  
   - Contributors with high fulfillment gain access to surplus resources, enabling further contributions.  
   - Free riders, lacking recognition, are excluded from surplus networks.  
-  Unlike capitalist accumulation (hoarding resources via ownership), surplus here acts as **social capital**—a collective endorsement of one’s value to the community.  
+  Unlike capitalist accumulation (hoarding resources via ownership), surplus here acts as **social capital**—a collective endorsement of one's value to the community.  
   
   ---
   
   ### **6. Sustainability Through Decentralized Accountability**  
   In capitalism, accountability is enforced externally (e.g., audits, layoffs). Free association internalizes accountability via **transitive recognition**:  
-  - If A recognizes B, and B recognizes C, A indirectly validates C’s contributions.  
+  - If A recognizes B, and B recognizes C, A indirectly validates C's contributions.  
   - Breakdowns in one relationship ripple through the network, incentivizing repair.  
   This creates **fault-tolerant coordination**: the system self-heals as contributors reorient toward functional associations, avoiding centralized oversight.  
   
@@ -347,8 +346,8 @@ export class Node {
   
   ### **7. Contradiction and Collapse of Coercive Systems**  
   Capitalist and state structures rely on **asymmetric recognition** (e.g., shareholders over workers, rulers over citizens). Free association erodes these by exposing their **social-material falsehoods**:  
-  - A factory owner’s claim to "produce goods" collapses when workers organize directly with suppliers/consumers.  
-  - A state’s claim to "maintain order" weakens as communities self-coordinate disaster relief.  
+  - A factory owner's claim to "produce goods" collapses when workers organize directly with suppliers/consumers.  
+  - A state's claim to "maintain order" weakens as communities self-coordinate disaster relief.  
   These contradictions accelerate as free association demonstrates that **coercion is unnecessary** for large-scale coordination.  
   
   ---
@@ -372,12 +371,12 @@ export class Node {
   Capitalism alienates labor by divorcing work from meaning (e.g., assembly-line drudgery). Free association dissolves alienation by tethering labor to **immediate social utility**:  
   - A carpenter sees their chairs used by neighbors.  
   - A programmer witnesses their code enabling community projects.  
-  Desire and fulfillment thus become **existential anchors**, transforming work from a "means to survive" into a "mode of being." This aligns with Marx’s vision of labor as "life’s prime want," where contribution and self-actualization merge.  
+  Desire and fulfillment thus become **existential anchors**, transforming work from a "means to survive" into a "mode of being." This aligns with Marx's vision of labor as "life's prime want," where contribution and self-actualization merge.  
   
   ---
   
   
   ### **Conclusion: The Organizational Horizon**  
-  Free association redefines organizations as **fluid, living networks**—not static institutions. By grounding legitimacy in mutual recognition, desire, and fulfillment, it resolves capitalism’s core contradictions: exploitation, alienation, and ecological unsustainability. The result is a social-material order where organizations evolve organically, powered by the collective pursuit of self-actualization. As Marx envisioned, this is not utopia but **practicable humanism**—a world where "the free development of each is the condition for the free development of all."
+  Free association redefines organizations as **fluid, living networks**—not static institutions. By grounding legitimacy in mutual recognition, desire, and fulfillment, it resolves capitalism's core contradictions: exploitation, alienation, and ecological unsustainability. The result is a social-material order where organizations evolve organically, powered by the collective pursuit of self-actualization. As Marx envisioned, this is not utopia but **practicable humanism**—a world where "the free development of each is the condition for the free development of all."
   */
   
