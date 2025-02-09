@@ -20,15 +20,6 @@
             <div class="drop-zone bottom-left" data-form="revealQR">
                 <span>Peer</span>
             </div>
-            <div class="drop-zone bottom-right" data-form="giveSurplus">
-                <span>Give Surplus</span>
-            </div>
-            <div class="drop-zone top-left" data-form="inventory">
-                <span>Inventory</span>
-            </div>
-            <div class="drop-zone center-top" data-form="createAssociation">
-                <span>Create Association</span>
-            </div>
         </div>
     </div>
 
@@ -103,6 +94,25 @@
                 </div>
                 <div class="form-buttons">
                     <button type="submit" class="create">Create Association</button>
+                    <button type="button" class="cancel">Close</button>
+                </div>
+            </form>
+
+            <!-- Add pie menu popup form -->
+            <form id="pieMenuForm" class="popup-form" style="display: none;">
+                <h2>Actions</h2>
+                <div class="menu-buttons">
+                    <button type="button" class="menu-button" data-form="inventory">
+                        <span>Inventory</span>
+                    </button>
+                    <button type="button" class="menu-button" data-form="createAssociation">
+                        <span>Create Association</span>
+                    </button>
+                    <button type="button" class="menu-button" data-form="giveSurplus">
+                        <span>Give Surplus</span>
+                    </button>
+                </div>
+                <div class="form-buttons">
                     <button type="button" class="cancel">Close</button>
                 </div>
             </form>
@@ -196,6 +206,28 @@
             this.reset();
         });
 
+        
+        // Add to your script section after all other initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            // Pie container click handler
+            document.getElementById('pie-container').addEventListener('click', function(e) {
+                console.log('Pie container clicked!'); // Debug log
+                $('.popup-form').hide(); // Hide any other open forms
+                $('#pieMenuForm').show(); // Show the pie menu
+                $('.node-popup').addClass('active'); // Make popup visible
+            });
+
+            // Menu button handlers
+            $('.menu-button').on('click', function(e) {
+                const formId = $(this).data('form');
+                if (!formId) return;
+                
+                console.log('Menu button clicked:', formId); // Debug log
+                $('#pieMenuForm').hide();
+                $(`#${formId}Form`).show();
+            });
+        });
+
         // Range input handler
         $('#nodePercentage').on('input', function() {
             $(this).next('output').text($(this).val() + '%');
@@ -247,7 +279,6 @@
                 }
             }
         });
-
     </script>
 </body>
 </html> 
