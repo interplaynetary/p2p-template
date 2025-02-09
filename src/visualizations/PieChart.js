@@ -8,6 +8,8 @@ export function createPieChart(data) {
     const height = container.clientHeight;
     const radius = Math.min(width, height) / 2;
 
+    const ringThickness = (radius * 0.8) - (radius * 0.4);
+
     // Get mutualFulfillmentDistribution from root node
     console.log('Creating pie chart for data:', data);
     const mutualFulfillmentDistribution = data.mutualFulfillmentDistribution;
@@ -52,7 +54,7 @@ export function createPieChart(data) {
         })
         .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .style("font-size", "15px")  // Adjust the font size here
+        .style("font-size", `${ringThickness * 0.3}px`)  // Scale text to 30% of ring thickness
         .text(d => `${d.data[0].name}`);
 
     // Add center text
@@ -61,7 +63,7 @@ export function createPieChart(data) {
         .attr("dominant-baseline", "middle");
 
     // Calculate text size based on inner radius
-    const fontSize = radius * 0.09;  // 20% of radius
+    const fontSize = radius * 0.12;  // 20% of radius
     
     /*
     On the other hand, it also serves as a measure of the portion of the common labour borne by each individual, 

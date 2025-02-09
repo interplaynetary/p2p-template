@@ -65,11 +65,24 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    user-select: none;  /* Prevent text selection */
+    cursor: pointer;    /* Show pointer cursor */
     
     @media (max-width: 768px) {
         width: auto;
         height: 100%;
     }
+}
+
+#pie-container svg {
+    pointer-events: none;  /* Prevent cursor interaction with SVG elements */
+}
+
+#pie-container svg text {
+    user-select: none;     /* Prevent text selection specifically */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 /* Menu bar styles */
@@ -285,4 +298,85 @@ svg {
 
 .view-toggle:hover {
     background: #e5e5e5;
+}
+
+/* Add these styles for the pie menu */
+#pieMenuForm {
+    text-align: center;
+}
+
+#pieMenuForm .menu-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin: 20px 0;
+    padding: 10px;
+}
+
+#pieMenuForm .menu-button {
+    aspect-ratio: 1;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #f5f5f5;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+#pieMenuForm .menu-button span {
+    font-size: 14px;
+    line-height: 1.2;
+    text-align: center;
+    word-wrap: break-word;
+    max-width: 100%;
+}
+
+/* Add specific style for emoji */
+#pieMenuForm .menu-button span:has(emoji) {
+    font-size: 32px;  /* Make emoji bigger */
+}
+
+#pieMenuForm .menu-button:hover {
+    background: #e5e5e5;
+    color: #333;
+    transform: scale(1.05);
+}
+
+#pieMenuForm .form-buttons {
+    margin-top: 20px;
+    justify-content: center;
+}
+
+#pieMenuForm .cancel {
+    background: #f5f5f5;
+    color: #666;
+    padding: 8px 20px;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+}
+
+#pieMenuForm .cancel:hover {
+    background: #e5e5e5;
+    color: #333;
+}
+
+#pieMenuForm h2 {
+    margin: 10px 0 20px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f5f5f5;
+}
+
+#pieMenuForm .menu-button span.emoji {
+    font-size: 32px;  /* Much bigger emoji */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
 }
