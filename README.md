@@ -68,7 +68,7 @@ You can interact with an interface implementing this logic [here](https://interp
 
   *In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
 
-  In commodity production, one values objects (apples) but not the labor that produced them (the subject-verb-object relation).
+  In stark contrast, in commodity production, one values objects (apples) but not the labor that produced them (the subject-verb-object relation).
 
   Alienated societies, expropriate the product (object) from the producer (subject-verb) and alienate the producer from the product.
 
