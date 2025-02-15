@@ -31,7 +31,7 @@ This approach represents a fundamental shift from traditional charity or market-
 2. B can (re)-attribute to A a share of B's total-recognition
 
 <details>
-  <summary><b><i>How this differs from equity: Domination of Past over Present -> Domination of Present over Past</i></b></summary>
+  <summary><b><i>How this differs from equity</i></b></summary>
 
   *Equity* structures also operate on the basis of proportions of 100%, the sharehoders hold a share in the company.
 
@@ -316,7 +316,7 @@ With shared esteem & love,
 # What is being done:
 - Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof. 
 
-It is being developed open-source at [interplaynetary-github](https://github.com/interplaynetary/free association).
+It is being developed open-source at [interplaynetary-github](https://github.com/interplaynetary/free-association).
 
 A To-Do list is being kept at [todo.md](todo.md).
 
