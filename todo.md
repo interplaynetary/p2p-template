@@ -3,6 +3,10 @@
 [] - Add examples
 [] - Correspondance Truth : make commodity fetish etc more discreet, focus on subject, verb object correspondence.
 
+# Code in General
+[] - Make comprehensive tests!
+[] - Make tests for all the edge cases!
+
 # Treemap
 [✅] - make text scale to fit
 [✅] - descriptions on nodes
@@ -12,13 +16,22 @@
 [] - Lets simplify isContributor logic!
 [] - Lets simplify getShareOfGeneralContribution logic! And generalize to traversal of any note, default is general.
 [] - Allow for distributing surplus to any branch
+[] - shareOfGeneralRecognition view: the size of the squares of shareOfGeneralRecognition: is the **potential** mutual-recognition -> and **potential** share of surplus-distribution
+[] - create generic treemap for displaying:
+    [] - shareOfGeneralFulfillment view: the size of the squares of shareOfGeneralRecognition: the fulfilled is what is recognized as actual!
+    [] - One's share of surplus-distribution is based on one's share of one's mutual-self-actualization!
 
 # Node
 [] - Are we properly accounting for the share of an instance in a node? (especially when it has multiple types which are contributors) (split the share of that instance between the types)?
 [] - Make type-circles on nodes transition more smoothly
 
+# Organizations
+[] - Right now the code focuses on mutual-recognition between individuals. We should also allow for mutual-recognition between organizations! [resources/leafs.md](resources/leafs.md)
+
 # P2P
-refer to [docs/p2p.md](docs/p2p.md)
+[] - Gun.js user-space
+[] - Gun.js add peers
+[] - Peers as types!
 
 # Inventory & Associations
 [] - add a button to distribute surplus (in general, or to a specific branch/leaf?)

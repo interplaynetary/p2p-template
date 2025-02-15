@@ -32,15 +32,24 @@ export function initializeExampleData() {
         console.log(ruzgar);
         
         const hosts = indoorSpace.addChild("Space Providers/Hosts", 14);
+        const infrastructure = indoorSpace.addChild("Infra(de)structure & Bottom-secret Spaces", 25);
 
         // Main Categories with their percentage weights
-        const infrastructure = ruzgar.addChild("Infra(de)structure & Bottom-secret Spaces", 25);
-        const magicalTech = ruzgar.addChild("Magical Technologies & Systems", 25);
-        const substances = ruzgar.addChild("Transformative Substances", 20);
-        const realityHacking = ruzgar.addChild("Reality Hacking & Manifestation", 20);
-        const loreSystem = ruzgar.addChild("Lore & Knowledge Systems", 10);
+        const subverse = ruzgar.addChild("Subverse 🌌", 25);
+
+        const magicalTech = subverse.addChild("Magical Technologies & Systems", 25);
+        const substances = subverse.addChild("Transformative Substances", 20);
+        const realityHacking = subverse.addChild("Reality Hacking & Manifestation", 20);
+        const loreSystem = subverse.addChild("Lore & Knowledge Systems", 10);
+
         const money = ruzgar.addChild("Money", 10)
         const freeAssociation = ruzgar.addChild("Free Association", 10)
+
+        const automation = ruzgar.addChild("Automation of Useful-repetitive Tasks", 10)
+        const commons = ruzgar.addChild("Socialization of Land & Means of Production", 10)
+        const property = ruzgar.addChild("Maintaining Personal Property Relations", 10)
+        const securingLaptop = property.addChild("Securing my Laptop", 10)
+        const securingBackpack = property.addChild("Securing my Backpack", 10)
 
         const openCollective = money.addChild("Playnet Open Collective", 10)
         const personalDonations = money.addChild("Personal Donations", 10)
