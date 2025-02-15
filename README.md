@@ -22,6 +22,34 @@ You can interact with an interface implementing this logic [here](https://interp
 1. A can (re)-attribute to B a share of A's total-recognition
 2. B can (re)-attribute to A a share of B's total-recognition
 
+<details>
+  <summary><b><i>How this differs from equity: Domination of Past over Present -> Domination of Present over Past</i></b></summary>
+
+  *Equity* structures also operate on the basis of proportions of 100%, the sharehoders hold a share in the company.
+
+   Imagine we are each involved in organizations that issue their own shares and distribute dividends (surplus) to their shareholders.
+
+   Mutual-Stakeholding: Imagine several such organization swapping shares with each other, now dividends are flowing bidirectionally through the network.
+
+   We are risking-together and benefiting-together.
+
+   In Mutual-Stakeholding, we have entered a non-zero-sum economic relationship, in which we each gain by increasing the well-being of all others.
+
+   All of these desirable properties of Mutual-Stakeholding are inhertied in Free-Association, but with a **crucial** difference.
+
+  In equity you *own* a share of me.
+
+  You may deploy any duplicitous means to gain my recognition of your contribution towards my self-fulfillment, you could lie to me with no end! And so long as you have secured your shares: you *own* me.
+
+  In other words, in Mutual-Stakeholding the Past dominates the Present. I can not remove my recognition of the past that is no longer true, because you own it.
+
+  On the contrary in Free-Association: **The Present dominates the Past**. I am able to, at a whim, modify my recognition of the Past in the light of new information in the Present.
+  
+  In Free-Assocation I can *re-attribute* shares of my total-recognition - also proportions of 100% - and this is only possible because in Free-Association we each own 100% of ourselves!
+
+  We are free! You don't own me, and I don't own you! We owe eachother nothing!
+</details>
+
 **Let:**
 - **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contributions towards eachother's self-actualization
 
@@ -34,6 +62,28 @@ You can interact with an interface implementing this logic [here](https://interp
 *Interestingly  we don't have to keep a ledger of objects whose definitions are centrally defined, there is no universal definition of object-hood (of what constitutes objects), but a distributed recognition of the social-utility of contributions!*
 
 *In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
+
+<details>
+  <summary><b><i>More on Subject-Verb-Object</i></b></summary>
+
+  *In free-association, one does not value apples (objects) but a contributor's provision of apples (subject-verb-object).*
+
+  In commodity production, one values objects (apples) but not the labor that produced them (the subject-verb-object relation).
+
+  Alienated societies, expropriate the product (object) from the producer (subject-verb) and alienate the producer from the product.
+
+  In capitalism, the capitalist claims to own the surplus-product produced by the subject-verb, and can sell it as a commodity, which leads to *commodity fetishism*.
+
+  By exchanging the objects between eachother, (already alienated from their respective subject-verbs) the commodity fetish takes full hold: **and definite social relations between men themselves, take on - for them - the fantastic form of a social relation between things.**
+  
+  "In order, therefore, to find an analogy, we must take flight into the misty realm of religion. There the products of the human brain appear as autonomous figures endowed with a life of their own, which enter into relations, both with each other and with the human race. So it is in the world of commodities with the products of men's hands. I call this the fetishism which attaches itself to the products of labour as soon as they are produced as commodities, and is, therefore, inseparable from the production of commodities." - Marx
+
+  https://en.wikipedia.org/wiki/Marx's_theory_of_alienation
+  https://en.wikipedia.org/wiki/Reification_(Marxism)
+  https://en.wikipedia.org/wiki/Commodity_fetishism
+
+
+</details>
 
 **Let:**
 - **Association** = a set of relations where:
@@ -54,6 +104,8 @@ You can interact with an interface implementing this logic [here](https://interp
 *"From each according to his ability, to each according to his needs!"*
 
 *The distribution of surplus-roles through networks of mutual-contribution is a form of distributed-peer-discovery/offering/matching! Finding collaborators who directly/transitively contribute to your self-actualization!*
+
+*What one is actually distributing surplus to is one's **direct/transitive mutual-self-actualization***
 
 **Let:**
 - **Total Recognition = 100%**
@@ -132,12 +184,13 @@ The mathematics naturally punishes false recognition by reducing your access to 
 
 Transitive self-actualization refers to the ripple effect of contributions as they spread beyond a single hub of interaction. Rather than an isolated A → B relationship, we see A helping B in a way that not only meets B’s needs but empowers B to help C, D, and so on. This means that *one’s actions to help a neighbor* do not stop once that neighbor’s need is fulfilled; instead, **the neighbor’s newly enhanced capacity** to help others becomes part of the original contributor’s indirect contribution as well. In a free-association framework, these “transitive” contributors seed a chain reaction of material and social support that expands the web of mutual-fulfillment.
 
-From a systems perspective, this phenomenon highlights how the *value* of a contribution compounds when it has multiple “hops” of effectiveness. When Node A helps Node B, and Node B in turn supports Node C, Node A (ironically) ends up benefiting from an environment where Node C is stronger or better able to meet Node A’s needs in the future—even though A and C may never interact directly. In terms of self-actualization, fulfilling a single node often unlocks opportunities for fulfilling an entire network, because **every node’s fulfillment contributes to the overall capacity for support.** Thus, transitive contributors demonstrate that *individual well-being is always embedded in collective well-being*.
+When Node A helps Node B, and Node B in turn supports Node C, Node A ends up benefiting from an environment where Node C is stronger or better able to meet Node A’s needs in the future—even though A and C may never interact directly. In terms of self-actualization, fulfilling a single node often unlocks opportunities for fulfilling an entire network, because **every node’s fulfillment contributes to the overall capacity for support.** Thus, transitive contributors demonstrate that *individual well-being is always embedded in collective well-being*.
 
 ---
 
-**On Capital Relations (and Coercive Relations in General) within Free Association:**
-
+<details>
+  <summary><b><i>On Capital Relations (and Coercive Relations in General) within Free Association:</i></b></summary>
+   
 **Let:**
 - Capitalist-Simulated-Production = Production appearing to come from capitalist but actually produced by contributors!
 - Commodity Fetish = The masking of social-material relations of contribution behind the veil of the product as commodity (market-relations) - the objective social-forgetting of the social-origin of things
@@ -174,8 +227,10 @@ From a systems perspective, this phenomenon highlights how the *value* of a cont
 
 **In other words:**
 The commodity fetish cannot persist when the labor-power being purchased begins organizing on the basis of Free Association, as this creates pressure to reveal real contribution relations. The commodity fetish, which normally masks social relations of contribution, cannot be maintained within Free Association because Free Association requires demonstration of real contribution, creating a contradiction that must resolve either through the loss of recognition of Capitalist-Simulated-Production or its dissolution into Free Association.
+</details>
 
-**On Free Association and State Power:**
+<details>
+  <summary><b><i>On Free Association and State Power:</i></b></summary>
 
 **Let:**
 - State-Power = The organized force appearing separate from and above contributors
@@ -226,6 +281,8 @@ The state fetish cannot persist when contributors organize via Free Association,
 - ∴ ↑Means of contribution in common → ↑Access to Materials Necessary for Playing Associations
 - ∴ ↑Truly Free Association (both socially and materially)
 
+</details>
+
 ---
 
 **Definitions:**
@@ -240,9 +297,7 @@ With shared esteem & love,
 
 *"In a higher phase of communist society, after the enslaving subordination of the individual to the division of labor, and therewith also the antithesis between mental and physical labor, has vanished; after labor has become not only a means of life but life's prime desire; after the productive forces have also increased with the all-around development of the individual, and all the springs of co-operative wealth flow more abundantly—only then can the narrow horizon of bourgeois right be crossed in its entirety and society inscribe on its banners: From each according to his ability, to each according to his needs!"* (Marx)
 
-***Freedom* and *necessity* are not opposed but united in the free association of contributors.**
-
-**When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual-recognition of real contributions, when relations activate only through genuine desire and participation - then we have finally a form in which the free development of each is the condition for the free development of all!**
+**When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual-recognition of real contributions towards eachother's self-actualization, when relations activate only through mutual desire and participation - then we have finally a form in which the free development of each is the condition for the free development of all!**
 
 *"Communism as the positive transcendence of private property as human self-estrangement, and therefore as the real appropriation of the human essence by and for man; communism therefore as the complete return of man to himself as a social (i.e., human) being – a return accomplished consciously and embracing the entire wealth of previous development. This communism, as fully developed naturalism, equals humanism, and as fully developed humanism equals naturalism; it is the genuine resolution of the conflict between man and nature and between man and man – the true resolution of the strife between existence and essence, between objectification and self-confirmation, between freedom and necessity, between the individual and the species. Communism is the riddle of history solved, and it knows itself to be this solution."* (Marx)
 
@@ -253,7 +308,9 @@ With shared esteem & love,
 # What is being done:
 - Ruzgar: A p2p interface (a single html file) is being created for peers to express their mutual-recognition of contributions towards their own self-actualization (contributions towards one's needs, values, goals, social and/or material dependencies etc.) and to distribute associations (mutual-relations) according to their mutual-recognition-distributions. Implementing all the logic presented in this proof. 
 
-It is being developed open-source at [interplaynetary-github](https://github.com/interplaynetary/free association) but is additionally available p2p on [radicl](https://link-needed).
+It is being developed open-source at [interplaynetary-github](https://github.com/interplaynetary/free association).
+
+A To-Do list is being kept at [todo.md](todo.md).
 
 **A basic interface for free association is almost complete but we are seeking support in user-interface-development as well as support in the form of housing, food etc.**
 
