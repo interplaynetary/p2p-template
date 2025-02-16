@@ -30,34 +30,6 @@ This approach represents a fundamental shift from traditional charity or market-
 1. A can (re)-attribute to B a share of A's total-recognition
 2. B can (re)-attribute to A a share of B's total-recognition
 
-<details>
-  <summary><b><i>How this differs from equity</i></b></summary>
-
-  *Equity* structures also operate on the basis of proportions of 100%, the sharehoders hold a share in the company.
-
-   Imagine we are each involved in organizations that issue their own shares and distribute dividends (surplus) to their shareholders.
-
-   Mutual-Stakeholding: Imagine several such organization swapping shares with each other, now dividends are flowing bidirectionally through the network.
-
-   We are risking-together and benefiting-together.
-
-   In Mutual-Stakeholding, we have entered a non-zero-sum economic relationship, in which we each gain by increasing the well-being of all others.
-
-   All of these desirable properties of Mutual-Stakeholding are inhertied in Free-Association, but with a **crucial** difference.
-
-  In equity you *own* a share of me.
-
-  You may deploy any duplicitous means to gain my recognition of your contribution towards my self-fulfillment, you could lie to me with no end! And so long as you have secured your shares: you *own* me.
-
-  In other words, in Mutual-Stakeholding the Past dominates the Present. I can not remove my recognition of the past that is no longer true, because you own it.
-
-  On the contrary in Free-Association: **The Present dominates the Past**. I am able to, at a whim, modify my recognition of the Past in the light of new information in the Present.
-  
-  In Free-Assocation I can *re-attribute* shares of my total-recognition - also proportions of 100% - and this is only possible because in Free-Association we each own 100% of ourselves!
-
-  We are free! You don't own me, and I don't own you! We owe eachother nothing!
-</details>
-
 **Let:**
 - **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contributions towards eachother's self-actualization
 
@@ -195,6 +167,38 @@ Transitive self-actualization refers to the ripple effect of contributions as th
 When Node A helps Node B, and Node B in turn supports Node C, Node A ends up benefiting from an environment where Node C is stronger or better able to meet Node A’s needs in the future—even though A and C may never interact directly. In terms of self-actualization, fulfilling a single node often unlocks opportunities for fulfilling an entire network, because **every node’s fulfillment contributes to the overall capacity for support.** Thus, transitive contributors demonstrate that *individual well-being is always embedded in collective well-being*.
 
 ---
+
+<details>
+  <summary><b><i>How this differs from equity</i></b></summary>
+
+  *Equity* structures also operate on the basis of proportions of 100%, the sharehoders hold a share in the company.
+
+   Imagine we are each involved in organizations that issue their own shares and distribute dividends (surplus) to their shareholders.
+
+   Mutual-Stakeholding: Imagine several such organization swapping shares with each other, now dividends are flowing bidirectionally through the network.
+
+   We are risking-together and benefiting-together.
+
+   In Mutual-Stakeholding, we have entered a non-zero-sum economic relationship, in which we each gain by increasing the well-being of all others.
+
+   All of these desirable properties of Mutual-Stakeholding are inherited in Free-Association, but with a **crucial** difference.
+
+  In equity you *own* a share of me.
+
+  You may deploy any duplicitous means to gain my recognition of your contribution towards my self-fulfillment, you could lie to me with no end! And so long as you have secured your shares: you *own* me.
+
+  In other words, in Mutual-Stakeholding the Past dominates the Present. I can not remove my recognition of the past that is no longer true, because you own it.
+
+  On the contrary in Free-Association: **The Present dominates the Past**. I am able to, at a whim, modify my recognition of the Past in the light of new information in the Present.
+  
+  In Free-Assocation I can *re-attribute* shares of my total-recognition - also proportions of 100% - and this is only possible because in Free-Association we each own 100% of ourselves!
+
+  We are free! You don't own me, and I don't own you! We owe each other nothing!
+
+  Recall that Mutual-Recognition is Hegel's resolution of the master-slave dialectic.
+
+  For more on this see [resources/love.md](resources/love.md)
+</details>
 
 <details>
   <summary><b><i>On Capital Relations (and Coercive Relations in General) within Free Association:</i></b></summary>
