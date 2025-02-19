@@ -336,6 +336,16 @@ With shared esteem & love,
 - Ruzgar Imski & Free Association
    [Playnet.lol](https://playnet.lol)
 
+"Let us suppose that we had carried out production as human beings. Each of us would have in *two ways affirmed* himself and the other person. 
+- 1) In my *production* I would have objectified my *individuality*, *its specific character*, and therefore enjoyed not only an individual *manifestation of my life* during the activity, but also when looking at the object I would have the individual pleasure of knowing my personality to be *objective*, *visible to the senses and hence a power beyond all doubt*. 
+- 2) In your enjoyment or use of my product I would have the *direct* enjoyment both of being conscious of having satisfied a *human* need by my work, that is, of having objectified *man's* essential nature, and of having thus created an object corresponding to the need of another *man's* essential nature. 
+- 3) I would have been for you the *mediator* between you and the species, and therefore would become recognised and felt by you yourself as a completion of your own essential nature and as a necessary part of yourself, and consequently would know myself to be confirmed both in your thought and your love. 
+- 4) In the individual expression of my life I would have directly created your expression of your life, and therefore in my individual activity I would have directly *confirmed* and *realised* my true nature, my *human nature*, my *communal nature*.
+
+Our products would be so many mirrors in which we saw reflected our essential nature.
+
+This relationship would moreover be reciprocal; what occurs on my side has also to occur on yours." (Marx)
+
 *"In a higher phase of communist society, after the enslaving subordination of the individual to the division of labor, and therewith also the antithesis between mental and physical labor, has vanished; after labor has become not only a means of life but life's prime desire; after the productive forces have also increased with the all-around development of the individual, and all the springs of co-operative wealth flow more abundantly—only then can the narrow horizon of bourgeois right be crossed in its entirety and society inscribe on its banners: From each according to his ability, to each according to his needs!"* (Marx)
 
 **When individuals freely contribute to each other's self-actualization, when surplus flows according to mutual-recognition of real contributions towards eachother's self-actualization, when relations activate only through mutual desire and participation - then we have finally a form in which the free development of each is the condition for the free development of all!**
