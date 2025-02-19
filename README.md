@@ -30,6 +30,35 @@ This approach represents a fundamental shift from traditional charity or market-
 1. A can (re)-attribute to B a share of A's total-recognition
 2. B can (re)-attribute to A a share of B's total-recognition
 
+
+<details>
+  <summary><b><i>Being Questioned: Recognition as Bandwidth</i></b></summary>
+
+**Recognition as Bandwidth:**
+- **Let:** 
+- **Total-Receptivity = Total-Recognition = 100%**
+- **Default: OtherShareOfTotalReceptivity = shareOfGeneralFulfillment**
+    - (each side can have un-reciprocal receptivity)
+    - Receptivity-Overrides for special cases should be possible.
+
+For example I would set my **Receptivity-Limit = 1k Charecters/day** and your share of my 1k charecters/day is equal to your share of my total-recognition (shareOfGeneralFulfillment).
+
+Each recognizer can set their their **Receptivity-Limit** on the fly!
+
+So if you are 50% of my total-recognition, you would be allowed to send me 500 characters/day.
+
+If I am 10% of your total-recognition, I would be allowed to send you 100 characters/day.
+
+We could override this default for special cases.
+
+This allows us to take control of our own attention. And in a sense allows people to sets limits on the working-day (or at least to set limits on the amount of attention that they are willing to give to others via free-association interfaces).
+
+**Question:** should default bandwidth-for-other be shareOfGeneralFulfillment or share-of-mutual-fulfillment-distribution?
+
+**Relations as Communication Channels:**
+- Relations are Communication Channels between Role-Players: Similar to chats or topics between two role-players.
+</details>
+
 **Let:**
 - **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contributions towards eachother's self-actualization
 
