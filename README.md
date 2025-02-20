@@ -324,6 +324,49 @@ The state fetish cannot persist when contributors organize via Free Association,
 
 </details>
 
+
+<details>
+  <summary><b><i>Being Explored: What if States Freely-Associated?</i></b></summary>
+
+Thus far we have principally spoken of free-association between individuals, but what about between organizations, communities, states etc.?
+
+In the case of states, if they mutually recognized eachother's contributions towards their own self actualization, and surplus flowed bi-directionally, there would be no more need for imports/exports or international-trade. 
+
+Internally each state would have a mechanism for collective setting of the proportions of the branches of self-actualization of their community. For example: Each citizen has an equal share of proportion-setting-power.
+
+We can also imagine a mechanism by which, citizens could delegate a portion of their proportion-setting-power to another agent, within a particular category. So for example delegating 10% of your proportion-setting-power in the category of "environmental protection" to the an ecologist.
+
+Such a scenario would have a number of benefits and would make the question of the socialization of land and means of production, easier to answer, but raises other questions.
+
+"The first act by virtue of which the state really constitutes itself the representative of the whole of society — the taking possession of the means of production in the name of society — this is, at the same time, its last independent act as a state. State interference in social relations becomes, in one domain after another, superfluous, and then dies out of itself; the government of persons is replaced by the administration of things, and by the conduct of processes of production. The state is not "abolished". It dies out." (Engels)
+
+Some of this is being explored in the [resources/leafs.md](resources/leafs.md) file.
+
+---
+
+Within the constitutions of various states, there are clauses that allow for the conversion of private property to state ownership. Their names vary, but terms like "nationalization" or "expropriation" are used when done on a larger scale (like industries) or "eminent domain" when done for specific properties (like land for highways).
+
+These clauses generally allow governments to take private property for public use, though usually with the requirement to provide "just compensation" to the original owners. The specific terms and scope vary by country:
+
+In the US, it's the "Takings Clause" of the Fifth Amendment
+In India, it's covered under Article 31 of the Constitution
+In the UK, it's called "compulsory purchase"
+In many Latin American countries, it's known as "expropiación"
+
+However it should be noted that socialization of land and means of production in the hands of existing states (often times bourgoise, deformed-workers-states or degenerated-workers-states) comes with a lot of legal and historical baggage, and is not a simple process. 
+
+**Bourgoise State:** the capitalist class has not been overthrown, the economy is largely private and market-driven, and there is no internal democracy or workers' control of industry.
+**Deformed Workers State:** the capitalist class has been overthrown, the economy is largely state-owned and planned, but there is no internal democracy or workers' control of industry. In a deformed workers' state, the working class has never held political power like it did in Russia shortly after the Russian Revolution. These states are considered deformed because their political and economic structures have been imposed from the top (or from outside), and because revolutionary working class organizations are crushed. 
+**Degenerate Workers State:** the capitalist class has been overthrown, the economy is largely state-owned and planned, there was internal democracy or workers' control of industry, but the working class lost political power, and democratic control of the state has given way to a state controled by a beauracratic clique.
+
+Moreover, the question of how to distribute the means of production and land, if they are to be socialized, is a complex one. So is the question of how to distribute the surplus-production of the means of production and land, if they are to be socialized. And more fundamentaly, what will decide of each of these - the governance of each State - is a complex question.
+
+Rather than reforming existing states, dual-power should be established in each country, and should be established on the basis of the widest democracy.
+
+---
+
+</details>
+
 ---
 
 **Definitions:**
