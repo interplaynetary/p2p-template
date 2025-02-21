@@ -134,89 +134,151 @@
     
     <!-- Remove the old script tags for d3 and qrcode -->
 
+    <div id="auth-container" style="display: none;">
+        <form id="auth-form">
+            <input type="text" id="username" placeholder="Username" autocomplete="username">
+            <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+            <button type="submit">Login/Create</button>
+        </form>
+    </div>
+
+    <div id="app-container" style="display: none;">
+        <!-- Existing app content -->
+    </div>
+
     <script type="module">
-        import { App } from './src/App.js';
         import { initializeExampleData } from './src/example.js';
-        const { ruzgar } = initializeExampleData();
+        import { App } from './src/App.js';
+        import * as GunX from './src/models/Gun.js';
 
-        // Initialize app
-        const app = new App(ruzgar);
+        let app = undefined;
 
-        // Define texts array
-        const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
-        let currentTextIndex = 0;
+        async function handleAuth(event) {
+            event.preventDefault();
+            console.log('Auth handler started');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
 
-        // Menu button and drop-zone handlers
-        $('.menu-button, .drop-zone').on('click', function(e) {
-            const formId = $(this).data('form');
-            if (!formId) return; // Skip if no form ID is set
-            
-            // If this is the add node form, cycle text first
-            if (formId === 'addNode') {
-                currentTextIndex = (currentTextIndex + 1) % addNodeTexts.length;
-                $('.cycle-text').text(addNodeTexts[currentTextIndex]);
-                $('#addNodeForm h2').text(addNodeTexts[currentTextIndex]);
-            }
-            
-            // Then open the form
-            $('.popup-form').hide();
-            $(`#${formId}Form`).show();
-            $('.node-popup').addClass('active');
-
-            if (formId === 'addNode') {
-                const hasChildren = app.currentView.data.children.size > 0;
-                $('#percentageGroup').toggle(hasChildren);
+            try {
+                await GunX.login(username, password);
+                console.log('Login successful');
+            } catch {
+                console.log('Login failed, attempting creation');
+                await GunX.create(username, password);
+                console.log('Account creation successful');
             }
 
-            if (formId === 'revealQR') {
-                generateQRCode();
-            }
-        });
+            document.getElementById('auth-container').style.display = 'none';
+            console.log('Auth container hidden');
 
-        // Form submission handler
-        $('#addNodeForm').on('submit', function(e) {
-            e.preventDefault();
-            const name = $('#nodeName').val();
-            const currentViewData = app.currentViewData;
-            console.log('Form submission - currentViewData:', currentViewData.name);  // Debug log
-            console.log('Form submission - currentView:', app.currentView.data.name);  // Debug log
-            
-            const hasChildren = currentViewData.children.size > 0;
-            const percentage = hasChildren ? Number($('#nodePercentage').val()) : 100;
-            
-            if (hasChildren && (percentage <= 0 || percentage >= 100)) {
-                alert('Percentage must be between 1 and 99');
-                return;
-            }
-            
-            const currentTotal = currentViewData.totalChildPoints || currentViewData.points || 100;
-            const points = hasChildren ? 
-                Math.max(1, Math.ceil(currentTotal / (1 - percentage/100)) - currentTotal) : 
-                currentTotal;
-            
-            console.log('Adding node to:', currentViewData.name);  // Debug log
-            const newChild = currentViewData.addChild(name, points);
-            
-            // Update visualizations
-            app.updateVisualizations();
-            
-            // Close and reset form
-            $('.node-popup').removeClass('active');
-            this.reset();
-        });
+            try {
+                // Initialize app with proper await
+                const { ruzgar } = await initializeExampleData();
+                
+                console.log('Example data initialized');
+                app = ruzgar;
+                console.log('App initialized:', app);
 
-        
-        // Add to your script section after all other initialization
-        document.addEventListener('DOMContentLoaded', function() {
-            // Pie container click handler
-            document.getElementById('pie-container').addEventListener('click', function(e) {
+                // Only enable UI interactions after app is fully initialized
+                setupUIHandlers();
+            } catch (error) {
+                console.error('Failed to initialize app:', error);
+            }
+        }
+
+        // Move all UI handlers into a separate function
+        function setupUIHandlers() {
+            // Define texts array
+            const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
+            let currentTextIndex = 0;
+
+            // Menu button and drop-zone handlers
+            $('.menu-button, .drop-zone').on('click', function(e) {
+                if (!app) {
+                    console.error('App not initialized yet');
+                    return;
+                }
+                console.log('Menu/drop-zone clicked');
+                console.log('app exists:', app);
+                console.log('app treemap exists:', (app?.treemap));
+                const formId = $(this).data('form');
+                if (!formId) return; // Skip if no form ID is set
+                
+                // If this is the add node form, cycle text first
+                if (formId === 'addNode') {
+                    currentTextIndex = (currentTextIndex + 1) % addNodeTexts.length;
+                    $('.cycle-text').text(addNodeTexts[currentTextIndex]);
+                    $('#addNodeForm h2').text(addNodeTexts[currentTextIndex]);
+                }
+                
+                // Then open the form
+                $('.popup-form').hide();
+                $(`#${formId}Form`).show();
+                $('.node-popup').addClass('active');
+
+                if (formId === 'addNode') {
+                    const hasChildren = app?.currentView?.hasChildren;
+                    console.log('currentViewData:', app?.currentViewData);  // Debug log
+                    console.log('currentView:', app?.currentView.data.name);  // Debug log
+                
+                    $('#percentageGroup').toggle(hasChildren);
+                }
+
+                if (formId === 'revealQR') {
+                    generateQRCode();
+                }
+            });
+
+            // Form submission handler
+            $('#addNodeForm').on('submit', function(e) {
+                e.preventDefault();
+                if (!app) {
+                    console.error('App not initialized yet');
+                    return;
+                }
+                console.log('Form submitted');
+                console.log('app exists:', app);
+                console.log('app treemap exists:', (app?.treemap));
+                const name = $('#nodeName').val();
+                const currentViewData = app?.currentViewData;
+                
+                const hasChildren = currentViewData.hasChildren;
+                const percentage = hasChildren ? Number($('#nodePercentage').val()) : 100;
+                
+                if (hasChildren && (percentage <= 0 || percentage >= 100)) {
+                    alert('Percentage must be between 1 and 99');
+                    return;
+                }
+                
+                const currentTotal = currentViewData.totalChildPoints || currentViewData.points || 100;
+                const points = hasChildren ? 
+                    Math.max(1, Math.ceil(currentTotal / (1 - percentage/100)) - currentTotal) : 
+                    currentTotal;
+                
+                console.log('Adding node to:', currentViewData.name);  // Debug log
+                const newChild = currentViewData.addChild(name, points);
+                
+                // Update visualizations
+                app?.updateVisualizations();
+                
+                // Close and reset form
+                $('.node-popup').removeClass('active');
+                this.reset();
+            });
+
+            // Pie container click handler - moved out of DOMContentLoaded
+            $('#pie-container').on('click', function(e) {
                 console.log('Pie container clicked!'); // Debug log
+                if (!app) {
+                    console.error('App not initialized yet');
+                    return;
+                }
                 $('.popup-form').hide(); // Hide any other open forms
                 $('#pieMenuForm').show(); // Show the pie menu
                 $('.node-popup').addClass('active'); // Make popup visible
             });
 
-            // Menu button handlers
+            // Menu button handlers - moved out of DOMContentLoaded
             $('.menu-button').on('click', function(e) {
                 const formId = $(this).data('form');
                 if (!formId) return;
@@ -225,59 +287,78 @@
                 $('#pieMenuForm').hide();
                 $(`#${formId}Form`).show();
             });
-        });
 
-        // Range input handler
-        $('#nodePercentage').on('input', function() {
-            $(this).next('output').text($(this).val() + '%');
-        });
-
-        // Cancel buttons
-        $('.cancel').on('click', function() {
-            $('.node-popup').removeClass('active');
-            $('#addNodeForm')[0].reset();
-        });
-
-        // Copy key handler
-        $('.copy-key').on('click', function() {
-            const publicKey = $('#public-key-text').text();
-            navigator.clipboard.writeText(publicKey)
-                .then(() => alert('Public key copied to clipboard!'));
-        });
-
-        function generateQRCode() {
-            // Use the existing 'player' Gun reciever instance
-            const publicKey = app.user.is?.pub;  // Add optional chaining for safety
-            
-            if (!publicKey) {
-                console.log('Reciever not logged in yet');
-                return;
-            }
-            
-            $('#qr-code').empty();
-            new QRCode(document.getElementById("qr-code"), {
-                text: publicKey,
-                width: 200,
-                height: 200,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H,
-                useSVG: true
+            // Range input handler
+            $('#nodePercentage').on('input', function() {
+                $(this).next('output').text($(this).val() + '%');
             });
-            $('#public-key-text').text(publicKey);
+
+            // Cancel buttons
+            $('.cancel').on('click', function() {
+                $('.node-popup').removeClass('active');
+                $('#addNodeForm')[0].reset();
+            });
+
+            // Copy key handler
+            $('.copy-key').on('click', function() {
+                const publicKey = $('#public-key-text').text();
+                navigator.clipboard.writeText(publicKey)
+                    .then(() => alert('Public key copied to clipboard!'));
+            });
+
+            function generateQRCode() {
+                // Use the existing 'player' Gun reciever instance
+                const publicKey = GunX.user.is.pub;  // Add optional chaining for safety
+                
+                if (!publicKey) {
+                    console.log('Reciever not logged in yet');
+                    return;
+                }
+                
+                $('#qr-code').empty();
+                new QRCode(document.getElementById("qr-code"), {
+                    text: publicKey,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H,
+                    useSVG: true
+                });
+                $('#public-key-text').text(publicKey);
+            }
+
+            // Add keyboard event listener for Escape key
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    const treemap = app?.treemap;  // Get treemap instance from app
+                    const currentView = treemap.getCurrentView();  // Use treemap's method to get current view
+                    
+                    if (currentView && currentView.parent) {
+                        treemap.zoomout(currentView);  // Use treemap's zoomout method directly
+                    }
+                }
+            });
         }
 
-        // Add keyboard event listener for Escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                const treemap = app.treemap;  // Get treemap instance from app
-                const currentView = treemap.getCurrentView();  // Use treemap's method to get current view
-                
-                if (currentView && currentView.parent) {
-                    treemap.zoomout(currentView);  // Use treemap's zoomout method directly
+        // Initial setup for already logged in users
+        if (!GunX.user.is) {
+            document.getElementById('auth-container').style.display = 'block';
+            document.getElementById('auth-form')
+                .addEventListener('submit', handleAuth);
+        } else {
+            // Handle already logged in case
+            (async () => {
+                try {
+                    const { ruzgar } = await initializeExampleData();
+                    app = ruzgar;
+                    console.log('App initialized for logged in user:', app);
+                    setupUIHandlers();
+                } catch (error) {
+                    console.error('Failed to initialize app for logged in user:', error);
                 }
-            }
-        });
+            })();
+        }
     </script>
 </body>
 </html> 

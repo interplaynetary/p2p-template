@@ -2,7 +2,8 @@ import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils.js';
 import { calculateFontSize } from '../utils/fontUtils.js';
 
-export function createTreemap(data, width, height) {
+export function createTreemap(rootNode, width, height) {
+    console.log('Creating treemap with rootNode:', rootNode);
     // State variables for growth animation
     let growthInterval = null;
     let growthTimeout = null;
@@ -21,15 +22,14 @@ export function createTreemap(data, width, height) {
         };
     })();
 
-    const name = d => d.data.ancestors().reverse().map(d => d.name).join(" / ");
+    const name = d => d.data.ancestors.reverse().map(d => d.name).join(" / ");
 
     // Create scales
     const x = d3.scaleLinear().rangeRound([0, width]);
     const y = d3.scaleLinear().rangeRound([0, height]);
 
-    // Create hierarchy
-    let hierarchy = d3.hierarchy(data, d => d.childrenArray)
-        .sum(d => d.data.points)
+    // Create hierarchy from D3Node
+    let hierarchy = d3.hierarchy(rootNode, d => d.childrenArray)
         .each(d => { d.value = d.data.points || 0; });
 
     // Create treemap layout
@@ -56,16 +56,16 @@ export function createTreemap(data, width, height) {
         const availableWidth = x1 - x0;
         const availableHeight = y1 - y0;
         
-        // Ensure values match points
+        // Use points directly from data
         node.children.forEach(child => {
-            child.value = child.data.points || 0;
+            child.value = child.data.points;
         });
         
         // Create a simpler hierarchy object that matches d3's expectations
         const tempRoot = {
             children: node.children.map(child => ({
                 data: child.data,
-                value: child.value
+                value: child.data.points  // Use points directly
             }))
         };
         
@@ -123,9 +123,8 @@ export function createTreemap(data, width, height) {
     }
   
     function render(group, root) {
-      // First, create groups only for nodes with value or root
-      const nodeData = (root.children || []).concat(root);
-
+        const nodeData = root.children ? root.children.concat(root) : [root];
+        
         const node = group
             .selectAll("g")
             .data(nodeData)
@@ -133,7 +132,7 @@ export function createTreemap(data, width, height) {
             .filter(d => d === root || d.value > 0);
 
         node.append("title")
-            .text(d => `${name(d)}\n`);
+            .text(d => d.data.name);  // Use d.data to access D3Node properties
 
         node.selectAll("text").remove();
 
@@ -228,24 +227,18 @@ export function createTreemap(data, width, height) {
             
             // Update current view
             currentView = type;
+            root = type;
             
-            // Clear existing content and recreate group
-            group.selectAll("*").remove();
-            
-            // Create new hierarchy using childrenArray for D3Node
-            hierarchy = d3.hierarchy(type, d => d.childrenArray)
-                .sum(d => d.points)
-                .each(node => {
-                    node.value = node.data.points || 0;
-                });
-            
-            // Apply treemap layout
-            const treemap = d3.treemap().tile(tile);
-            root = treemap(hierarchy);
+            // Update hierarchy to reference new root
+            hierarchy = d3.hierarchy(type, d => d.childrenArray);
+            updateHierarchyValues();
             
             // Reset domains
             x.domain([root.x0, root.x1]);
             y.domain([root.y0, root.y1]);
+            
+            // Clear existing content and recreate group
+            group.selectAll("*").remove();
             
             // Render new view
             render(group, root);
@@ -264,7 +257,7 @@ export function createTreemap(data, width, height) {
     function isInContributorTree() {
         let temp = currentView;
         while (temp) {
-            if (temp.data === data) {
+            if (temp.data === rootNode) {
                 return false;
             }
             temp = temp.parent;
@@ -295,7 +288,7 @@ export function createTreemap(data, width, height) {
                         event.button === 2 : // right click
                         event.touches.length === 2; // two finger touch
 
-                    growthTimeout = setTimeout(() => {
+                    growthTimeout = setTimeout(async () => {
                         // Only start growing/shrinking if still touching the same node
                         if (isTouching && activeNode === d) {
                             isGrowing = true;
@@ -310,21 +303,13 @@ export function createTreemap(data, width, height) {
                                 
                                 // Calculate growth/shrink amount
                                 const rate = isShrinking ? SHRINK_RATE(d) : GROWTH_RATE(d);
-                                const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
+                                const newPoints = Math.max(0, d.data.points + rate);
                                 d.data.setPoints(newPoints);
                                 
-                                // Recompute hierarchy ensuring values match points
-                                hierarchy.sum(node => node.data.points)
-                                    .each(node => {
-                                        // Force value to exactly match points
-                                        node.value = node.data.points || 0;
-                                    });
+                                // Update hierarchy to match data
+                                updateHierarchyValues();
                                 
-                                // Apply treemap
-                                const treemap = d3.treemap().tile(tile);
-                                treemap(hierarchy);
-                                
-                                // Update visualization including type indicators
+                                // Existing transitions
                                 const nodes = group.selectAll("g")
                                     .filter(node => node !== root);
                                 
@@ -369,7 +354,6 @@ export function createTreemap(data, width, height) {
                                         const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
                                         return `translate(${rectWidth - 10}, 10)`;
                                     });
-
                                 // console.log("\nFinal values:");
                                 // console.log("Node points:", d.data.points);
                                 // console.log("Node value:", d.value);
@@ -428,7 +412,7 @@ export function createTreemap(data, width, height) {
             }
         });
 
-        if (root.data.children.size === 0 && root !== data) {  // Check if view is empty and not root
+        if (root.data.children.size === 0 && root !== rootNode) {  // Check if view is empty and not root
             group.append("text")
                 .attr("class", "helper-text")
                 .attr("text-anchor", "middle")
@@ -449,7 +433,7 @@ export function createTreemap(data, width, height) {
                 let temp = d;
                 let isContributorTree = true;
                 while (temp) {
-                    if (temp.data === data) {  // data is the original root passed to createTreemap
+                    if (temp.data === rootNode) {  // data is the original root passed to createTreemap
                         isContributorTree = false;
                         break;
                     }
@@ -469,14 +453,12 @@ export function createTreemap(data, width, height) {
                             group.selectAll("*").remove();
                             
                             // Reset to original data
-                            hierarchy = d3.hierarchy(data, d => d.childrenArray)
-                                .sum(d => d.data.points)
-                                .each(d => { d.value = d.data.points || 0; });
+                            currentView = rootNode;
+                            root = rootNode;
                             
-                            // Apply treemap layout
-                            const treemap = d3.treemap().tile(tile);
-                            root = treemap(hierarchy);
-                            currentView = root;
+                            // Update hierarchy to reference original root
+                            hierarchy = d3.hierarchy(rootNode, d => d.childrenArray);
+                            updateHierarchyValues();
                             
                             // Reset domains
                             x.domain([root.x0, root.x1]);
@@ -534,10 +516,22 @@ export function createTreemap(data, width, height) {
                 .call(position, d.parent));
     }
 
+    // Modify growth/shrink update to work directly with hierarchy
+    function updateHierarchyValues() {
+        // Update hierarchy values to match current data points
+        hierarchy.each(node => {
+            node.value = node.data.points;
+        });
+        
+        // Apply treemap
+        const treemap = d3.treemap().tile(tile);
+        treemap(hierarchy);
+    }
+
     // Return public interface with functions to get current state
     return {
         getCurrentView: () => currentView,
-        getCurrentData: () => data,
+        getCurrentData: () => rootNode,
         element: svg.node(),
         getRoot: () => root,
         zoomin,
