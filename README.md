@@ -20,6 +20,26 @@ Imagine a potluck where pies you bake that you don't need (surplus) helps a neig
 This approach represents a fundamental shift from traditional charity or market-based systems. Instead of asking "What can I get in return?" or "Who deserves my help?", the question becomes "How can my surplus best contribute to a network that supports everyone's self-actualization?" As this network grows, it creates a new kind of economy - one based on recognition, reciprocity, and the understanding that our individual fulfillment is inextricably linked to the fulfillment of others.
 
 ---
+
+## Table of Contents
+- [Introduction](#example-based-introduction)
+- [Proof & Strategy](#proof--strategy)
+  - [Basic Concepts](#let)
+    - [Recognition](#let)
+    - [Recognition as Bandwidth](#being-questioned-recognition-as-bandwidth)
+    - [Subject-Verb-Object](#more-on-subject-verb-object)
+  - [Association Framework](#association)
+    - [Surplus Distribution](#surplus)
+    - [Social Material Truth](#for-any-participant)
+  - [Free Association Requirements](#free-association-requires)
+  - [Transitive Self-Actualization](#on-transitive-self-actualization-and-transitive-self-actualization)
+- [Additional Topics](#additional-topics)
+  - [Comparison with Equity](#how-this-differs-from-equity)
+  - [Capital Relations](#on-capital-relations-and-coercive-relations-in-general-within-free-association)
+  - [State Power](#on-free-association-and-state-power)
+  - [State Free Association](#being-explored-what-if-states-freely-associated)
+- [Current Work](#what-is-being-done)
+
 ## Proof & Strategy:
 
 **Let:**
@@ -127,7 +147,18 @@ This allows us to take control of our own attention. And in a sense allows peopl
 - ∴ ↓Surplus-Associations from Real Contributors
 - ∴ ↓Access to Real Social-Material Coordination via Surplus-Associations from Real Contributors
 - ∴ ↓Real Social-Material Basis for Self-Actualization
-- ∴ social-material-truth is realized through Free Association
+
+∴ social-material-truth is realized through Free Association because also:
+- ∴ ↑True Recognition = ↓False Recognition
+- ∴ ↑Mutual-Recognition with Real Contributors
+- ∴ ↑Surplus-Associations from Real Contributors
+- ∴ ↑Access to Real Social-Material Coordination via Surplus-Associations from Real Contributors
+- ∴ ↑Real Social-Material Basis for Self-Actualization
+
+
+# forums but where users can put any amount of upvotes they want on any given post
+- mutuality: determines the points i see a post has accumulated in terms of %'s of my total social-points
+- shareOfGeneralContribution (including self recognition) = % of my total-points (the social is a multiple of individual-points)
 
 <details>
   <summary><b><i>Click for Example</i></b></summary>

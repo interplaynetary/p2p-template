@@ -173,10 +173,9 @@
 
             try {
                 // Initialize app with proper await
-                const { ruzgar } = await initializeExampleData();
-                
-                console.log('Example data initialized');
-                app = ruzgar;
+                app = new App();  // This will set window.app
+                window.app = app
+                await app.initialize();  // Wait for initialization
                 console.log('App initialized:', app);
 
                 // Only enable UI interactions after app is fully initialized
@@ -230,7 +229,7 @@
             });
 
             // Form submission handler
-            $('#addNodeForm').on('submit', function(e) {
+            $('#addNodeForm').on('submit', async function(e) {
                 e.preventDefault();
                 if (!app) {
                     console.error('App not initialized yet');
@@ -259,7 +258,7 @@
                 const newChild = currentViewData.addChild(name, points);
                 
                 // Update visualizations
-                app?.updateVisualizations();
+                await app?.updateVisualizations();
                 
                 // Close and reset form
                 $('.node-popup').removeClass('active');

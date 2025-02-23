@@ -20,6 +20,7 @@
 [] - create generic treemap for displaying:
     [] - shareOfGeneralFulfillment view: the size of the squares of shareOfGeneralRecognition: the fulfilled is what is recognized as actual!
     [] - One's share of surplus-distribution is based on one's share of one's mutual-self-actualization!
+[] - currently we see parent-children relationships. But lets also show type-parents-of-instances relationships!
 
 # Node
 [] - Are we properly accounting for the share of an instance in a node? (especially when it has multiple types which are contributors) (split the share of that instance between the types)?
@@ -27,6 +28,7 @@
 
 # Organizations
 [] - Right now the code focuses on mutual-recognition between individuals. We should also allow for mutual-recognition between organizations! [resources/leafs.md](resources/leafs.md)
+[] - Delegate a portion of your allocation-power within a category to others!
 
 # P2P
 [] - Gun.js user-space
