@@ -3,7 +3,7 @@ import { getColorForName } from '../utils/colorUtils.js';
 import { calculateFontSize } from '../utils/fontUtils.js';
 
 export function createTreemap(rootNode, width, height) {
-    console.log('Creating treemap with rootNode:', rootNode);
+    // console.log('Creating treemap with rootNode:', rootNode);
     // State variables for growth animation
     let growthInterval = null;
     let growthTimeout = null;
@@ -204,7 +204,7 @@ export function createTreemap(rootNode, width, height) {
         const spacing = circleRadius * 2.5;
         
         // Debug the types data
-        console.log('Types for node:', d.data.name, d.data.types);
+        // console.log('Types for node:', d.data.name, d.data.types);
         
         const circles = container.selectAll("circle")
             .data(d.data.types)

@@ -1,11 +1,16 @@
 // Initialize Gun with SEA
 const SEA = Gun.SEA;
 console.log('Initializing Gun with peer:', ['http://127.0.0.1:5500/gun']);
-const gun = Gun(['http://127.0.0.1:5500/gun']);
+
+/** @type {import('gun').IGunInstance} */
+var gun = Gun(
+  {
+    peers: ['http://127.0.0.1:5500/gun'],
+    localStorage: true
+  })
 
 // Get authenticated user space
 export const user = gun.user();
-console.log('Initial user state:', user.is);
 
 // Authentication helpers with proper error handling
 export const login = async (alias, pass) => {
@@ -25,11 +30,7 @@ export const login = async (alias, pass) => {
       
       try {
         // Clean up old data first
-        await cleanup();
-        
-        // Initialize user space
-        await initializeUserSpace();
-        
+        // await cleanup();        
         resolve(ack);
       } catch (err) {
         console.error('Error during login setup:', err);
@@ -67,11 +68,27 @@ export const isAuthenticated = () => {
 };
 
 export const cleanup = async () => {
-  if (!user.is) return;
-  await Promise.all([
-      new Promise(r => user.get('nodes').put(null, r)),
-      new Promise(r => user.get('types').put(null, r))
-  ]);
+    if (!user.is) return;
+    console.log('Cleaning up user data...');
+    await Promise.all([
+        new Promise(r => {
+            console.log('Clearing nodes...');
+            user.get('nodes').once(data => console.log('Current nodes before cleanup:', data));
+            user.get('nodes').put(null, (ack) => {
+                console.log('Nodes cleanup ack:', ack);
+                r();
+            });
+        }),
+        new Promise(r => {
+            console.log('Clearing types...');
+            user.get('types').once(data => console.log('Current types before cleanup:', data));
+            user.get('types').put(null, (ack) => {
+                console.log('Types cleanup ack:', ack);
+                r();
+            });
+        })
+    ]);
+    console.log('Cleanup complete');
 };
 
 // Helper to get encrypted paths
@@ -104,31 +121,8 @@ export const getTypesGraph = async () => {
   return path ? user.get(path) : null;
 };
 
-export const initializeUserSpace = async () => {
-    console.log('Initializing user space...');
-    
-    // Create root node data with Gun-friendly objects
-    const rootData = {
-        id: user.is.pub,
-        name: user.is.alias,
-        parentId: null,
-        childrenIds: {},  // Empty object instead of array
-        typeIds: {},      // Empty object instead of array
-        points: 0,
-        totalChildPoints: 0,
-        isContributor: true,
-        _manualFulfillment: null
-    };
-
-    // Initialize both graphs
-    user.get('nodes').get(user.is.pub).put(rootData);
-    user.get('types').put({});
-    
-    return rootData;
-};
-
 // Add database inspection helper
-export const inspectDatabase = () => {
+export const inspectDatabase = async () => {
     return new Promise((resolve) => {
         user.get('nodes').once((nodes) => {
             console.log('Current Gun Database State:', {
@@ -138,15 +132,4 @@ export const inspectDatabase = () => {
             resolve(nodes);
         });
     });
-};
-
-// Usage example:
-export const debugSave = async (nodeId, data) => {
-    console.log('Before save:');
-    await inspectDatabase();
-    
-    await user.get('nodes').get(nodeId).put(data);
-    
-    console.log('After save:');
-    await inspectDatabase();
 };

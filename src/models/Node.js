@@ -1,7 +1,5 @@
-//import { Store } from './Store.js';
-
 export class Node {
-  constructor(name, parent = null, types = [], id = null) {
+  constructor(name, parent = null, types = [], id = null, manualFulfillment = null) {
     this.name = name;
     this.id = id || crypto.randomUUID();
     this.parent = parent;
@@ -16,9 +14,6 @@ export class Node {
     // Map of type -> Set of instances
     this.typeIndex = parent ? this.root.typeIndex : new Map();
     
-    // Initialize store first
-    //this.store = parent ? this.root.store : new Store();
-    
     // Initialize update flag
     if (!parent) {
       this.updateNeeded = false;
@@ -27,18 +22,14 @@ export class Node {
     // Then add types after store is ready
     if (types.length > 0) {
       // Use Promise.all to handle async type additions
-      Promise.all(types.map(type => this.addInitialTypes(type)))
+      Promise.all(types.map(type => this.addInitialType(type)))
         .catch(err => console.error('Error adding types:', err));
     }
   }
 
-  delete() {
-    //return this.store.removeNode(this);;
-  }
-
   // Persistence transformations
   toGun() {
-    console.log('Converting node to Gun format:', this.name); // Add logging
+    // console.log('Converting node to Gun format:', this.name); // Add logging
     
     const data = {
         id: this.id,
@@ -67,7 +58,7 @@ export class Node {
         }
     });
 
-    console.log('Converted data:', data); // Add logging
+    // console.log('Converted data:', data); // Add logging
     return data;
   }
 
@@ -75,22 +66,26 @@ export class Node {
     const node = new Node(data.name, null, [], data.id);
     node.points = data.points || 0;
     node.isContributor = data.isContributor || false;
-    
-    // Handle _manualFulfillment properly
     node._manualFulfillment = data._manualFulfillment?.value ?? null;
     
-    // Convert Gun object format back to arrays
-    const typeIds = data.typeIds ? Object.keys(data.typeIds) : [];
-    const childrenIds = data.childrenIds ? Object.keys(data.childrenIds) : [];
-    
-    // Store for later relationship resolution
+    // Store ALL relationships for later resolution
     store.pendingRelations.push({
         node,
         parentId: data.parentId,
-        typeIds
+        typeIds: Object.keys(data.typeIds || {}),
+        childrenIds: Object.keys(data.childrenIds || {})  // Include children!
     });
-    
     return node;
+  }
+
+  save() {
+    if (this.root.store) {
+      this.root.store.saveQueue.add(this);
+    }
+  }
+
+  delete() {
+    this.root.store.removeNode(this);
   }
 
   get root() {
@@ -102,28 +97,24 @@ export class Node {
     return Array.from(this.root.typeIndex.keys());
   }
 
-  addInitialTypes(type) {
-    //if (!this.store) return; // Guard against missing store
-    
+  // Add this node as an instance of the given type
+  addInitialType(type) {
     const root = this.root;
     if (!root.typeIndex.has(type)) {
       root.typeIndex.set(type, new Set());
     }
     root.typeIndex.get(type).add(this);
-
-    // Add to node's types Set
     this.types.add(type);
-
+    
     if (type.isContributor) {
       this.isContributor = true;
     }
-    return this; 
+    return this;
   }
+
 
   // Add this node as an instance of the given type
   addType(type) {
-    //if (!this.store) return this;
-    
     const root = this.root;
     if (!root.typeIndex.has(type)) {
       root.typeIndex.set(type, new Set());
@@ -134,7 +125,8 @@ export class Node {
     if (type.isContributor) {
       this.isContributor = true;
     }
-    
+    this.save();
+    this.root.updateNeeded = true;
     return this;
   }
 
@@ -153,22 +145,26 @@ export class Node {
     } else {
       this.isContributor = Array.from(this.types).some(t => t.isContributor);
     }    
+    this.save();
+    this.root.updateNeeded = true;
     return this;
   }
 
-  addChild(name, points = 0, types = []) {
+  addChild(name, points = 0, types = [], id, manualFulfillment = null) {
     if (this.parent && this.isContributor) {
       throw new Error(
         `Node ${this.name} is an instance of a contributor and cannot have children.`
       );
     }
 
-    const child = new Node(name, this, types);
+    const child = new Node(name, this, types, id, manualFulfillment);
 
     this.children.set(name, child);
     if (points > 0) {
       child.setPoints(points);
     }
+    this.save();
+    this.root.updateNeeded = true;
     return child;
   }
 
@@ -186,12 +182,15 @@ export class Node {
       // Remove from children
       this.children.delete(name);
     }
+    this.save();
+    this.root.updateNeeded = true;
     return this;
   }
 
   setPoints(points) {
-    console.log('Setting points for', this.name, points);
+    // console.log('Setting points for', this.name, points);
     this.points = points;
+    this.save();
     this.root.pieUpdateNeeded = true;
     return this;
   }
@@ -322,11 +321,13 @@ export class Node {
         throw new Error('Fulfillment must be between 0 and 1');
       }
       this._manualFulfillment = value;
+      this.save();
       return this;
     };
 
   clearFulfillment() {
     this._manualFulfillment = null;
+    this.save();
     return this;
   };
 

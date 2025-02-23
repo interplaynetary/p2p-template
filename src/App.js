@@ -1,7 +1,9 @@
 import * as GunX from './models/Gun.js';
 import { Node } from './models/Node.js';
+import { Store } from './models/Store.js';
 import { createTreemap } from './visualizations/TreeMap.js';
 import { createPieChart } from './visualizations/PieChart.js';
+import { initializeExampleData } from './example.js';
 
 export class App extends Node {
     constructor() {
@@ -16,35 +18,50 @@ export class App extends Node {
             [], 
             GunX.user.is.pub
         );
-        console.log('App super() completed');
-        console.log('Initial children count:', this.children.size);
-        console.log('Initial children:', Array.from(this.children.entries()));
 
-        console.log('App constructor completed');
+        // Initialize store first
+        this.store = new Store(this);
         
-        // Initialize both update flags
+        // Make app instance available globally
+        window.app = this;
+    }
+
+    // New method to properly initialize app
+    async initialize() {
+        console.log('Starting app initialization...');
+        
+        // Wait for store to fully sync and load existing data
+        const nodesLoaded = await this.store.sync();
+        console.log('Store sync complete, loaded', nodesLoaded, 'nodes');
+        console.log('App initialized with', this.children.size, 'children');
+        
+        // Now that sync is complete, check if we need example data
+        if (this.children.size === 0) {
+            console.log('No existing data found, initializing example data...');
+            await initializeExampleData();
+        }
+        
+        // Initialize visualization
         this.updateNeeded = true;
         this.pieUpdateNeeded = true;
         this.init();
         
-        // Start update cycle with separate checks
+        // Start update cycle
         this.updateInterval = setInterval(() => {
             if (this.updateNeeded) {
                 console.log('Tree update needed, refreshing visualizations');
-                this.updateTreeMap();
-                this.updateNeeded = false;
+                try {
+                    this.updateTreeMap();
+                } finally {
+                    this.updateNeeded = false;
+                }
             }
             if (this.pieUpdateNeeded) {
                 console.log('Pie update needed, refreshing pie chart');
                 this.updatePieChart();
                 this.pieUpdateNeeded = false;
             }
-        }, 60);  // Check every 60ms
-        
-
-
-        // Add debug command to window
-        window.inspectGun = () => this.inspectGunState();
+        }, 60);
     }
 
     init() {
@@ -101,7 +118,7 @@ export class App extends Node {
         this.treemap.update(width, height);
     }
 
-    updateVisualizations() {
+    async updateVisualizations() {
         console.log('App.updateVisualizations called');
         if (!this.treemap) {
             console.log('Treemap not initialized yet');
@@ -113,8 +130,11 @@ export class App extends Node {
             console.log('Children before update:', Array.from(this.children.entries()));
             
             if (this.updateNeeded) {
-                this.updateTreeMap();
-                this.updateNeeded = false;
+                try {
+                    this.updateTreeMap();
+                } finally {
+                    this.updateNeeded = false;
+                }
             }
             if (this.pieUpdateNeeded) {
                 this.updatePieChart();
@@ -173,20 +193,6 @@ export class App extends Node {
         pieContainer.innerHTML = '';
         const newPieChart = createPieChart(this);
         pieContainer.appendChild(newPieChart);
-    }
-
-    // New method to save entire tree
-    async saveTree() {
-        /*
-        // Save all dirty nodes
-        const dirtyNodes = this.descendants().filter(node => node.isDirty);
-        if (dirtyNodes.length > 0) {
-            console.log('Saving dirty nodes:', dirtyNodes.map(n => ({
-                name: n.name,
-                changes: n.pendingChanges
-            })));
-            await Promise.all(dirtyNodes.map(node => node.save()));
-        }*/
     }
 
     // Cleanup
