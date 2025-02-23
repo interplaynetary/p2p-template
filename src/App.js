@@ -28,6 +28,7 @@ export class App extends Node {
 
     // New method to properly initialize app
     async initialize() {
+        this.initalizing = true
         console.log('Starting app initialization...');
         
         // Wait for store to fully sync and load existing data
@@ -45,6 +46,7 @@ export class App extends Node {
         this.updateNeeded = true;
         this.pieUpdateNeeded = true;
         this.init();
+
         
         // Start update cycle
         this.updateInterval = setInterval(() => {
@@ -91,7 +93,7 @@ export class App extends Node {
         window.addEventListener('resize', this.handleResize.bind(this));
 
         console.log('App init completed');
-
+        this.initalizing = false
     }
 
     get currentView() {

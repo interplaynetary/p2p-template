@@ -22,7 +22,7 @@ export class Node {
     // Then add types after store is ready
     if (types.length > 0) {
       // Use Promise.all to handle async type additions
-      Promise.all(types.map(type => this.addInitialType(type)))
+      Promise.all(types.map(type => this.addType(type)))
         .catch(err => console.error('Error adding types:', err));
     }
   }
@@ -79,13 +79,15 @@ export class Node {
   }
 
   save() {
-    if (this.root.store) {
+    if (this.root.store && !this.root.initalizing) {
       this.root.store.saveQueue.add(this);
     }
   }
 
   delete() {
-    this.root.store.removeNode(this);
+    if (this.root.store && !this.root.initalizing) {
+      this.root.store.removeNode(this);
+    }
   }
 
   get root() {
@@ -96,22 +98,6 @@ export class Node {
   get rootTypes() {
     return Array.from(this.root.typeIndex.keys());
   }
-
-  // Add this node as an instance of the given type
-  addInitialType(type) {
-    const root = this.root;
-    if (!root.typeIndex.has(type)) {
-      root.typeIndex.set(type, new Set());
-    }
-    root.typeIndex.get(type).add(this);
-    this.types.add(type);
-    
-    if (type.isContributor) {
-      this.isContributor = true;
-    }
-    return this;
-  }
-
 
   // Add this node as an instance of the given type
   addType(type) {
@@ -126,7 +112,7 @@ export class Node {
       this.isContributor = true;
     }
     this.save();
-    this.root.updateNeeded = true;
+    this.root.initalizing ? this.root.updateNeeded = true : null
     return this;
   }
 
