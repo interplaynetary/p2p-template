@@ -18,7 +18,7 @@ export class App extends Node {
             [], 
             GunX.user.is.pub
         );
-
+        
         // Initialize store first
         this.store = new Store(this);
         
@@ -39,14 +39,13 @@ export class App extends Node {
         // Now that sync is complete, check if we need example data
         if (this.children.size === 0) {
             console.log('No existing data found, initializing example data...');
-            await initializeExampleData();
+            await initializeExampleData(this);
         }
         
         // Initialize visualization
         this.updateNeeded = true;
         this.pieUpdateNeeded = true;
         this.init();
-
         
         // Start update cycle
         this.updateInterval = setInterval(() => {
@@ -93,7 +92,7 @@ export class App extends Node {
         window.addEventListener('resize', this.handleResize.bind(this));
 
         console.log('App init completed');
-        this.initalizing = false
+        this.initializing = false
     }
 
     get currentView() {

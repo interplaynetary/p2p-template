@@ -51,6 +51,7 @@ What makes this system powerful is its unification of concepts. Everything flows
 
 // TODO: secure the Council class's properties from being accessed improperly!
 // TODO: make better bootstrapping.
+// TODO: add a method to delete proposals! Or to hide them from the UI!
 
 class Delegate {
     constructor(name, mandate, from, to) {
@@ -200,7 +201,8 @@ class Council {
 
     // Getter for proposals - returns a copy of the proposals array
     get proposals() {
-        return this.#proposals.map(proposal => ({ ...proposal }));
+        // Return the actual proposal objects instead of spreading them
+        return [...this.#proposals];
     }
 
     addProposal(description, actions = new Map()) {
@@ -214,7 +216,7 @@ class Council {
         });
 
         this.#proposals.push(proposal);
-        console.log(`Proposal "${description}" added to ${this.#name}`);
+        //console.log(`Proposal "${description}" added to ${this.#name}`);
         return proposal;
     }
 
@@ -228,7 +230,10 @@ class Council {
             console.log(`${voter.name} is not a member or delegate from a member of ${this.#name}`);
             return;
         }
+
+        // Use the proposal's castVote method
         proposal.castVote(voter, decision);
+        console.log(`${voter.name} votes ${decision} on proposal: ${proposal.description}`);
     }
 
     addMember(member) {
@@ -347,7 +352,7 @@ class Council {
                 
                 // If proposal is complete and was rejected, consider revoking membership
                 if (status.completed && !status.accepted) {
-                    console.log(`Warning: ${council.name} rejected proposal "${description}"`);
+                    //console.log(`Warning: ${council.name} rejected proposal "${description}"`);
                     // Could trigger membership review process
                 }
             }
@@ -382,26 +387,9 @@ class Council {
         for (const proposal of this.#proposals) {
             const currentVotes = proposal.getCurrentVotes();
             
-            // Add debugging for delegates
-            console.log('Calculating delegate voting power. Current delegates:', 
-                this.#delegates.map(d => ({
-                    name: d.proxy.name,
-                    mandate: {
-                        description: d.proxy.mandate.description,
-                        votes: Array.from(d.proxy.mandate.votes.entries()),
-                        supporters: d.proxy.mandate.supporters
-                    }
-                }))
-            );
-            
             // Calculate total voting power from both delegates and regular members
             const delegateVotingPower = this.#delegates
                 .reduce((sum, delegate) => {
-                    console.log('Processing delegate:', {
-                        name: delegate.proxy.name,
-                        mandate: delegate.proxy.mandate,
-                        supporters: delegate.proxy.mandate.supporters
-                    });
                     return sum + (delegate.proxy.mandate.supporters?.length || 0);
                 }, 0);
                 
@@ -411,27 +399,28 @@ class Council {
             const quorum = totalVotingPower * 0.5;
 
             const status = {
-                proposal: proposal.description,
+                proposal: proposal,  // Pass the entire proposal object
+                description: proposal.description,
                 votes: currentVotes,
                 totalVotingPower,
                 quorum,
-                isApproved: currentVotes.yes > quorum
+                isApproved: currentVotes.yes >= quorum
             };
 
             yield status;
 
             if (status.isApproved) {
-                console.log(`Proposal "${proposal.description}" is approved.`);
-                this.#execute(proposal);  // Execute the approved proposal's actions
+                //console.log(`Proposal "${status.proposal.description}" is approved.`);
+                this.#execute(status.proposal);  // Execute the approved proposal's actions
                 
                 // Send to member councils and track their responses
                 const memberProposals = await Promise.all(this.#members
                     .filter(member => member instanceof Council)  // Only process council members
                     .map(async member => {
-                        const actions = proposal.getActionsForCouncil(member.proxyRef);
+                        const actions = status.proposal.getActionsForCouncil(member.proxyRef);
                         if (actions) {
                             const memberProposal = await member.addProposal(
-                                proposal.description,
+                                status.proposal.description,
                                 new Map([[member, actions]])
                             );
                             return { council: member, proposal: memberProposal };
@@ -447,9 +436,23 @@ class Council {
                     this.#pendingResponses.get(council).set(proposal.description, proposal);
                 });
             } else {
-                console.log(`Proposal "${proposal.description}" is not approved.`);
+                //console.log(`Proposal "${status.proposal.description}" is not approved.`);
             }
         }
+    }
+
+    getMethods() {
+        // Get all methods from the prototype
+        const prototypeMethods = Object.getOwnPropertyNames(Council.prototype)
+            .filter(prop => prop !== 'constructor')
+            .filter(prop => typeof Council.prototype[prop] === 'function');
+
+        // Get all methods directly on the instance
+        const instanceMethods = Object.getOwnPropertyNames(this)
+            .filter(prop => typeof this[prop] === 'function');
+
+        // Combine and deduplicate
+        return [...new Set([...prototypeMethods, ...instanceMethods])];
     }
 }
 
@@ -465,7 +468,8 @@ function createCouncil(name) {
         'addProposal',
         'castVote',
         'bootstrap',
-        'processProposals'
+        'processProposals',
+        'getMethods'
     ]);
 
     // Define properties that should be accessed directly (not bound)
@@ -568,7 +572,7 @@ async function main() {
     for await (const status of councilA.processProposals()) {
         console.log('Proposal status:', status);
         if (status.isApproved) {
-            console.log(`Mandate proposal "${status.proposal}" is approved.`);
+            //console.log(`Mandate proposal "${status.proposal.description}" is approved.`);
             // Let the processProposals method handle the execution
             // The delegate will be created after this iteration
         }
@@ -692,3 +696,5 @@ async function testVotingScenarios() {
 
 // Run the tests
 testVotingScenarios().catch(console.error);
+
+export { createCouncil };

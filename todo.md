@@ -69,3 +69,27 @@
 [] - clicking contributor makes it the new root?
     (so you can see the tree from their perspective)
     (but your perspective is retained (your perspective of their perspective))
+
+
+// TO DO:
+// - add a way for nodes to be saved also in the public space! (so we can have shared-nodes in our trees)
+// recursive saves!
+// - add a way for nodes to be saved also in the public space! (so we can have shared-nodes in our trees)
+// And so that nodes can store space-time-data
+// Add type indexing rebuilding
+
+/*
+// NEW CODE: Check if this node has children
+if (childData.childrenIds && typeof childData.childrenIds === 'object') {
+    const grandchildIds = Object.keys(childData.childrenIds)
+        .filter(id => id !== '_' && !loadedNodes.has(id));
+    
+    if (grandchildIds.length > 0) {
+        console.log(`Node ${childData.name} has ${grandchildIds.length} children to load`);
+        // Add these IDs to our list of nodes to load
+        childIds.push(...grandchildIds);
+    }
+}
+
+lodadedCount++
+*/

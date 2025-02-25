@@ -3,9 +3,7 @@ import { Node } from './models/Node.js';
 import { App } from './App.js';
 
 // Export the initialization function
-export async function initializeExampleData() {
-
-        const ruzgar = new App('ruzgar');
+export async function initializeExampleData(app) {
 
         // Initialize data structure
         const environmentalist = new Node('environmentalist');
@@ -18,7 +16,7 @@ export async function initializeExampleData() {
         const alice = new Node('alice', null, [researcher]);  // is a contributor
 
         // 1. Material Needs & Dependencies
-        const space = await ruzgar.addChild("Space & Environment", 25);
+        const space = await app.addChild("Space & Environment", 25);
 
         // Space & Environment children
         const indoorSpace = await space.addChild("Indoor/Outdoor Space", 15);
@@ -34,19 +32,19 @@ export async function initializeExampleData() {
         const infrastructure = await indoorSpace.addChild("Infra(de)structure & Bottom-secret Spaces", 25);
 
         // Main Categories with their percentage weights
-        const subverse = await ruzgar.addChild("Subverse 🌌", 25);
+        const subverse = await app.addChild("Subverse 🌌", 25);
 
         const magicalTech = await subverse.addChild("Magical Technologies & Systems", 25);
         const substances = await subverse.addChild("Transformative Substances", 20);
         const realityHacking = await subverse.addChild("Reality Hacking & Manifestation", 20);
         const loreSystem = await subverse.addChild("Lore & Knowledge Systems", 10);
 
-        const money = await ruzgar.addChild("Money", 10)
-        const freeAssociation = await ruzgar.addChild("Free Association", 10)
+        const money = await app.addChild("Money", 10)
+        const freeAssociation = await app.addChild("Free Association", 10)
 
-        const automation = await ruzgar.addChild("Automation of Useful-repetitive Tasks", 10)
-        const commons = await ruzgar.addChild("Socialization of Land & Means of Production", 10)
-        const property = await ruzgar.addChild("Maintaining Personal Property Relations", 10)
+        const automation = await app.addChild("Automation of Useful-repetitive Tasks", 10)
+        const commons = await app.addChild("Socialization of Land & Means of Production", 10)
+        const property = await app.addChild("Maintaining Personal Property Relations", 10)
         const securingLaptop = await property.addChild("Securing my Laptop", 10)
         const securingBackpack = await property.addChild("Securing my Backpack", 10)
 
@@ -129,26 +127,26 @@ export async function initializeExampleData() {
         const crimeLords = await loreSystem.addChild("Alien Crime Lords", 7, [whalewatch, clownsWithoutBorders]);
         const ballerinas = await loreSystem.addChild("Sci-fi Ballerinas", 6, [alice, educator]);
 
-        // whalewatch's recognition of ruzgar
+        // whalewatch's recognition of app
         const whalewatchgive = await whalewatch.addChild('🌳 give', 80);
         const whalewatchrecieve = await whalewatch.addChild('recieve', 80);
         const whalewatchpotential = await whalewatchgive.addChild('🔮 potential', 40);
-        const ruzgarInwhalewatchpotential = await whalewatchpotential.addChild('ruzgar', 15, [ruzgar]);
+        const appInwhalewatchpotential = await whalewatchpotential.addChild(app.name, 15, [app]);
 
-        // alice's recognition of ruzgar
+        // alice's recognition of app
         const alicegive = await alice.addChild('🌳 give', 80);
         const alicepotential = await alicegive.addChild('🔮 potential', 40);
-        const ruzgarInalicepotential = await alicepotential.addChild('ruzgar', 15, [ruzgar]);
+        const appInalicepotential = await alicepotential.addChild(app.name, 15, [app]);
 
-        // clownsWithoutBorders's recognition of ruzgar
+        // clownsWithoutBorders's recognition of app
         const clownsWithoutBordersgive = await clownsWithoutBorders.addChild('🌳 give', 80);
         const clownsWithoutBorderspotential = await clownsWithoutBordersgive.addChild('🔮 potential', 40);
-        const ruzgarInclownsWithoutBorderspotential = await clownsWithoutBorderspotential.addChild('ruzgar', 15, [ruzgar]);
+        const appInclownsWithoutBorderspotential = await clownsWithoutBorderspotential.addChild(app.name, 15, [app]);
 
 
     // Return the root node and any other important references
     return {
-        ruzgar,
+        app,
         whalewatch,
         alice,
         clownsWithoutBorders,

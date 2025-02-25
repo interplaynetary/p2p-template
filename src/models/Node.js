@@ -6,7 +6,7 @@ export class Node {
     this.points = 0;
     this.children = new Map();
     this.isContributor = !this.parent;
-    this._manualFulfillment = null;
+    this._manualFulfillment = manualFulfillment;
     
     // Initialize types as a Set
     this.types = new Set(types);
@@ -79,7 +79,7 @@ export class Node {
   }
 
   save() {
-    if (this.root.store && !this.root.initalizing) {
+    if (this.root.store /*&& !this.root.initalizing*/) {
       this.root.store.saveQueue.add(this);
     }
   }

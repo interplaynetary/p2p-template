@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ruzgar</title>
+    <!-- Move styles to separate CSS file -->
+    <link rel="stylesheet" href=" ../styles/main.css">
+    <style>
+        .visualization-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #treemap-container {
+            flex: 3;
+            min-height: 600px;
+            border: 1px solid #ccc;
+            margin-right: 20px;
+        }
+
+        #pie-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 300px;
+        }
+
+        #pie-container {
+            flex: 1;
+            min-height: 300px;
+            border: 1px solid #ccc;
+            margin: 20px 0;
+        }
+
+        .drop-zone {
+            height: 50px;
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main visualization container -->
+    <div class="visualization-container">
+        <div id="treemap-container"></div>
+        <div id="pie-section">
+            <div class="drop-zone top-right" data-form="addNode">
+                <span class="cycle-text">Add Value</span>
+            </div>
+            <div id="pie-container">
+            </div>
+            <div class="drop-zone bottom-left" data-form="revealQR">
+                <span>Peer</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup forms container at document level -->
+    <div class="node-popup">
+        <div class="node-popup-content">
+            <!-- Add Node Form -->
+            <form id="addNodeForm" class="popup-form">
+                <h2>Add New Node</h2>
+                <div class="form-group">
+                    <label for="nodeName">Name:</label>
+                    <input type="text" id="nodeName" required>
+                </div>
+                <div id="percentageGroup" class="form-group" style="display: none;">
+                    <label for="nodePercentage">Desired Percentage:</label>
+                    <input type="range" id="nodePercentage" min="1" max="100" value="10">
+                    <output for="nodePercentage">10%</output>
+                </div>
+                <div class="form-buttons">
+                    <button type="submit" class="primary">Add Node</button>
+                    <button type="button" class="cancel">Cancel</button>
+                </div>
+            </form>
+
+            <!-- Reveal QR Form -->
+            <form id="revealQRForm" class="popup-form" style="display: none;">
+                <h2>Your Public Key</h2>
+                <div class="qr-display">
+                    <div id="qr-code"></div>
+                    <div id="public-key-text"></div>
+                </div>
+                <div class="form-buttons">
+                    <button type="button" class="copy-key">Copy Key</button>
+                    <button type="button" class="cancel">Close</button>
+                </div>
+            </form>
+
+            <!-- Give Surplus Form -->
+            <form id="giveSurplusForm" class="popup-form" style="display: none;">
+                <h2>Give Surplus to Direct/Transitive-Mutual-Self-Fulfillment</h2>
+                <div class="form-buttons">
+                    <button type="button" class="give-surplus">Give Surplus</button>
+                    <button type="button" class="cancel">Close</button>
+                </div>
+            </form>
+
+            <!-- Inventory Form -->
+            <form id="inventoryForm" class="popup-form" style="display: none;">
+                <h2>Inventory Management</h2>
+                <div class="inventory-list">
+                    <!-- Inventory items will be dynamically populated here -->
+                </div>
+                <div class="form-buttons">
+                    <button type="button" class="update-inventory">Update</button>
+                    <button type="button" class="cancel">Close</button>
+                </div>
+            </form>
+
+            <!-- Create Relation Form -->
+            <form id="createRelationForm" class="popup-form" style="display: none;">
+                <h2>New Relation</h2>
+                <div class="form-group">
+                    <h3>Provider</h3>
+                    <label for="providerRoleName">Role Name:</label>
+                    <input type="text" id="providerRoleName" required>
+                </div>
+                <div class="form-group">
+                    <h3>Reciever</h3>
+                    <label for="recieverRoleName">Role Name:</label>
+                    <input type="text" id="recieverRoleName" required>
+                </div>
+                <div class="form-buttons">
+                    <button type="submit" class="create">Create Relation</button>
+                    <button type="button" class="cancel">Close</button>
+                </div>
+            </form>
+
+            <!-- Add pie menu popup form -->
+            <form id="pieMenuForm" class="popup-form" style="display: none;">
+                <h2>Actions</h2>
+                <div class="menu-buttons">
+                    <button type="button" class="menu-button" data-form="inventory">
+                        <span class="emoji">🎒</span>
+                    </button>
+                    <button type="button" class="menu-button" data-form="createRelation">
+                        <span>Relation</span>
+                    </button>
+                    <button type="button" class="menu-button" data-form="giveSurplus">
+                        <span>Give Surplus</span>
+                    </button>
+                </div>
+                <div class="form-buttons">
+                    <button type="button" class="cancel">Close</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- External Dependencies -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- Gun Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/examples/jquery.js"></script>
+    <script>
+        // Ensure SEA and Gun.user are properly initialized
+        var SEA = Gun.SEA;
+        if (!Gun.user) {
+            Gun.user = function() {
+                // Copy the instance method to the constructor
+                return Gun.prototype.user.apply(this, arguments);
+            }
+        }
+    </script>
+    <script type="importmap">
+    {
+        "imports": {
+            "d3": "https://cdn.jsdelivr.net/npm/d3@7/+esm"
+        }
+    }
+    </script>
+    <!-- Main Application Code -->
+    <script type="module">
+        import { Visualization } from './GunViz.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.log('DOM loaded, starting initialization...');
+                
+                // Check Gun initialization
+                console.log('Checking Gun initialization...', {
+                    GunExists: typeof Gun === 'function',
+                    GunUser: typeof Gun.user === 'function',
+                    SEAExists: typeof Gun.SEA === 'object',
+                    SEAAuth: typeof Gun.SEA?.auth === 'function'
+                });
+
+                // Create Gun instance
+                const gun = Gun(['http://127.0.0.1:5500/gun']);
+
+                // Test user functionality
+                const testUser = gun.user();
+                console.log('Testing user functionality:', {
+                    instanceUser: typeof gun.user === 'function',
+                    staticUser: typeof Gun.user === 'function',
+                    userExists: !!testUser,
+                    userAuth: typeof testUser?.auth === 'function',
+                    userCreate: typeof testUser?.create === 'function'
+                });
+
+                console.log('Creating Visualization instance...');
+                const ruzgar = new Visualization(gun, 'test', 'testpassword123');
+                console.log('Visualization instance created, waiting for init...');
+                
+                try {
+                    await ruzgar.waitForInit();
+                    console.log('Visualization initialized successfully');
+                    
+                    console.log('Creating initial structure...');
+                    try {
+                        console.log('Adding Space & Environment node...');
+                        const space = await ruzgar.addChild("Space & Environment", 25);
+                        console.log('Space node created:', space);
+
+                        console.log('Adding children to Space node...');
+                        const children = await Promise.all([
+                            space.addChild("Indoor/Outdoor Space", 15),
+                            space.addChild("Comfortable Seating", 15),
+                            space.addChild("Lighting", 12),
+                            space.addChild("Temperature Control", 12),
+                            space.addChild("Bathroom Access", 12),
+                            space.addChild("Water Access", 12),
+                            space.addChild("Cleaning Supplies", 11),
+                            space.addChild("Trash/Recycling", 11)
+                        ]);
+                        console.log('Children added:', children);
+                    } catch (structureError) {
+                        console.error('Error creating structure:', structureError);
+                        throw structureError;
+                    }
+                } catch (initError) {
+                    console.error('Error in initialization:', initError);
+                    throw initError;
+                }
+
+                // Store reference for debugging
+                window.app = ruzgar;
+                console.log('Initialization complete, app ready');
+                
+            } catch (error) {
+                console.error('Error in application initialization:', error);
+            }
+        });
+    </script>
+</body>
+</html> 

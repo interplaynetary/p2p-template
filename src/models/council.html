@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Council Settings</title>
+    <link rel="stylesheet" href="council.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Settings</h1>
+        <div class="controls">
+            <select id="councilSelect" onchange="window.loadCouncilData()">
+                <option value="">Select Council</option>
+            </select>
+            <select id="memberSelect" onchange="window.selectMember()">
+                <option value="">Select Member</option>
+            </select>
+            <button class="add-proposal" onclick="window.addProposal()">+</button>
+        </div>
+    </div>
+
+    <div id="proposals" class="proposals">
+        <!-- Proposals will be dynamically added here -->
+    </div>
+
+    <!-- Add this modal HTML just before the script tag -->
+    <div id="proposalModal" class="modal">
+        <div class="modal-content">
+            <h2>New Proposal</h2>
+            <form id="proposalForm">
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea id="description" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Actions:</label>
+                    <div class="action-inputs">
+                        <select id="actionType">
+                            <option value="">Select Action Type</option>
+                            <option value="addMember">Add Member</option>
+                            <option value="electDelegate">Elect Delegate</option>
+                            <option value="addProposal">Add Proposal</option>
+                            <option value="castVote">Cast Vote</option>
+                        </select>
+                        
+                        <!-- Dynamic fields based on action type -->
+                        <div id="actionFields" class="hidden">
+                            <!-- Fields will be dynamically added here -->
+                        </div>
+                        
+                        <button type="button" id="addAction">+ Add</button>
+                    </div>
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="submit">Create Proposal</button>
+                    <button type="button" onclick="closeProposalModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createCouncil } from '../models/Council.js';
+
+        let currentCouncil = null;
+        let currentMember = null;  // Add this to track current member
+        let councils = new Map();
+        let proposalActions = [];
+
+        // Initialize with some test councils
+        async function initializeTestData() {
+            // Create test councils
+            const councilA = createCouncil('Workers Council');
+            const councilB = createCouncil('Farmers Council');
+
+            // Bootstrap councils
+            const bootstrapA = councilA.bootstrap();
+            const member1 = bootstrapA.addMember('Worker 1');
+            const member2 = bootstrapA.addMember('Worker 2');
+            const member3 = bootstrapA.addMember('Worker 3');
+            
+            const bootstrapB = councilB.bootstrap();
+            const memberB1 = bootstrapB.addMember('Farmer 1');
+            const memberB2 = bootstrapB.addMember('Farmer 2');
+
+            // Store councils with their members
+            councils.set('councilA', {
+                council: councilA,
+                members: [member1, member2, member3]
+            });
+            councils.set('councilB', {
+                council: councilB,
+                members: [memberB1, memberB2]
+            });
+
+            // Add constitutional proposals
+            const proposals = [
+                "Create a network of freely-associating autonomous regions, united through mutual cooperation and shared democratic principles.",
+                "Transition land, natural resources, infrastructure, and large-scale agricultural operations to community stewardship for common benefit.",
+                "Transfer industrial infrastructure (factories, transportation, energy) to democratic worker control through a coordinated economic system based on free-association.",
+                "Cancel all debt held by previous power structures and financial institutions to enable economic reset.",
+                "Restructure the banking system under democratic community control to serve common interests rather than private profit.",
+                "Ensure community security through universal training and democratic control of defense forces, preventing power concentration.",
+                "Ensure media independence through community ownership of communication infrastructure.",
+                "Provide accessible community spaces with modern facilities for public gatherings and democratic participation.",
+                "Provide community workshops, shared resources, and democratic access to creative spaces.",
+                "Establish a network of freely-associating community health centers combining preventive care, traditional wisdom, and modern medicine.",
+                "Establish a network of freely-associating community educational centers providing universal and free education, combining practical skills, critical thinking, and democratic values.",
+                "Establish a network of freely-associating research communities coordinating scientific endeavors based on social needs and ecological harmony.",
+                "Support grassroots organizing with resources and infrastructure for community empowerment.",
+                "Support global liberation movements and end economic exploitation of developing regions worldwide.",
+                "Promote international cooperation through transparent diplomacy and solidarity across borders.",
+                // maybe some new babylonian demands
+
+                // freedom of speech demands
+
+                // disarmement of the bourgoisie and the previous power structures
+
+                /*
+                "Establish sliding scale of wages with automatic increases tied to consumer goods prices and guaranteed minimum wage"
+                "Create public works programs integrated into democratic economic planning"
+                "Implement sliding scale of working hours: divide available work among all workers with no wage reduction"
+                "Unite employed and unemployed workers through trade unions and mass organizations"
+                "Resume closed private businesses as public utilities under worker management"
+                "Establish factory committees elected by workers to create counterweight to administration"
+                "Create industry-wide committees linking factory committees across regions and sectors"
+                "Abolish 'business secrets' and implement worker control of industry through open examination of company books"
+                "Establish price control committees with representatives from factories, unions, cooperatives, farmers, and consumers"
+
+                "Establish joint worker-farmer committees for economic planning and coordination"
+                "Create joint price control committees to monitor agricultural and industrial prices"
+                "Form transport and credit control committees to ensure fair agricultural distribution"
+                "Protect small farmers' autonomy while enabling voluntary collectivization"
+                "Support artisans and small merchants through credit access and economic protection"
+
+                Defense and Security Proposals:
+                "Establish democratic worker self-defense units based in factories and neighborhoods"
+                "Create coordinated regional defense networks"
+                "Implement democratic military training programs under worker control"
+                "Form strike defense guards and picket line protection units"
+                "Create neighborhood-based defense groups with democratic leadership"
+                "Establish transparent oversight of military spending and arms production"
+
+                Democratic Organization Proposals:
+                "Create workers' councils (soviets) uniting representatives from factories, unions, and community organizations"
+                "Establish democratic economic planning bodies at local, regional, and national levels"
+                "Form price control committees with broad community representation"
+                "Create public works planning committees"
+                "Establish committees for banking and credit system control"
+                "Form transport and distribution committees"
+                "Create committees for coordinating scientific research based on social needs"
+                */
+            ];
+
+            // Add proposals to Workers Council
+            proposals.forEach(proposal => {
+                councilA.addProposal(proposal);
+            });
+
+            // Add relevant agricultural proposals to Farmers Council
+            const farmerProposals = proposals.filter(p => 
+                p.toLowerCase().includes('farm') || 
+                p.toLowerCase().includes('land') || 
+                p.toLowerCase().includes('agricultur')
+            );
+            
+            farmerProposals.forEach(proposal => {
+                councilB.addProposal(proposal);
+            });
+        }
+
+        async function getCouncil(councilId) {
+            const data = councils.get(councilId);
+            if (data) {
+                if (!currentMember) {
+                    currentMember = data.members[0]; // Only set first member if no member is selected
+                }
+                return data.council;
+            }
+            return null;
+        }
+
+        // Initialize councils dropdown
+        function initializeCouncils() {
+            const select = document.getElementById('councilSelect');
+            select.innerHTML = '<option value="">Select Council</option>';
+            
+            for (const [id, data] of councils.entries()) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = data.council.name;
+                if (data.council === currentCouncil) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            }
+        }
+
+        function updateUIState() {
+            const memberSelect = document.getElementById('memberSelect');
+            const hasValidMember = memberSelect.value !== '';  // Check if a member is actually selected
+
+            if (!currentCouncil || !hasValidMember) {
+                // Hide proposal cards and add button if no council or no member selected
+                $('.proposals').hide();
+                $('.add-proposal').hide();
+            } else {
+                // Show everything when both council and member are selected
+                $('.proposals').show();
+                $('.add-proposal').show();
+            }
+        }
+
+        async function loadCouncilData() {
+            const councilId = document.getElementById('councilSelect').value;
+            if (!councilId) {
+                currentCouncil = null;
+                currentMember = null;
+                updateUIState();
+                return;
+            }
+
+            currentCouncil = await getCouncil(councilId);
+            
+            // Update member dropdown
+            const memberSelect = document.getElementById('memberSelect');
+            memberSelect.innerHTML = '<option value="">Select Member</option>';
+            
+            const councilData = councils.get(councilId);
+            councilData.members.forEach((member, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = member.name;
+                if (member === currentMember) {
+                    option.selected = true;
+                }
+                memberSelect.appendChild(option);
+            });
+
+            updateUIState();
+            await updateProposals();
+        }
+
+        function selectMember() {
+            const councilId = document.getElementById('councilSelect').value;
+            const memberIndex = document.getElementById('memberSelect').value;
+            
+            if (councilId && memberIndex !== '') {
+                const councilData = councils.get(councilId);
+                currentMember = councilData.members[memberIndex];
+                
+                // Update the member dropdown to reflect the current selection
+                const memberSelect = document.getElementById('memberSelect');
+                Array.from(memberSelect.options).forEach(option => {
+                    option.selected = option.value === memberIndex;
+                });
+            } else {
+                currentMember = null;
+            }
+            
+            updateUIState();
+            if (currentMember) {
+                updateProposals();
+            }
+        }
+
+        async function updateProposals() {
+            const proposalsContainer = document.getElementById('proposals');
+            proposalsContainer.innerHTML = '';
+
+            if (!currentCouncil) return;
+
+            try {
+                for await (const status of currentCouncil.processProposals()) {
+                    const card = createProposalCard(status);
+                    proposalsContainer.appendChild(card);
+                }
+            } catch (error) {
+                console.error('Error processing proposals:', error);
+            }
+        }
+
+        function createProposalCard(status) {
+            const card = document.createElement('div');
+            
+            // Check if current member has voted
+            const currentVote = Array.from(status.proposal.votes.entries())
+                .find(([voter, _]) => voter === currentMember)?.[1];
+            
+            // Set classes based on vote status
+            const votedClass = currentVote ? `voted-${currentVote}` : '';
+            card.className = `proposal-card ${getStatusClass(status)} ${votedClass}`;
+            
+            // Format actions for display
+            let actionsHtml = '';
+            if (status.proposal.actions && status.proposal.actions.size > 0) {
+                const actionItems = Array.from(status.proposal.actions.entries())
+                    .map(([council, action]) => `
+                        <div class="action-item">
+                            <span class="action-target">${council.name}</span>
+                            <span class="action-method">${action.methodName}</span>
+                            <span class="action-args">${action.methodArgs.join(', ')}</span>
+                        </div>
+                    `).join('');
+                
+                actionsHtml = `
+                    <div class="proposal-actions">
+                        <h4>Actions:</h4>
+                        ${actionItems}
+                    </div>
+                `;
+            }
+            
+            card.innerHTML = `
+                <div class="proposal-header">
+                    <h3>${status.description}</h3>
+                    <label class="toggle-switch">
+                        <input type="checkbox" 
+                               data-proposal="${status.description}"
+                               ${currentVote === 'yes' ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                ${actionsHtml}
+            `;
+
+            // Update the click handler
+            card.addEventListener('click', async (e) => {
+                // Don't handle clicks on action items
+                if (e.target.closest('.action-item')) return;
+                
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                const newVote = checkbox.checked ? 'no' : 'yes';  // Toggle between yes/no
+                checkbox.checked = newVote === 'yes';             // Update checkbox based on vote
+                
+                // Update the voted class immediately for visual feedback
+                card.className = `proposal-card ${getStatusClass(status)} voted-${newVote}`;
+                
+                await handleVoteChange({
+                    target: {
+                        dataset: { proposal: status.description },
+                        checked: newVote === 'yes'
+                    },
+                    type: 'change'
+                });
+            });
+
+            return card;
+        }
+
+        function getStatusClass(status) {
+            // Calculate total votes
+            const totalVotes = status.votes.yes + status.votes.no;
+            
+            // A proposal is approved if yes votes exceed 50% of total voting power
+            if (status.votes.yes >= status.quorum) {
+                return 'approved';
+            } else {
+                return 'rejected';  // Default to rejected instead of pending
+            }
+        }
+
+        async function handleVoteChange(event) {
+            const proposalId = event.target.dataset.proposal;
+            const vote = event.target.checked ? 'yes' : 'no';
+            console.log(`Attempting to vote ${vote} on proposal: ${proposalId}`);
+            console.log('Current member:', currentMember);
+            console.log('Current council:', currentCouncil);
+            await castVote(proposalId, vote);
+        }
+
+        async function castVote(proposalId, vote) {
+            if (!currentCouncil || !currentMember) {
+                console.log('Missing council or member:', { council: !!currentCouncil, member: !!currentMember });
+                return;
+            }
+            
+            try {
+                // Find the proposal by description
+                const proposal = currentCouncil.proposals.find(p => p.description === proposalId);
+                if (!proposal) {
+                    console.error('Proposal not found:', proposalId);
+                    return;
+                }
+                console.log('Found proposal:', proposal);
+
+                // Use the council's castVote method
+                currentCouncil.castVote(currentMember, proposal, vote);
+                console.log(`Vote cast successfully: ${vote}`);
+                await updateProposals();
+            } catch (error) {
+                console.error('Error casting vote:', error);
+            }
+        }
+
+        async function addProposal() {
+            if (!currentCouncil) {
+                alert('Please select a council first');
+                return;
+            }
+            showProposalModal();
+        }
+
+        function showProposalModal() {
+            document.getElementById('proposalModal').style.display = 'block';
+        }
+
+        function closeProposalModal() {
+            document.getElementById('proposalModal').style.display = 'none';
+            document.getElementById('proposalForm').reset();
+            document.getElementById('actionFields').innerHTML = '';
+            proposalActions = [];  // Clear any added actions
+            updateActionsList();   // Clear the actions list display
+        }
+
+        function updateActionFields(actionType) {
+            const actionFields = document.getElementById('actionFields');
+            actionFields.innerHTML = '';
+            actionFields.className = actionType ? '' : 'hidden';
+
+            switch(actionType) {
+                case 'addMember':
+                    actionFields.innerHTML = `
+                        <input type="text" placeholder="Member Name" required>
+                    `;
+                    break;
+                case 'electDelegate':
+                    actionFields.innerHTML = `
+                        <input type="text" placeholder="Delegate Name" required>
+                        <input type="text" placeholder="Mandate Description" required>
+                        <select id="targetCouncil" required>
+                            <option value="">Select Target Council</option>
+                            ${Array.from(councils.entries()).map(([id, data]) => 
+                                `<option value="${id}">${data.council.name}</option>`
+                            ).join('')}
+                        </select>
+                    `;
+                    break;
+                case 'addProposal':
+                    actionFields.innerHTML = `
+                        <input type="text" placeholder="Proposal Description" required>
+                    `;
+                    break;
+                case 'castVote':
+                    actionFields.innerHTML = `
+                        <select required>
+                            <option value="">Select Decision</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                        </select>
+                    `;
+                    break;
+            }
+        }
+
+        // Add event listeners
+        document.getElementById('actionType').addEventListener('change', (e) => {
+            updateActionFields(e.target.value);
+        });
+
+        document.getElementById('addAction').addEventListener('click', () => {
+            const actionType = document.getElementById('actionType').value;
+            if (!actionType) return;
+            
+            // Save current action fields before adding new ones
+            const fields = document.getElementById('actionFields');
+            const actionData = collectActionData(actionType, fields);
+            if (actionData) {
+                proposalActions.push({ type: actionType, ...actionData });
+                // Clear the fields for next action
+                document.getElementById('actionType').value = '';
+                fields.innerHTML = '';
+                fields.className = 'hidden';
+                
+                // Show added actions
+                updateActionsList();
+            }
+        });
+
+        document.getElementById('proposalForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const description = document.getElementById('description').value;
+            
+            // Create actions map from collected actions
+            const actions = new Map();
+            proposalActions.forEach(action => {
+                actions.set(currentCouncil, {
+                    description: description,
+                    methodName: action.methodName,
+                    methodArgs: action.methodArgs
+                });
+            });
+            
+            // Add the proposal
+            currentCouncil.addProposal(description, actions);
+            await updateProposals();
+            
+            // Reset the form and actions
+            proposalActions = [];
+            closeProposalModal();
+        });
+
+        // Helper to collect action data
+        function collectActionData(type, fields) {
+            switch(type) {
+                case 'addMember':
+                    return {
+                        memberName: fields.querySelector('input[placeholder="Member Name"]').value,
+                        methodName: 'addMember',
+                        methodArgs: [fields.querySelector('input[placeholder="Member Name"]').value]
+                    };
+                case 'electDelegate':
+                    return {
+                        delegateName: fields.querySelector('input[placeholder="Delegate Name"]').value,
+                        mandateDescription: fields.querySelector('input[placeholder="Mandate Description"]').value,
+                        targetCouncil: fields.querySelector('#targetCouncil').value,
+                        methodName: 'electDelegate',
+                        methodArgs: [
+                            fields.querySelector('input[placeholder="Delegate Name"]').value,
+                            fields.querySelector('input[placeholder="Mandate Description"]').value,
+                            councils.get(fields.querySelector('#targetCouncil').value).council
+                        ]
+                    };
+                // Add other action types as needed
+                default:
+                    return null;
+            }
+        }
+
+        // Add this function to show added actions
+        function updateActionsList() {
+            const list = document.createElement('div');
+            list.className = 'added-actions';
+            list.innerHTML = proposalActions.map((action, index) => `
+                <div class="action-item">
+                    <span class="action-target">${currentCouncil.name}</span>
+                    <span class="action-method">${action.methodName}</span>
+                    <span class="action-args">${action.methodArgs.join(', ')}</span>
+                    <button type="button" onclick="removeAction(${index})">×</button>
+                </div>
+            `).join('');
+            
+            const actionsContainer = document.querySelector('.action-inputs');
+            const existingList = actionsContainer.querySelector('.added-actions');
+            if (existingList) {
+                actionsContainer.replaceChild(list, existingList);
+            } else {
+                actionsContainer.insertBefore(list, document.getElementById('addAction'));
+            }
+        }
+
+        // Add function to remove actions
+        window.removeAction = function(index) {
+            proposalActions.splice(index, 1);
+            updateActionsList();
+        };
+
+        // Make functions available globally
+        window.loadCouncilData = loadCouncilData;
+        window.castVote = castVote;
+        window.addProposal = addProposal;
+        window.handleVoteChange = handleVoteChange;
+        window.selectMember = selectMember;
+        window.closeProposalModal = closeProposalModal;
+
+        // Initialize the test data and page
+        await initializeTestData();
+        initializeCouncils();
+        updateUIState();
+
+        // Set up auto-refresh
+        setInterval(updateProposals, 5000); // Update every 5 seconds
+    </script>
+</body>
+</html>
