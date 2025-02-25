@@ -247,6 +247,7 @@ export class Store {
                                                 childData.points || 0,
                                                 [], // types will be added later
                                                 childId,
+                                                childData.childrenIds,
                                                 childData._manualFulfillment
                                             );
                                             

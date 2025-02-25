@@ -1,10 +1,11 @@
 export class Node {
-  constructor(name, parent = null, types = [], id = null, manualFulfillment = null) {
+  constructor(name, parent = null, types = [], id = null, childrenIds = {}, manualFulfillment = null) {
     this.name = name;
     this.id = id || crypto.randomUUID();
     this.parent = parent;
     this.points = 0;
     this.children = new Map();
+    this.childrenIds = childrenIds;
     this.isContributor = !this.parent;
     this._manualFulfillment = manualFulfillment;
     
@@ -63,7 +64,7 @@ export class Node {
   }
 
   static fromGun(data, store) {
-    const node = new Node(data.name, null, [], data.id);
+    const node = new Node(data.name, null, [], data.id, data.childrenIds);
     node.points = data.points || 0;
     node.isContributor = data.isContributor || false;
     node._manualFulfillment = data._manualFulfillment?.value ?? null;
@@ -136,14 +137,14 @@ export class Node {
     return this;
   }
 
-  addChild(name, points = 0, types = [], id, manualFulfillment = null) {
+  addChild(name, points = 0, types = [], id, childrenIds = {},manualFulfillment = null) {
     if (this.parent && this.isContributor) {
       throw new Error(
         `Node ${this.name} is an instance of a contributor and cannot have children.`
       );
     }
 
-    const child = new Node(name, this, types, id, manualFulfillment);
+    const child = new Node(name, this, types, id, childrenIds, manualFulfillment);
 
     this.children.set(name, child);
     if (points > 0) {
