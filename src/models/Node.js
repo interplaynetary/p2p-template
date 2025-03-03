@@ -1,3 +1,9 @@
+// subtype tres (planet, city, berlin, kreuzberg)
+
+class Inventory {
+  
+}
+
 export class Node {
   constructor(name, parent = null, types = [], id = null, childrenIds = {}, manualFulfillment = null) {
     this.name = name;

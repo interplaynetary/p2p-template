@@ -91,6 +91,11 @@ export const cleanup = async () => {
     console.log('Cleanup complete');
 };
 
+
+
+
+
+
 // Helper to get encrypted paths
 export const getPath = async (path) => {
   if (!user.is) {
