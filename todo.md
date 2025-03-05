@@ -49,8 +49,6 @@
 - [ ] + Node button (big) (Import sub-treefrom Library)
 - [ ] - Node button (big) (Drop sub-tree into Library)
 
-- [ ] Make everything more smooth, with less sharp clicks!
-
 - [ ] Allow for touching multiple nodes at once
 - [ ] Allow for dragging nodes around
 - [ ] Allow for composing nodes (dragging nodes to other nodes)
@@ -59,33 +57,16 @@
 - [ ] Menubuttons instead of text for add value
 - [ ] Distribute surplus to any branch
 - [ ] AI Integration!
-- [ ] Allow for choosing your own name!
-- [ ] Allow adding multiple types/contributors to nodes
-- [ ] How to unallocate points? (when points = 0, remove node)
+- [x] Allow adding multiple types/contributors to nodes
+- [x] How to unallocate points? (when points = 0, remove node)
 - [ ] How to manually reorder them? (by dragging?)
 - [ ] How do we show mutuality directly in the structure? (Showing max min and overlap? Of colors? Of self and other?)
-- [ ] Add a new intermediary class? For networking / persistence?
-- [ ] Add description to Nodes (and maybe other things?)
+- [x] Add a new intermediary class? For networking / persistence?
+- [x] Add description to Nodes (and maybe other things?)
 - [ ] node.makeContributor (retroactively) turns type into contributor
 - [ ] Display Descriptions to Nodes if they exist! 
 - [ ] Make contributor have special outline
 - [ ] "Add Contributor" button should reveal tabs: known (including self), add new contributor (reveal QR of self to others)
-- [ ] Clicking contributor makes it the new root?
+- [x] Clicking contributor makes it the new root?
     (so you can see the tree from their perspective)
     (but your perspective is retained (your perspective of their perspective))
-
-/*
-// NEW CODE: Check if this node has children
-if (childData.childrenIds && typeof childData.childrenIds === 'object') {
-    const grandchildIds = Object.keys(childData.childrenIds)
-        .filter(id => id !== '_' && !loadedNodes.has(id));
-    
-    if (grandchildIds.length > 0) {
-        console.log(`Node ${childData.name} has ${grandchildIds.length} children to load`);
-        // Add these IDs to our list of nodes to load
-        childIds.push(...grandchildIds);
-    }
-}
-
-lodadedCount++
-*/
