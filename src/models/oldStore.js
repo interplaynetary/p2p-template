@@ -109,6 +109,9 @@ export class Store {
                 this._loadCompleteCallback = resolve;
             });
 
+        // Initial load
+        await this.loadNodes();
+        
             // Subscribe to real-time updates only once
             if (!this._subscribed) {
         this.nodesRef.on((data, key) => {
@@ -126,10 +129,6 @@ export class Store {
                 this._subscribed = true;
             }
 
-            
-            // Initial load
-            await this.loadNodes();
-
             // Wait for load to complete
             console.log('Waiting for load to complete...');
             await this._currentSync;
@@ -144,41 +143,34 @@ export class Store {
         }
     }
 
-    async loadNodes(parentNode = null) {
+    async loadNodes() {
         return new Promise((resolve) => {
             console.log('Loading nodes from Gun...');
-
-            const node = parentNode ? parentNode : this.root;
-                
-            // If no parent node specified, use root
-            const nodeId = parentNode ? parentNode.id : GunX.user.is.pub;
             
-            this.nodesRef.get(nodeId).once((nodeData) => {
-                // For root node only
-                if (!parentNode) {
-                    if (!nodeData || !nodeData.name) {
-                        console.warn('No root node found');
-                        if (this._loadCompleteCallback) this._loadCompleteCallback();
-                        resolve();
-                        return;
-                    }
-                    // Use the App instance as root node
-                    this.nodes.set(nodeId, this.root);
-                    /*
-                    // Update root node properties from Gun data
-                    this.root.points = nodeData.points || 0;
-                    if (nodeData._manualFulfillment !== undefined) {
-                        this.root._manualFulfillment = nodeData._manualFulfillment;
-                    }
-                        */
+            const rootId = GunX.user.is.pub;
+            this.nodesRef.get(rootId).once((rootData) => {
+                if (!rootData || !rootData.name) {
+                    console.warn('No root node found');
+                    if (this._loadCompleteCallback) this._loadCompleteCallback();
+                    resolve();
+                    return;
+                }
+
+                // Use the App instance as root node
+                this.nodes.set(rootId, this.root);
+
+                // Update root node properties from Gun data
+                this.root.points = rootData.points || 0;
+                if (rootData._manualFulfillment !== undefined) {
+                    this.root._manualFulfillment = rootData._manualFulfillment;
                 }
 
                 // Track loaded nodes to prevent duplicates
-                const loadedNodes = new Set([nodeId]);
+                const loadedNodes = new Set([rootId]);
                 let loadingComplete = false;
 
                 // Load children IDs with rate limiting
-                this.nodesRef.get(nodeId).get('childrenIds').once((childrenIds) => {
+                this.nodesRef.get(rootId).get('childrenIds').once((childrenIds) => {
                     if (!childrenIds || typeof childrenIds !== 'object' || loadingComplete) {
                         if (this._loadCompleteCallback) this._loadCompleteCallback();
                         resolve();
@@ -239,16 +231,18 @@ export class Store {
                                         console.log('Loading child node:', childId, childData);
                                         
                                         // Find parent node
-
-                                        if (!node) {
-                                            console.warn(`Parent node ${node} not found for child ${childId}`);
+                                        const parentId = childData.parentId;
+                                        const parentNode = this.nodes.get(parentId);
+                                        
+                                        if (!parentNode) {
+                                            console.warn(`Parent node ${parentId} not found for child ${childId}`);
                                             resolveChild();
                                             return;
                                         }
 
                                         try {
                                             // Add child using parent's addChild method
-                                            const childNode = node.addChild(
+                                            const childNode = parentNode.addChild(
                                                 childData.name,
                                                 childData.points || 0,
                                                 [], // types will be added later
@@ -257,10 +251,10 @@ export class Store {
                                                 childData._manualFulfillment
                                             );
                                             
-                                            console.log('Loaded child node:', childNode);
-
-                                            // Recursively load this child's children
-                                            this.loadNodes(childNode);
+                                            // Verify the child was added correctly
+                                            if (!parentNode.children.has(childData.name)) {
+                                                console.warn(`Child ${childData.name} was not properly added to parent ${parentNode.name}`);
+                                            }
                                             
                                             loadedCount++;
                                         } catch (error) {
@@ -298,6 +292,10 @@ export class Store {
         
         // Remove from local cache
         this.nodes.delete(node.id);
+    }
+
+    getNode(id) {
+        return this.nodes.get(id);
     }
 
     // Clean up interval on destroy

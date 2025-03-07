@@ -3,7 +3,22 @@ import { getColorForName } from '../utils/colorUtils.js';
 import { calculateFontSize } from '../utils/fontUtils.js';
 
 export function createTreemap(rootNode, width, height) {
-    // console.log('Creating treemap with rootNode:', rootNode);
+    console.log('Creating treemap with rootNode:', rootNode);
+    console.log('createTreemap data children:', Array.from(rootNode.children.entries()));
+    console.log('createTreemap data children count:', rootNode.children.size);
+    
+    // Ensure rootNode has the expected structure
+    if (!rootNode || !rootNode.children || typeof rootNode.children.size !== 'number') {
+        console.error('Invalid root node structure for treemap:', rootNode);
+        return {
+            element: document.createElement('div'),
+            getRoot: () => null,
+            zoomin: () => {},
+            zoomout: () => {},
+            update: () => {}
+        };
+    }
+    
     // State variables for growth animation
     let growthInterval = null;
     let growthTimeout = null;
@@ -31,6 +46,10 @@ export function createTreemap(rootNode, width, height) {
     // Create hierarchy from D3Node
     let hierarchy = d3.hierarchy(rootNode, d => d.childrenArray)
         .each(d => { d.value = d.data.points || 0; });
+
+    console.log('createTreemap hierarchy:', hierarchy);
+    console.log('createTreemap hierarchy children:', hierarchy.children);
+    console.log('createTreemap hierarchy descendants:', hierarchy.descendants().length);
 
     // Create treemap layout
     let root = d3.treemap().tile(tile)(hierarchy);

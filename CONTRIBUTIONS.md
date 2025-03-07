@@ -10,7 +10,7 @@ The Free Association project is not just another web application - it's a proof-
 
 1. **Building Alternative Economic Systems** - Helping create tools that demonstrate how truly free social coordination can work without centralized control or markets
 
-2. **Working on Cutting-Edge Visualization** - Creating intuitive interfaces for complex social-economic concepts through interactive tree structures and data visualization
+2. **Working on Cutting-Edge Visualization** - Creating intuitive interfaces for social-economic concepts through interactive tree structures and data visualization
 
 3. **Implementing Recursive Mathematics** - Bringing to life mathematical concepts of mutual recognition, contribution networks, and proportional distribution
 

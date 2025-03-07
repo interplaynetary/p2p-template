@@ -11,7 +11,15 @@
     <!-- Main visualization container -->
     <div class="visualization-container">
         <div id="treemap-container"></div>
-        <div id="pie-section">
+        <div class="message-input-container">
+            <button id="message-plus" class="message-plus">+</button>
+            <textarea id="message-input" placeholder="Type your message..." maxlength="1000"></textarea>
+            <div class="message-controls">
+                <span id="char-count">0/1000</span>
+                <button id="send-message">Send</button>
+            </div>
+        </div>
+        <div id="menu-section">
             <div class="drop-zone top-right" data-form="addNode">
                 <span class="cycle-text">Add Value</span>
             </div>
@@ -118,6 +126,16 @@
         </div>
     </div>
 
+    <!-- Move auth container here, outside of any scripts -->
+    <div id="auth-container">
+        <form id="auth-form">
+            <h2>Welcome to Free Association</h2>
+            <input type="text" id="username" placeholder="Username" autocomplete="username">
+            <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+            <button type="submit">Login/Create</button>
+        </form>
+    </div>
+
     <!-- External Dependencies -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -133,14 +151,6 @@
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
     
     <!-- Remove the old script tags for d3 and qrcode -->
-
-    <div id="auth-container" style="display: none;">
-        <form id="auth-form">
-            <input type="text" id="username" placeholder="Username" autocomplete="username">
-            <input type="password" id="password" placeholder="Password" autocomplete="current-password">
-            <button type="submit">Login/Create</button>
-        </form>
-    </div>
 
     <div id="app-container" style="display: none;">
         <!-- Existing app content -->
@@ -168,7 +178,7 @@
                 console.log('Account creation successful');
             }
 
-            document.getElementById('auth-container').style.display = 'none';
+            document.getElementById('auth-container').classList.add('hidden');
             console.log('Auth container hidden');
 
             try {
@@ -342,10 +352,11 @@
 
         // Initial setup for already logged in users
         if (!GunX.user.is) {
-            document.getElementById('auth-container').style.display = 'block';
+            document.getElementById('auth-container').classList.remove('hidden');
             document.getElementById('auth-form')
                 .addEventListener('submit', handleAuth);
         } else {
+            document.getElementById('auth-container').classList.add('hidden');
             // Handle already logged in case
             (async () => {
                 try {
@@ -358,6 +369,14 @@
                 }
             })();
         }
+
+        // Add this to your existing script section
+        document.getElementById('message-input').addEventListener('input', function(e) {
+            // Reset height to auto to get the right scrollHeight
+            this.style.height = 'auto';
+            // Set new height based on content
+            this.style.height = (this.scrollHeight) + 'px';
+        });
     </script>
 </body>
 </html> 

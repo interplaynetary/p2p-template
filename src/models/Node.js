@@ -1,14 +1,11 @@
 // subtype tres (planet, city, berlin, kreuzberg)
 
-class Inventory {
-  
-}
-
 export class Node {
   constructor(name, parent = null, types = [], id = null, childrenIds = {}, manualFulfillment = null) {
     this.name = name;
     this.id = id || crypto.randomUUID();
     this.parent = parent;
+    this.parentId = () => parent ? parent.id : null;
     this.points = 0;
     this.children = new Map();
     this.childrenIds = childrenIds;
@@ -41,7 +38,7 @@ export class Node {
     const data = {
         id: this.id,
         name: this.name,
-        parentId: this.parent ? this.parent.id : null,
+        parentId: this.parentId(),
         points: Number(this.points) || 0,
         isContributor: Boolean(this.isContributor),
         _manualFulfillment: this._manualFulfillment === null ? 
@@ -70,7 +67,7 @@ export class Node {
   }
 
   static fromGun(data, store) {
-    const node = new Node(data.name, null, [], data.id, data.childrenIds);
+    const node = new Node(data.name, null, [], data.id, data.childrenIds, data._manualFulfillment);
     node.points = data.points || 0;
     node.isContributor = data.isContributor || false;
     node._manualFulfillment = data._manualFulfillment?.value ?? null;
@@ -347,6 +344,15 @@ export class Node {
     }, 0);
   }
 
+  get shareOfGeneralFulfillmentDistribution() {
+    const types = Array.from(this.root.typeIndex.keys())
+
+    return types.map(type => ({
+        type,
+        value: this.shareOfGeneralFulfillment(type),
+    })).filter(entry => entry.value > 0);
+  }
+
   mutualFulfillment(node) {
     const recognitionFromHere = this.shareOfGeneralFulfillment(node);
     const recognitionFromThere = node.shareOfGeneralFulfillment(this);
@@ -383,7 +389,8 @@ export class Node {
     }
 
     get childrenArray() {
-        return Array.from(this.children.values());
+        const result = Array.from(this.children.values());
+        return result;
     }
 
     get data() {

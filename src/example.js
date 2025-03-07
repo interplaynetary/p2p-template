@@ -1,17 +1,16 @@
 // Import Node if you're using modules
 import { Node } from './models/Node.js';
-import { App } from './App.js';
 
 // Export the initialization function
 export async function initializeExampleData(app) {
 
         // Initialize data structure
         const environmentalist = new Node('environmentalist');
-        const clownsWithoutBorders = new Node('clowns4all', null, [environmentalist]);
         const researcher = new Node('researcher', null, [environmentalist]);
         const educator = new Node('educator', null, [environmentalist]);
 
         // Our main nodes with multiple types
+        const clownsWithoutBorders = new Node('clowns4all', null, [environmentalist]);
         const whalewatch = new Node('whalewatch', null, [researcher]);  // is a contributor
         const alice = new Node('alice', null, [researcher]);  // is a contributor
 

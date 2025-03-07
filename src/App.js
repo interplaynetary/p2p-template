@@ -1,7 +1,7 @@
 import * as GunX from './models/Gun.js';
 import { Node } from './models/Node.js';
 import { Store } from './models/Store.js';
-import { createTreemap } from './visualizations/TreeMap.js';
+import { createTreemap } from './visualizations/RecursiveTreeMap.js';
 import { createPieChart } from './visualizations/PieChart.js';
 import { initializeExampleData } from './example.js';
 
@@ -31,6 +31,11 @@ export class App extends Node {
         this.initalizing = true
         console.log('Starting app initialization...');
         
+        // Initialize visualization
+        this.updateNeeded = true;
+        this.pieUpdateNeeded = true;
+        this.init();
+
         // Wait for store to fully sync and load existing data
         const nodesLoaded = await this.store.sync();
         console.log('Store sync complete, loaded', nodesLoaded, 'nodes');
@@ -41,11 +46,6 @@ export class App extends Node {
             console.log('No existing data found, initializing example data...');
             await initializeExampleData(this);
         }
-        
-        // Initialize visualization
-        this.updateNeeded = true;
-        this.pieUpdateNeeded = true;
-        this.init();
         
         // Start update cycle
         this.updateInterval = setInterval(() => {
@@ -69,30 +69,24 @@ export class App extends Node {
         console.log('App init started');
         const container = document.getElementById('treemap-container');
         console.log('Container found:', !!container);
-        const width = container.clientWidth;
-        const height = container.clientHeight;
         
-        console.log('Creating treemap with dimensions:', width, height);
-        console.log('Pre-treemap children count:', this.children.size);
-        console.log('Pre-treemap children:', Array.from(this.children.entries()));
-        
-        this.treemap = createTreemap(this, width, height);
-        console.log('Treemap created:', !!this.treemap);
-        console.log('Post-treemap root node:', this.treemap.getRoot());
-        console.log('Post-treemap descendants:', this.treemap.getRoot().descendants().length);
-        
-        if (!this.treemap) {
-            throw new Error('Failed to initialize treemap');
+        if (container) {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            console.log('Creating treemap with dimensions:', width, height);
+            console.log('Pre-treemap children count:', this.children.size);
+            console.log('Pre-treemap children:', Array.from(this.children.entries()));
+            
+            // Store treemap reference on the instance
+            this.treemap = createTreemap(this, width, height);
+            console.log('Treemap created:', !!this.treemap);
+            
+            container.appendChild(this.treemap.element);
         }
         
         this.updatePieChart();
-        container.appendChild(this.treemap.element);
-
-        // Setup handlers
-        window.addEventListener('resize', this.handleResize.bind(this));
-
         console.log('App init completed');
-        this.initializing = false
     }
 
     get currentView() {
@@ -149,40 +143,14 @@ export class App extends Node {
     }
 
     updateTreeMap() {
-        console.log('updateTreeMap started');
+        console.log('updateTreeMap called');
         const container = document.getElementById('treemap-container');
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        
-        // Store the current data path to restore zoom
-        const path = [];
-        let temp = this.currentViewData;
-        console.log('Current view before update:', temp);
-        console.log('Current children count:', temp.children.size);
-        console.log('Current children:', Array.from(temp.children.entries()));
-        
-        while (temp !== this) {
-            path.push(temp);
-            temp = temp.parent;
+        if (container && this.treemap) {
+            console.log('Updating treemap with children:', Array.from(this.children.entries()));
+            container.innerHTML = '';
+            this.treemap = createTreemap(this, container.clientWidth, container.clientHeight);
+            container.appendChild(this.treemap.element);
         }
-        
-        // Clear and recreate treemap
-        container.innerHTML = '';
-        console.log('Pre-recreate treemap children:', Array.from(this.children.entries()));
-        this.treemap = createTreemap(this, width, height);
-        console.log('Post-recreate treemap root:', this.treemap.getRoot());
-        console.log('Post-recreate descendants:', this.treemap.getRoot().descendants().length);
-        
-        container.appendChild(this.treemap.element);
-        
-        // Restore zoom path using data references
-        path.reverse().forEach(nodeData => {
-            const correspondingNode = this.treemap.getRoot().descendants()
-                .find(n => n.data === nodeData);
-            if (correspondingNode) {
-                this.treemap.zoomin(correspondingNode);
-            }
-        });
     }
 
     updatePieChart() {
