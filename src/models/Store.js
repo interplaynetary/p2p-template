@@ -43,6 +43,7 @@ export class Store {
         // Local cache for quick lookups
         this.nodes = new Map();
         this.pendingRelations = [];
+        this._loadingComplete = false;
         
         // Start syncing
         this.sync();
@@ -53,6 +54,10 @@ export class Store {
                 this.processSaveQueue();
             }
         }, 100); // Process queue every 100ms
+    }
+
+    get isFullyLoaded() {
+        return this._loadingComplete && this.saveQueue.size === 0;
     }
 
     async processSaveQueue() {
@@ -136,7 +141,6 @@ export class Store {
             
             const nodeCount = this.nodes.size;
             const childCount = this.root ? this.root.children.size : 0;
-            console.log(`Store sync complete with ${nodeCount} nodes loaded (${childCount} children)`);
             
             return nodeCount;
         } finally {
@@ -147,141 +151,80 @@ export class Store {
     async loadNodes(parentNode = null) {
         return new Promise((resolve) => {
             console.log('Loading nodes from Gun...');
+            let pendingLoads = 0;
+
+            const markLoadComplete = () => {
+                pendingLoads--;
+                if (pendingLoads === 0) {
+                    console.log('All nodes finished loading');
+                    this._loadingComplete = true;
+                    if (this._loadCompleteCallback) this._loadCompleteCallback();
+                    resolve();
+                }
+            };
 
             const node = parentNode ? parentNode : this.root;
-                
-            // If no parent node specified, use root
             const nodeId = parentNode ? parentNode.id : GunX.user.is.pub;
             
             this.nodesRef.get(nodeId).once((nodeData) => {
-                // For root node only
                 if (!parentNode) {
                     if (!nodeData || !nodeData.name) {
                         console.warn('No root node found');
+                        this._loadingComplete = true;
                         if (this._loadCompleteCallback) this._loadCompleteCallback();
                         resolve();
                         return;
                     }
-                    // Use the App instance as root node
                     this.nodes.set(nodeId, this.root);
-                    /*
-                    // Update root node properties from Gun data
-                    this.root.points = nodeData.points || 0;
-                    if (nodeData._manualFulfillment !== undefined) {
-                        this.root._manualFulfillment = nodeData._manualFulfillment;
-                    }
-                        */
                 }
 
-                // Track loaded nodes to prevent duplicates
-                const loadedNodes = new Set([nodeId]);
-                let loadingComplete = false;
-
-                // Load children IDs with rate limiting
                 this.nodesRef.get(nodeId).get('childrenIds').once((childrenIds) => {
-                    if (!childrenIds || typeof childrenIds !== 'object' || loadingComplete) {
-                        if (this._loadCompleteCallback) this._loadCompleteCallback();
-                        resolve();
+                    if (!childrenIds || typeof childrenIds !== 'object') {
+                        markLoadComplete();
                         return;
                     }
 
                     const childIds = Object.keys(childrenIds)
-                        .filter(id => id !== '_' && !loadedNodes.has(id));
+                        .filter(id => id !== '_');
                     
                     if (childIds.length === 0) {
-                        loadingComplete = true;
-                        if (this._loadCompleteCallback) this._loadCompleteCallback();
-                        resolve();
+                        markLoadComplete();
                         return;
                     }
 
                     console.log(`Found ${childIds.length} children to load`);
+                    pendingLoads += childIds.length;
                     
-                    const batchSize = 3;
-                    let currentBatch = 0;
-                    let loadedCount = 0;
-                    
-                    const loadBatch = () => {
-                        if (loadingComplete) return;
-
-                        const start = currentBatch * batchSize;
-                        const end = start + batchSize;
-                        const batch = childIds.slice(start, end);
-                        
-                        if (batch.length === 0) {
-                            console.log('Finished loading all children');
-                            loadingComplete = true;
-                            if (this._loadCompleteCallback) this._loadCompleteCallback();
-                            resolve();
-                            return;
-                        }
-                        
-                        console.log(`Loading batch ${currentBatch + 1}, nodes ${start + 1}-${end}`);
-                        
-                        let batchPromises = batch.map(childId => {
-                            return new Promise(resolveChild => {
-                                if (loadedNodes.has(childId)) {
-                                    resolveChild();
-                                    return;
-                                }
-                                
-                                loadedNodes.add(childId);
-                                
-                                this.nodesRef.get(childId).once((childData) => {
-                                    if (!childData || !childData.name) {
-                                        console.warn('Invalid child node:', childId);
-                                        loadedNodes.delete(childId);
-                                        resolveChild();
-                                        return;
-                                    }
-                                    
-                                    if (!this.nodes.has(childId)) {
-                                        console.log('Loading child node:', childId, childData);
-                                        
-                                        // Find parent node
-
-                                        if (!node) {
-                                            console.warn(`Parent node ${node} not found for child ${childId}`);
-                                            resolveChild();
-                                            return;
-                                        }
-
-                                        try {
-                                            // Add child using parent's addChild method
-                                            const childNode = node.addChild(
-                                                childData.name,
-                                                childData.points || 0,
-                                                [], // types will be added later
-                                                childId,
-                                                childData.childrenIds,
-                                                childData._manualFulfillment
-                                            );
-                                            
-                                            console.log('Loaded child node:', childNode);
-
-                                            // Recursively load this child's children
-                                            this.loadNodes(childNode);
-                                            
-                                            loadedCount++;
-                                        } catch (error) {
-                                            console.error(`Error adding child ${childId}:`, error);
-                                            loadedNodes.delete(childId);
-                                        }
-                                    }
-                                    resolveChild();
-                                });
-            });
-        });
-                        
-                        Promise.all(batchPromises).then(() => {
-                            currentBatch++;
-                            if (!loadingComplete) {
-                                setTimeout(loadBatch, 100);
+                    childIds.forEach(childId => {
+                        this.nodesRef.get(childId).once((childData) => {
+                            if (!childData || !childData.name) {
+                                console.warn('Invalid child node:', childId);
+                                markLoadComplete();
+                                return;
                             }
+                            
+                            if (!this.nodes.has(childId)) {
+                                console.log('Loading child node:', childId, childData);
+                                
+                                try {
+                                    const childNode = node.addChild(
+                                        childData.name,
+                                        childData.points || 0,
+                                        [], // types will be added later
+                                        childId,
+                                        childData.childrenIds,
+                                        childData._manualFulfillment
+                                    );
+                                    
+                                    console.log('Loaded child node:', childNode);
+                                    this.loadNodes(childNode);
+                                } catch (error) {
+                                    console.error(`Error adding child ${childId}:`, error);
+                                }
+                            }
+                            markLoadComplete();
                         });
-                    };
-                    
-                    loadBatch();
+                    });
                 });
             });
         });

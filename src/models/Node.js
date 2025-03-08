@@ -18,11 +18,6 @@ export class Node {
     // Map of type -> Set of instances
     this.typeIndex = parent ? this.root.typeIndex : new Map();
     
-    // Initialize update flag
-    if (!parent) {
-      this.updateNeeded = false;
-    }
-    
     // Then add types after store is ready
     if (types.length > 0) {
       // Use Promise.all to handle async type additions
@@ -83,7 +78,7 @@ export class Node {
   }
 
   save() {
-    if (this.root.store /*&& !this.root.initalizing*/) {
+    if (this.root.store && !this.root.initalizing) {
       this.root.store.saveQueue.add(this);
     }
   }
@@ -116,7 +111,7 @@ export class Node {
       this.isContributor = true;
     }
     this.save();
-    this.root.initalizing ? this.root.updateNeeded = true : null
+    this.root.initalizing ? null : this.root.updateNeeded = true
     return this;
   }
 
@@ -136,7 +131,7 @@ export class Node {
       this.isContributor = Array.from(this.types).some(t => t.isContributor);
     }    
     this.save();
-    this.root.updateNeeded = true;
+    this.root.initalizing ? null : this.root.updateNeeded = true
     return this;
   }
 
@@ -154,7 +149,8 @@ export class Node {
       child.setPoints(points);
     }
     this.save();
-    this.root.updateNeeded = true;
+    console.log('adding child', name, 'to', this.name, 'root', this.root, 'initalizing', this.root.initalizing)
+    this.root.initalizing ? null : this.root.updateNeeded = true
     return child;
   }
 
@@ -173,7 +169,7 @@ export class Node {
       this.children.delete(name);
     }
     this.save();
-    this.root.updateNeeded = true;
+    this.root.initalizing ? null : this.root.updateNeeded = true
     return this;
   }
 
@@ -181,7 +177,7 @@ export class Node {
     // console.log('Setting points for', this.name, points);
     this.points = points;
     this.save();
-    this.root.pieUpdateNeeded = true;
+      this.root.initalizing ? null : this.root.pieUpdateNeeded = true
     return this;
   }
 
@@ -301,7 +297,10 @@ export class Node {
       return 1 - this.fulfilled;
     };
 
-  setFulfillment(value) {
+  /**
+   * @param {number} value
+   */
+  set fulfilled(value) {
       if (!this.hasDirectContributorChild) {
         throw new Error(
           'Can only manually set fulfillment for parents of contributors'
@@ -314,12 +313,6 @@ export class Node {
       this.save();
       return this;
     };
-
-  clearFulfillment() {
-    this._manualFulfillment = null;
-    this.save();
-    return this;
-  };
 
   get fulfillmentWeight() {
     return this.fulfilled * this.weight;

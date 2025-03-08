@@ -3,9 +3,9 @@ import { getColorForName } from '../utils/colorUtils.js';
 import { calculateFontSize } from '../utils/fontUtils.js';
 
 export function createTreemap(rootNode, width, height) {
-    console.log('Creating treemap with rootNode:', rootNode);
-    console.log('createTreemap data children:', Array.from(rootNode.children.entries()));
-    console.log('createTreemap data children count:', rootNode.children.size);
+    // console.log('Creating treemap with rootNode:', rootNode);
+    // console.log('createTreemap data children:', Array.from(rootNode.children.entries()));
+    // console.log('createTreemap data children count:', rootNode.children.size);
     
     // Ensure rootNode has the expected structure
     if (!rootNode || !rootNode.children || typeof rootNode.children.size !== 'number') {
@@ -15,7 +15,7 @@ export function createTreemap(rootNode, width, height) {
             getRoot: () => null,
             zoomin: () => {},
             zoomout: () => {},
-            update: () => {}
+            1: () => {}
         };
     }
     
@@ -47,9 +47,9 @@ export function createTreemap(rootNode, width, height) {
     let hierarchy = d3.hierarchy(rootNode, d => d.childrenArray)
         .each(d => { d.value = d.data.points || 0; });
 
-    console.log('createTreemap hierarchy:', hierarchy);
-    console.log('createTreemap hierarchy children:', hierarchy.children);
-    console.log('createTreemap hierarchy descendants:', hierarchy.descendants().length);
+    // console.log('createTreemap hierarchy:', hierarchy);
+    // console.log('createTreemap hierarchy children:', hierarchy.children);
+    // console.log('createTreemap hierarchy descendants:', hierarchy.descendants().length);
 
     // Create treemap layout
     let root = d3.treemap().tile(tile)(hierarchy);
@@ -239,10 +239,10 @@ export function createTreemap(rootNode, width, height) {
 
         // Attach click handler separately
         circles.on("click", function(event, type) {
-            console.log('Circle clicked!');
+            // console.log('Circle clicked!');
             event.stopPropagation();
             
-            console.log('Loading tree for type:', type.name);
+            // console.log('Loading tree for type:', type.name);
             
             // Update current view
             currentView = type;
@@ -403,24 +403,24 @@ export function createTreemap(rootNode, width, height) {
             event.preventDefault();
             
             const touchDuration = Date.now() - touchStartTime;
-            console.log('Click detected on:', d.data.name);
-            console.log('Is root?', d === root);
-            console.log('Has parent?', d.parent ? 'yes' : 'no');
-            console.log('Touch duration:', touchDuration);
-            console.log('Is growing?', isGrowing);
+            // console.log('Click detected on:', d.data.name);
+            // console.log('Is root?', d === root);
+            // console.log('Has parent?', d.parent ? 'yes' : 'no');
+            // console.log('Touch duration:', touchDuration);
+            // console.log('Is growing?', isGrowing);
             
             // Allow navigation (zooming) regardless of tree
             if (touchDuration < GROWTH_DELAY && !isGrowing) {
                 if (d === root && d.parent) {
-                    console.log('Attempting zoom out from:', d.data.name);
+                    // console.log('Attempting zoom out from:', d.data.name);
                     zoomout(root);
                 } else if (d !== root && !d.data.isContributor) {  // Check isContributor directly
-                    console.log('Attempting zoom in to:', d.data.name);
+                    // console.log('Attempting zoom in to:', d.data.name);
                     zoomin(d);
                 }
             } else {
-                console.log('Navigation blocked because:',
-                    touchDuration >= GROWTH_DELAY ? 'touch too long' : 'growing active');
+                // console.log('Navigation blocked because:',
+                //     touchDuration >= GROWTH_DELAY ? 'touch too long' : 'growing active');
             }
             
             // Clear states only if not in contributor tree
@@ -496,7 +496,7 @@ export function createTreemap(rootNode, width, height) {
     }
 
     function zoomin(d) {
-        console.log('Zooming in to:', d.data.name);
+        // console.log('Zooming in to:', d.data.name);
         currentView = d;
         const group0 = group.attr("pointer-events", "none");
         
@@ -516,7 +516,7 @@ export function createTreemap(rootNode, width, height) {
     }
   
     function zoomout(d) {
-        console.log('Zooming out from:', d.data.name);
+        // console.log('Zooming out from:', d.data.name);
         currentView = d.parent;
         const group0 = group.attr("pointer-events", "none");
         

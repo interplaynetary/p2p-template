@@ -21,7 +21,8 @@ export class App extends Node {
         
         // Initialize store first
         this.store = new Store(this);
-        
+        this._updateNeeded = true
+        this._pieUpdateNeeded = true
         // Make app instance available globally
         window.app = this;
     }
@@ -30,42 +31,7 @@ export class App extends Node {
     async initialize() {
         this.initalizing = true
         console.log('Starting app initialization...');
-        
-        // Initialize visualization
-        this.updateNeeded = true;
-        this.pieUpdateNeeded = true;
-        this.init();
 
-        // Wait for store to fully sync and load existing data
-        const nodesLoaded = await this.store.sync();
-        console.log('Store sync complete, loaded', nodesLoaded, 'nodes');
-        console.log('App initialized with', this.children.size, 'children');
-        
-        // Now that sync is complete, check if we need example data
-        if (this.children.size === 0) {
-            console.log('No existing data found, initializing example data...');
-            await initializeExampleData(this);
-        }
-        
-        // Start update cycle
-        this.updateInterval = setInterval(() => {
-            if (this.updateNeeded) {
-                console.log('Tree update needed, refreshing visualizations');
-                try {
-                    this.updateTreeMap();
-                } finally {
-                    this.updateNeeded = false;
-                }
-            }
-            if (this.pieUpdateNeeded) {
-                console.log('Pie update needed, refreshing pie chart');
-                this.updatePieChart();
-                this.pieUpdateNeeded = false;
-            }
-        }, 60);
-    }
-
-    init() {
         console.log('App init started');
         const container = document.getElementById('treemap-container');
         console.log('Container found:', !!container);
@@ -86,8 +52,76 @@ export class App extends Node {
         }
         
         this.updatePieChart();
+
         console.log('App init completed');
+
+        // Wait for store to fully sync and load existing data
+        const nodesLoaded = await this.store.sync()
+            .then(async (loaded) => {
+                console.log('Store sync complete, loaded', loaded, 'nodes');
+                
+                // Now that sync is complete, check if we need example data
+                if (this.children.size === 0) {
+                    this.initalizing = false
+                    console.log('No existing data found, initializing example data...');
+                    await initializeExampleData(this);
+                    this.initalizing = true
+                }
+                
+                // Start update cycle
+                this.updateInterval = setInterval(() => {
+                    if (this.updateNeeded) {
+                        console.log('Tree update needed, refreshing visualizations');
+                        try {
+                            this.updateTreeMap();
+                        } finally {
+                            this.updateNeeded = false;
+                        }
+                    }
+                    if (this.pieUpdateNeeded) {
+                        console.log('Pie update needed, refreshing pie chart');
+                        this.updatePieChart();
+                        this.pieUpdateNeeded = false;
+                    }
+                }, 60);
+
+                // Wait for both loading and saving to complete
+                await new Promise(resolve => {
+                    const checkComplete = () => {
+                        if (this.store.isFullyLoaded) {
+                            console.log('All nodes loaded and saved, initialization complete');
+                            resolve();
+                        } else {
+                            const queueSize = this.store.saveQueue.size;
+                            const loadingComplete = this.store._loadingComplete;
+                            console.log(`Waiting for initialization: Loading complete: ${loadingComplete}, Save queue size: ${queueSize}`);
+                            setTimeout(checkComplete, 100);
+                        }
+                    };
+                    checkComplete();
+                });
+
+                this.initalizing = false;
+                return loaded;
+            });
+            
     }
+
+    get updateNeeded() {
+        return this._updateNeeded;
+    }
+
+    set updateNeeded(value) {
+        this._updateNeeded = value;
+    }
+
+    get pieUpdateNeeded() {
+        return this._pieUpdateNeeded;
+    }
+
+    set pieUpdateNeeded(value) {
+        this._pieUpdateNeeded = value;
+    } 
 
     get currentView() {
         console.log('currentView getter called, treemap exists:', !!this.treemap);
@@ -155,8 +189,8 @@ export class App extends Node {
 
     updatePieChart() {
         console.log('updatePieChart started');
-        console.log('Current app children:', Array.from(this.children.entries()));
-        console.log('Current mutual fulfillment distribution:', this.mutualFulfillmentDistribution);
+        // console.log('Current app children:', Array.from(this.children.entries()));
+        // console.log('Current mutual fulfillment distribution:', this.mutualFulfillmentDistribution);
         
         const pieContainer = document.getElementById('pie-container');
         pieContainer.innerHTML = '';
