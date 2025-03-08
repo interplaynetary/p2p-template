@@ -74,6 +74,10 @@ export class Node {
         typeIds: Object.keys(data.typeIds || {}),
         childrenIds: Object.keys(data.childrenIds || {})  // Include children!
     });
+    
+    console.log(`Node ${node.name} loaded with ${Object.keys(data.typeIds || {}).length} typeIds:`, 
+                Object.keys(data.typeIds || {}));
+    
     return node;
   }
 
@@ -95,16 +99,15 @@ export class Node {
 
   // Helper method to get all types in the system
   get rootTypes() {
-    return Array.from(this.root.typeIndex.keys());
+    return Array.from(this.typeIndex.keys());
   }
 
   // Add this node as an instance of the given type
   addType(type) {
-    const root = this.root;
-    if (!root.typeIndex.has(type)) {
-      root.typeIndex.set(type, new Set());
+    if (!this.typeIndex.has(type)) {
+      this.typeIndex.set(type, new Set());
     }
-    root.typeIndex.get(type).add(this);
+    this.typeIndex.get(type).add(this);
     this.types.add(type);
     
     if (type.isContributor) {
@@ -118,10 +121,8 @@ export class Node {
   removeType(type) {
     // Remove from node's types Set
     this.types.delete(type);
-    
-    const root = this.root;
-    if (root.typeIndex.has(type)) {
-      root.typeIndex.get(type).delete(this);
+    if (this.typeIndex.has(type)) {
+      this.typeIndex.get(type).delete(this);
     }
 
     // Recheck contributor status
@@ -135,7 +136,7 @@ export class Node {
     return this;
   }
 
-  addChild(name, points = 0, types = [], id, childrenIds = {},manualFulfillment = null) {
+  addChild(name, points = 0, types = [], id, childrenIds = {}, manualFulfillment = null) {
     if (this.parent && this.isContributor) {
       throw new Error(
         `Node ${this.name} is an instance of a contributor and cannot have children.`
@@ -154,6 +155,14 @@ export class Node {
     return child;
   }
 
+  addNodeChild(node) {
+    node.parent = this;
+    this.children.set(node.name, node);
+    this.save();
+    this.root.initalizing ? null : this.root.updateNeeded = true
+    return node;
+  }
+
   removeChild(name) {
     const child = this.children.get(name);
     if (child) {
@@ -162,7 +171,7 @@ export class Node {
         this.totalChildPoints -= child.points;
       }
       // Remove from type index
-      this.root.typeIndex.forEach(instances => {
+      this.typeIndex.forEach(instances => {
         instances.delete(child);
       });
       // Remove from children
@@ -188,7 +197,7 @@ export class Node {
 
   // Helper method to get all instances of a given type
   getInstances(type) {
-    return this.root.typeIndex.get(type) || new Set();
+    return this.typeIndex.get(type) || new Set();
   }
 
   get weight() {
@@ -319,7 +328,7 @@ export class Node {
   }
 
   shareOfGeneralFulfillment(node) {
-    const instances = this.root.typeIndex.get(node) || new Set();
+    const instances = this.typeIndex.get(node) || new Set();
     return Array.from(instances).reduce((sum, instance) => {
         // Convert types Set to Array before filtering
         const contributorTypesCount = Array.from(instance.types)
@@ -338,7 +347,7 @@ export class Node {
   }
 
   get shareOfGeneralFulfillmentDistribution() {
-    const types = Array.from(this.root.typeIndex.keys())
+    const types = Array.from(this.typeIndex.keys())
 
     return types.map(type => ({
         type,
@@ -354,7 +363,7 @@ export class Node {
 
   get mutualFulfillmentDistribution() {
     // Convert typeIndex keys to Array
-    const types = Array.from(this.root.typeIndex.keys()).filter(
+    const types = Array.from(this.typeIndex.keys()).filter(
         type => this.getInstances(type).size > 0
     );
 

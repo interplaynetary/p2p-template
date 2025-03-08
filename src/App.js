@@ -18,7 +18,7 @@ export class App extends Node {
             [], 
             GunX.user.is.pub
         );
-        
+                
         // Initialize store first
         this.store = new Store(this);
         this._updateNeeded = true

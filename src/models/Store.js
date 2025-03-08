@@ -20,7 +20,7 @@ gun.user() -> {
             },
             points: 0,
             isContributor: true,
-            _manualFulfillment: null
+            _manualFulfillment: null,
         },
         [nodeId]: { ... },  // Other nodes
     },
@@ -31,6 +31,10 @@ gun.user() -> {
     }
 }
 */
+
+// Process
+// 1. Load each node
+// 2. use addNodeChild to add children to each node
 
 export class Store {
     constructor(root) {
@@ -157,6 +161,10 @@ export class Store {
                 pendingLoads--;
                 if (pendingLoads === 0) {
                     console.log('All nodes finished loading');
+                    
+                    // Resolve types before marking loading as complete
+                    // this.resolveTypes();
+                    
                     this._loadingComplete = true;
                     if (this._loadCompleteCallback) this._loadCompleteCallback();
                     resolve();
@@ -247,4 +255,55 @@ export class Store {
     destroy() {
         clearInterval(this.saveInterval);
     }
+
+    /*
+    // New method to resolve type relationships from pendingRelations
+    resolveTypes() {
+        console.log('Resolving types for', this.pendingRelations.length, 'nodes');
+        
+        if (this.pendingRelations.length === 0) {
+            console.log('No pending relations to resolve');
+            return;
+        }
+        
+        // Track nodes with missing types to aid debugging
+        const missingTypes = [];
+        
+        // Process all pending relations to establish type relationships
+        this.pendingRelations.forEach(relation => {
+            const { node, typeIds } = relation;
+            
+            if (!typeIds || typeIds.length === 0) {
+                return; // Skip if no type IDs
+            }
+            
+            console.log(`Resolving ${typeIds.length} types for node ${node.name}`);
+            
+            // Process each type ID
+            typeIds.forEach(typeId => {
+                // Find the type node reference in our loaded nodes
+                const typeNode = this.nodes.get(typeId);
+                
+                if (typeNode) {
+                    console.log(`Adding type ${typeNode.name} to ${node.name}`);
+                    // Add the type to the node
+                    node.addType(typeNode);
+                } else {
+                    // Keep track of missing types for debugging
+                    missingTypes.push({ nodeId: node.id, nodeName: node.name, typeId });
+                    console.warn(`Type node with ID ${typeId} not found for ${node.name}`);
+                }
+            });
+        });
+        
+        if (missingTypes.length > 0) {
+            console.warn('Missing type nodes:', missingTypes);
+        } else {
+            console.log('All types resolved successfully');
+        }
+        
+        // Clear pending relations after processing
+        this.pendingRelations = [];
+    }
+    */
 }
