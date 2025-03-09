@@ -117,7 +117,7 @@ Surplus can be distributed directly/transitively via *Mutual-Recognition Distrib
 A lot of civil-society is organized around mutually-referencing right-obligation pairs.
 
 Some examples:
-- The right to a loan carries with it the corresponding obligation to repay, the right was obtain by granting the right to seize collateral to the lender and taking on the obligation to comply with any such seizures.
+- The right to a loan carries with it the corresponding obligation to repay, the right was obtained by granting the right to seize collateral to the lender and taking on the obligation to comply with any such seizures.
 - The right to a court hearing means some judge carries the corresponding obligation to preside over the hearing. 
 
 And these rights/obligations can often be transfered! Debtors regularly trade and transfer the right to collect on debt (seconary repo markets). Similarly the obligation to preside over a hearing may rotate from judge to judge!

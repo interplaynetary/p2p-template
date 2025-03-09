@@ -1,21 +1,22 @@
 {
   "name": "free-association",
-  "version": "1.0.0",
-  "dependencies": {
-    "d3": "^7.9.0",
-    "gun": "^0.2020.1240"
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
-    "http-server": "^14.1.1",
-    "webpack": "^5.0.0",
-    "webpack-cli": "^4.0.0"
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
   },
-  "scripts": {
-    "start": "http-server -c-1"
-  },
-  "main": "index.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "dependencies": {
+    "@peculiar/webcrypto": "^1.5.0",
+    "@types/jquery": "^3.5.32",
+    "d3": "^7.9.0",
+    "gun": "^0.2020.1240",
+    "jquery": "^3.7.1"
+  }
 }
