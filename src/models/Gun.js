@@ -2,8 +2,7 @@
 const SEA = Gun.SEA;
 console.log('Initializing Gun with peer:', ['http://127.0.0.1:5500/gun']);
 
-/** @type {import('gun').IGunInstance} */
-var gun = Gun(
+let gun = Gun(
   {
     peers: ['http://127.0.0.1:5500/gun'],
     localStorage: true

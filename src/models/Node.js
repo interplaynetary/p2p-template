@@ -27,14 +27,14 @@ export class Node {
   }
 
   save() {
-    if (this.root.store && !this.root.initalizing) {
+    if (this.root.store && !this.root.initializing) {
       console.log('saving node', this.name, 'to store', this.root.store);
       this.root.store.saveQueue.add(this);
     }
   }
 
   delete() {
-    if (this.root.store && !this.root.initalizing) {
+    if (this.root.store && !this.root.initializing) {
       this.root.store.removeNode(this);
     }
   }
@@ -60,7 +60,7 @@ export class Node {
       this.isContributor = true;
     }
     this.save();
-    this.root.initalizing ? null : this.root.updateNeeded = true
+    this.root.initializing ? null : this.root.updateNeeded = true
     return this;
   }
 
@@ -78,7 +78,7 @@ export class Node {
       this.isContributor = Array.from(this.types).some(t => t.isContributor);
     }    
     this.save();
-    this.root.initalizing ? null : this.root.updateNeeded = true
+    this.root.initializing ? null : this.root.updateNeeded = true
     return this;
   }
 
@@ -91,51 +91,45 @@ export class Node {
 
     const child = new Node(name, this, types, id, childrenIds, manualFulfillment);
 
-    this.children.set(name, child);
+    this.children.set(child.id, child);
     if (points > 0) {
       child.setPoints(points);
     }
     this.save();
-    console.log('adding child', name, 'to', this.name, 'root', this.root, 'initalizing', this.root.initalizing)
-    this.root.initalizing ? null : this.root.updateNeeded = true
+    this.root.initializing ? null : this.root.updateNeeded = true
     return child;
   }
 
   addNodeChild(node) {
     node.parent = this;
-    this.children.set(node.name, node);
+    this.children.set(node.id, node);
     this.save();
-    this.root.initalizing ? null : this.root.updateNeeded = true
+    this.root.initializing ? null : this.root.updateNeeded = true
     return node;
   }
 
-  removeChild(name) {
-    const child = this.children.get(name);
+  removeChild(childId) {
+    const child = this.children.get(childId);
     if (child) {
-      // Update points
       if (child.points > 0) {
         this.totalChildPoints -= child.points;
       }
-      // Remove from type index
       this.typeIndex.forEach(instances => {
         instances.delete(child);
       });
-      // Remove from children
-      this.children.delete(name);
+      this.children.delete(child.id);
     }
     this.save();
-    this.root.initalizing ? null : this.root.updateNeeded = true
+    this.root.initializing ? null : this.root.updateNeeded = true
     return this;
   }
 
   setPoints(points) {
-    // console.log('Setting points for', this.name, points);
     this.points = points;
     this.save();
-      this.root.initalizing ? null : this.root.pieUpdateNeeded = true
+    this.root.initializing ? null : this.root.pieUpdateNeeded = true
     return this;
   }
-
 
   get totalChildPoints() {
     return this.children.values().reduce((sum, child) => sum + child.points, 0) || 0;

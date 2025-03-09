@@ -1,5 +1,5 @@
 // Import Node if you're using modules
-import { Node } from './models/Node.js';
+import { Node } from './models/Node';
 
 // Export the initialization function
 export async function initializeExampleData(app) {

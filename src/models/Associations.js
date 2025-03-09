@@ -1,3 +1,5 @@
+import { Node } from './Node';
+
 class SocialNode extends Node {
     constructor(name, parent = null, types = [], isContributor = true) {
         super(name, parent, types, isContributor);
