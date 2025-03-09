@@ -111,7 +111,6 @@ Surplus can be distributed directly/transitively via *Mutual-Recognition Distrib
 4. Holders can stop expressing Desire and Playing at any time
 5. Relations can be composed into larger structures while maintaining these properties
 
-
 <details>
   <summary><b><i>Why Roles? Beyond Obligation</i></b></summary>
 
@@ -137,6 +136,8 @@ Well you could call them whatever you want, giver/reciever, producer/consumer et
 However, I am particular drawn to **provider/user** because it is general enough to encapsulate the entirity of production, distribution, and consumption, while avoiding connatations like ownership/private-property/transfer of ownership (potentially implied in the giver/reciever).
 
 For example: One can be *provided* housing, a glass of wine, etc. while this in no way implies the transfer of ownership!
+
+So these role-relations are less about property, rights/obligations and are more about *social-material coordination-potential*
 
 </details>
 

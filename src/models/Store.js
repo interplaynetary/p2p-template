@@ -20,7 +20,7 @@ gun.user() -> {
             },
             points: 0,
             isContributor: true,
-            _manualFulfillment: null,
+            manualFulfillment: null,
         },
         [nodeId]: { ... },  // Other nodes
     },
@@ -35,20 +35,20 @@ gun.user() -> {
 // Process
 // 1. Load each node
 // 2. use addNodeChild to add children to each node
+// 3. use addType to add the nodes corresponding types to each node
 
 export class Store {
     constructor(root) {
         this.root = root
         this.saveQueue = new Set();
-        // Get references to our Gun paths
         this.nodesRef = GunX.user.get('nodes');
         this.typesRef = GunX.user.get('types');
-        
-        // Local cache for quick lookups
+
         this.nodes = new Map();
-        this.pendingRelations = [];
-        this._loadingComplete = false;
+        this.nodes.set(root.id, root);
         
+        this.pendingRelations = [];
+
         // Start syncing
         this.sync();
 
@@ -57,11 +57,147 @@ export class Store {
             if (this.saveQueue.size > 0) {
                 this.processSaveQueue();
             }
-        }, 100); // Process queue every 100ms
+        }, 100);
+    }
+    async sync() {
+        // Prevent multiple syncs
+        console.log('Starting store sync...');
+        this._syncing = true;
+        
+        try {
+            // Initial load
+            await this.loadAll();
+        } finally {
+            this._syncing = false;
+        }
     }
 
-    get isFullyLoaded() {
-        return this._loadingComplete && this.saveQueue.size === 0;
+    // Persistence transformations
+    toGun(node) {        
+        const data = {
+            id: node.id,
+            name: node.name,
+            parentId: node.parentId(),
+            points: Number(node.points) || 0,
+            isContributor: Boolean(node.isContributor),
+            manualFulfillment: node.manualFulfillment === null ? 
+                null : 
+                Number(node.manualFulfillment),
+            childrenIds: {},
+            typeIds: {}
+        };
+
+        // Convert children to Gun format
+        node.children.forEach(child => {
+            if (child && child.id) {
+                data.childrenIds[child.id] = true;
+            }
+        });
+
+        // Convert types to Gun format
+        node.types.forEach(type => {
+            if (type && type.id) {
+                data.typeIds[type.id] = true;
+            }
+        });
+
+        // console.log('Converted data:', data); // Add logging
+        return data;
+    }
+
+    fromGun(data) {
+        const node = new Node(data.name, null, [], data.id, {}, data.manualFulfillment);
+        node.points = data.points || 0;
+        node.isContributor = data.isContributor || false;
+        
+        // Store ALL relationships for later resolution
+        this.pendingRelations.push({
+            node,
+            parentId: data.parentId,
+            typeIds: this.nodesRef.get(data.id).get('typeIds').once((typeIds) => {
+                // Gun has already resolved the references internally at this point
+                if(typeIds instanceof Object) {
+                    const result = Object.keys(typeIds).filter(id => id !== '_');
+                    console.log(data.name, 'typeIds:', result);
+                    return result;
+                } else {
+                    return [];
+                }
+            }),
+            childrenIds: this.nodesRef.get(data.id).get('childrenIds').once((childrenIds) => {
+                // Gun has already resolved the references internally at this point
+                if(childrenIds instanceof Object) {
+                    const result = Object.keys(childrenIds).filter(id => id !== '_');
+                    console.log(data.name, 'childrenIds:', result);
+                    return result;
+                } else {
+                    return []
+                }
+            })
+        });
+        
+        return node;
+      }
+
+      async loadNode(nodeId) {
+        return new Promise(async (resolve) => {
+            this.nodesRef.get(nodeId).once((nodeData) => {
+                const loadedNode = this.fromGun(nodeData);
+                this.nodes.set(nodeId, loadedNode);
+                resolve(loadedNode);
+            });
+        });
+    }
+
+    async processPendingRelations() {
+        console.log(`Processing ${this.pendingRelations.length} pending relations`);
+        // we need to resolve the gun references for the childrenIds & typeIds
+        for (const relation of this.pendingRelations) {
+            const { node, parentId, typeIds, childrenIds } = relation;
+            const parent = this.nodes.get(parentId);
+            node.parent = parent;
+            const children = childrenIds.map(id => this.nodes.get(id));
+            if (children.length > 0) {
+                for (const child of children) {
+                    if (child) {
+                        node.addNodeChild(child); 
+                    }
+                }
+            }
+            const types = typeIds.map(id => this.nodes.get(id));
+            if (types.length > 0) {
+                for (const type of types) {
+                    if (type) {
+                        node.addType(type);
+                    }
+                }
+            }
+            this.pendingRelations.shift();
+        }
+        this.pendingRelations = [];
+    }
+
+
+    async loadAll() {
+        // Create a promise that resolves when all nodes are loaded
+        return new Promise((resolveAll) => {            
+            // Use Gun's map function to iterate over all nodes
+            this.nodesRef.map().once((nodeData) => {
+                if (!nodeData) return; // Skip if already loaded or null
+                // Load the node into our local cache
+                const loadedNode = this.fromGun(nodeData);
+                this.nodes.set(nodeData.id, loadedNode);
+                
+                console.log(`Loaded node ${nodeData.id}: ${nodeData.name}`);
+            });
+            
+            // We need to wait a bit after map().once() to ensure all callbacks have fired
+            // Gun doesn't provide a built-in way to know when map is complete
+            setTimeout(async () => {
+                await this.processPendingRelations();
+                resolveAll();
+            }, 800); // Wait 800ms to ensure all nodes and types have loaded
+        });
     }
 
     async processSaveQueue() {
@@ -75,11 +211,11 @@ export class Store {
             console.log('About to save nodes:', nodesToSave.map(n => ({
                 id: n.id,
                 name: n.name,
-                data: n.toGun()
+                data: this.toGun(n)
             })));
 
             await Promise.all(nodesToSave.map(async (node) => {
-                const data = node.toGun();
+                const data = this.toGun(node);
                 // console.log('Saving node from queue:', node.name);
                 
                 return new Promise((resolve, reject) => {
@@ -102,141 +238,6 @@ export class Store {
         }
     }
 
-    async sync() {
-        // Prevent multiple syncs
-        if (this._syncing) {
-            console.log('Sync already in progress...');
-            return this._currentSync;
-        }
-
-        console.log('Starting store sync...');
-        this._syncing = true;
-        
-        try {
-            // Create a promise that resolves when initial load is complete
-            this._currentSync = new Promise((resolve) => {
-                this._loadCompleteCallback = resolve;
-            });
-
-            // Subscribe to real-time updates only once
-            if (!this._subscribed) {
-        this.nodesRef.on((data, key) => {
-            if (!data) return;
-            
-            // Update local cache
-            const node = Node.fromGun(data, this);
-            this.nodes.set(key, node);
-            
-            // Set root if this is the user's root node
-            if (key === GunX.user.is.pub) {
-                        this.root = node;
-                    }
-                });
-                this._subscribed = true;
-            }
-
-            
-            // Initial load
-            await this.loadNodes();
-
-            // Wait for load to complete
-            console.log('Waiting for load to complete...');
-            await this._currentSync;
-            
-            const nodeCount = this.nodes.size;
-            const childCount = this.root ? this.root.children.size : 0;
-            
-            return nodeCount;
-        } finally {
-            this._syncing = false;
-        }
-    }
-
-    async loadNodes(parentNode = null) {
-        return new Promise((resolve) => {
-            console.log('Loading nodes from Gun...');
-            let pendingLoads = 0;
-
-            const markLoadComplete = () => {
-                pendingLoads--;
-                if (pendingLoads === 0) {
-                    console.log('All nodes finished loading');
-                    
-                    // Resolve types before marking loading as complete
-                    // this.resolveTypes();
-                    
-                    this._loadingComplete = true;
-                    if (this._loadCompleteCallback) this._loadCompleteCallback();
-                    resolve();
-                }
-            };
-
-            const node = parentNode ? parentNode : this.root;
-            const nodeId = parentNode ? parentNode.id : GunX.user.is.pub;
-            
-            this.nodesRef.get(nodeId).once((nodeData) => {
-                if (!parentNode) {
-                    if (!nodeData || !nodeData.name) {
-                        console.warn('No root node found');
-                        this._loadingComplete = true;
-                        if (this._loadCompleteCallback) this._loadCompleteCallback();
-                        resolve();
-                        return;
-                    }
-                    this.nodes.set(nodeId, this.root);
-                }
-
-                this.nodesRef.get(nodeId).get('childrenIds').once((childrenIds) => {
-                    if (!childrenIds || typeof childrenIds !== 'object') {
-                        markLoadComplete();
-                        return;
-                    }
-
-                    const childIds = Object.keys(childrenIds)
-                        .filter(id => id !== '_');
-                    
-                    if (childIds.length === 0) {
-                        markLoadComplete();
-                        return;
-                    }
-
-                    console.log(`Found ${childIds.length} children to load`);
-                    pendingLoads += childIds.length;
-                    
-                    childIds.forEach(childId => {
-                        this.nodesRef.get(childId).once((childData) => {
-                            if (!childData || !childData.name) {
-                                console.warn('Invalid child node:', childId);
-                                markLoadComplete();
-                                return;
-                            }
-                            
-                            if (!this.nodes.has(childId)) {
-                                console.log('Loading child node:', childId, childData);
-                                
-                                try {
-                                    const childNode = node.addChild(
-                                        childData.name,
-                                        childData.points || 0,
-                                        [], // types will be added later
-                                        childId,
-                                        childData.childrenIds,
-                                        childData._manualFulfillment
-                                    );
-                                    
-                                    console.log('Loaded child node:', childNode);
-                                    this.loadNodes(childNode);
-                                } catch (error) {
-                                    console.error(`Error adding child ${childId}:`, error);
-                                }
-                            }
-                            markLoadComplete();
-                        });
-                    });
-                });
-            });
-        });
-    }
 
     async removeNode(node) {
         // Remove from Gun
@@ -251,59 +252,7 @@ export class Store {
         this.nodes.delete(node.id);
     }
 
-    // Clean up interval on destroy
     destroy() {
         clearInterval(this.saveInterval);
     }
-
-    /*
-    // New method to resolve type relationships from pendingRelations
-    resolveTypes() {
-        console.log('Resolving types for', this.pendingRelations.length, 'nodes');
-        
-        if (this.pendingRelations.length === 0) {
-            console.log('No pending relations to resolve');
-            return;
-        }
-        
-        // Track nodes with missing types to aid debugging
-        const missingTypes = [];
-        
-        // Process all pending relations to establish type relationships
-        this.pendingRelations.forEach(relation => {
-            const { node, typeIds } = relation;
-            
-            if (!typeIds || typeIds.length === 0) {
-                return; // Skip if no type IDs
-            }
-            
-            console.log(`Resolving ${typeIds.length} types for node ${node.name}`);
-            
-            // Process each type ID
-            typeIds.forEach(typeId => {
-                // Find the type node reference in our loaded nodes
-                const typeNode = this.nodes.get(typeId);
-                
-                if (typeNode) {
-                    console.log(`Adding type ${typeNode.name} to ${node.name}`);
-                    // Add the type to the node
-                    node.addType(typeNode);
-                } else {
-                    // Keep track of missing types for debugging
-                    missingTypes.push({ nodeId: node.id, nodeName: node.name, typeId });
-                    console.warn(`Type node with ID ${typeId} not found for ${node.name}`);
-                }
-            });
-        });
-        
-        if (missingTypes.length > 0) {
-            console.warn('Missing type nodes:', missingTypes);
-        } else {
-            console.log('All types resolved successfully');
-        }
-        
-        // Clear pending relations after processing
-        this.pendingRelations = [];
-    }
-    */
 }

@@ -1,4 +1,4 @@
-// subtype tres (planet, city, berlin, kreuzberg)
+// subtype trees (planet, city, berlin, kreuzberg)
 
 export class Node {
   constructor(name, parent = null, types = [], id = null, childrenIds = {}, manualFulfillment = null) {
@@ -10,7 +10,7 @@ export class Node {
     this.children = new Map();
     this.childrenIds = childrenIds;
     this.isContributor = !this.parent;
-    this._manualFulfillment = manualFulfillment;
+    this.manualFulfillment = manualFulfillment;
     
     // Initialize types as a Set
     this.types = new Set(types);
@@ -26,63 +26,9 @@ export class Node {
     }
   }
 
-  // Persistence transformations
-  toGun() {
-    // console.log('Converting node to Gun format:', this.name); // Add logging
-    
-    const data = {
-        id: this.id,
-        name: this.name,
-        parentId: this.parentId(),
-        points: Number(this.points) || 0,
-        isContributor: Boolean(this.isContributor),
-        _manualFulfillment: this._manualFulfillment === null ? 
-            null : 
-            Number(this._manualFulfillment),
-        childrenIds: {},
-        typeIds: {}
-    };
-
-    // Convert children to Gun format
-    this.children.forEach(child => {
-        if (child && child.id) {
-            data.childrenIds[child.id] = true;
-        }
-    });
-
-    // Convert types to Gun format
-    this.types.forEach(type => {
-        if (type && type.id) {
-            data.typeIds[type.id] = true;
-        }
-    });
-
-    // console.log('Converted data:', data); // Add logging
-    return data;
-  }
-
-  static fromGun(data, store) {
-    const node = new Node(data.name, null, [], data.id, data.childrenIds, data._manualFulfillment);
-    node.points = data.points || 0;
-    node.isContributor = data.isContributor || false;
-    node._manualFulfillment = data._manualFulfillment?.value ?? null;
-    
-    // Store ALL relationships for later resolution
-    store.pendingRelations.push({
-        node,
-        parentId: data.parentId,
-        typeIds: Object.keys(data.typeIds || {}),
-        childrenIds: Object.keys(data.childrenIds || {})  // Include children!
-    });
-    
-    console.log(`Node ${node.name} loaded with ${Object.keys(data.typeIds || {}).length} typeIds:`, 
-                Object.keys(data.typeIds || {}));
-    
-    return node;
-  }
-
   save() {
     if (this.root.store && !this.root.initalizing) {
+      console.log('saving node', this.name, 'to store', this.root.store);
       this.root.store.saveQueue.add(this);
     }
   }
@@ -262,7 +208,7 @@ export class Node {
   // The core method: fulfilled():
   // 1. Leaf nodes with isContributor == true → full 1.0 fulfillment
   // 2. Leaf nodes with isContributor == false → 0
-  // 3. If _manualFulfillment is set and node has both contributor and non-contributor children:
+  // 3. If manualFulfillment is set and node has both contributor and non-contributor children:
   //    merges the manual fulfillment for contributor children with the calculated fulfillment for non-contributor children using a weighted approach.
   // 4. Otherwise falls back to summing child fulfillments * shareOfParent().
 
@@ -274,12 +220,12 @@ export class Node {
 
       // If fulfillment was manually set and node has contributor children
       if (
-        this._manualFulfillment !== null &&
+        this.manualFulfillment !== null &&
         this.hasDirectContributorChild
       ) {
         // If we only have contributor children, return manual fulfillment
         if (!this.hasNonContributorChild) {
-          return this._manualFulfillment;
+          return this.manualFulfillment;
         }
 
         // For hybrid case: combine manual fulfillment for contributor children
@@ -290,7 +236,7 @@ export class Node {
           this.nonContributorChildrenFulfillment;
 
         return (
-          this._manualFulfillment * contributorChildrenWeight +
+          this.manualFulfillment * contributorChildrenWeight +
           nonContributorFulfillment * (1 - contributorChildrenWeight)
         );
       }
@@ -318,7 +264,7 @@ export class Node {
       if (value < 0 || value > 1) {
         throw new Error('Fulfillment must be between 0 and 1');
       }
-      this._manualFulfillment = value;
+      this.manualFulfillment = value;
       this.save();
       return this;
     };

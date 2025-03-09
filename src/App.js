@@ -59,7 +59,7 @@ export class App extends Node {
         const nodesLoaded = await this.store.sync()
             .then(async (loaded) => {
                 console.log('Store sync complete, loaded', loaded, 'nodes');
-                
+                /*
                 // Now that sync is complete, check if we need example data
                 if (this.children.size === 0) {
                     this.initalizing = false
@@ -67,6 +67,7 @@ export class App extends Node {
                     await initializeExampleData(this);
                     this.initalizing = true
                 }
+                */
                 
                 // Start update cycle
                 this.updateInterval = setInterval(() => {
@@ -84,22 +85,6 @@ export class App extends Node {
                         this.pieUpdateNeeded = false;
                     }
                 }, 60);
-
-                // Wait for both loading and saving to complete
-                await new Promise(resolve => {
-                    const checkComplete = () => {
-                        if (this.store.isFullyLoaded) {
-                            console.log('All nodes loaded and saved, initialization complete');
-                            resolve();
-                        } else {
-                            const queueSize = this.store.saveQueue.size;
-                            const loadingComplete = this.store._loadingComplete;
-                            console.log(`Waiting for initialization: Loading complete: ${loadingComplete}, Save queue size: ${queueSize}`);
-                            setTimeout(checkComplete, 100);
-                        }
-                    };
-                    checkComplete();
-                });
 
                 this.initalizing = false;
                 return loaded;
