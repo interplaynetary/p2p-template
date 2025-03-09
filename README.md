@@ -85,18 +85,6 @@ This approach represents a fundamental shift from traditional charity or market-
 </details>
 
 **Let:**
-- **Association** = a set of relations where:
-1. Each Relation consists of (Provider-Role, User-Role)
-2. Each Role has a Holder who can:
-   - Express Desire (Will to Play)
-   - Express Playing (Active-Participation)
-3. Relations become Active only when:
-   - Both Role-Holders express Desire
-   - Both Role-Holders express Playing
-4. Holders can stop expressing Desire and Playing at any time
-5. Relations can be composed into larger structures while maintaining these properties
-
-**Let:**
 - **Surplus** = Roles one holds but does not desire
 
 **Definitions:**
@@ -110,6 +98,47 @@ Surplus can be distributed directly/transitively via *Mutual-Recognition Distrib
 *The distribution of surplus-roles through networks of mutual-contribution is a form of distributed-peer-discovery/offering/matching! Finding collaborators who directly/transitively contribute to your eachother's self-actualization!*
 
 *What one is actually distributing surplus to is one's **direct/transitive mutual-self-actualization***
+
+**Let:**
+- **Association** = a set of relations where:
+1. Each Relation consists of (Provider-Role, User-Role)
+2. Each Role has a Holder who can:
+   - Express Desire (Will to Play)
+   - Express Playing (Active-Participation)
+3. Relations become Active only when:
+   - Both Role-Holders express Desire
+   - Both Role-Holders express Playing
+4. Holders can stop expressing Desire and Playing at any time
+5. Relations can be composed into larger structures while maintaining these properties
+
+
+<details>
+  <summary><b><i>Why Roles? Beyond Obligation</i></b></summary>
+
+A lot of civil-society is organized around mutually-referencing right-obligation pairs.
+
+Some examples:
+- The right to a loan carries with it the corresponding obligation to repay, the right was obtain by granting the right to seize collateral to the lender and taking on the obligation to comply with any such seizures.
+- The right to a court hearing means some judge carries the corresponding obligation to preside over the hearing. 
+
+And these rights/obligations can often be transfered! Debtors regularly trade and transfer the right to collect on debt (seconary repo markets). Similarly the obligation to preside over a hearing may rotate from judge to judge!
+
+To give another example, a reciept for purchasing a coffee represents a right to the drink/food, and the issuer of the reciept has the corresponding obligation to provide the coffee.
+
+And of course these obligations are often enforced by the threat or use of the force of state-intervention.
+
+Instead of mutually-referencing right-obligation pairs, free-association introduces mutually-referencing role-pairs that go beyond the concept of right/obligation.
+
+In contrast with obligations which one must do, regardless of whether one desires, relations in free-association activate only through mutual desire and participation, where either player of the role can stop expressing desire to play at any time - at which point the role counts as *surplus*, that can be distributed through mutual-recognition networks until it arrives at someone who once again desires to play the role!
+
+**Why provider/user?**
+Well you could call them whatever you want, giver/reciever, producer/consumer etc. 
+
+However, I am particular drawn to **provider/user** because it is general enough to encapsulate the entirity of production, distribution, and consumption, while avoiding connatations like ownership/private-property/transfer of ownership (potentially implied in the giver/reciever).
+
+For example: One can be *provided* housing, a glass of wine, etc. while this in no way implies the transfer of ownership!
+
+</details>
 
 **Let:**
 - **Total Recognition = 100%**
