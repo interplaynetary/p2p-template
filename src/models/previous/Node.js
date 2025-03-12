@@ -1,34 +1,57 @@
 // subtype trees (planet, city, berlin, kreuzberg)
 
 export class Node {
-  constructor(name, parent = null, types = [], id = null, childrenIds = {}, manualFulfillment = null) {
+  constructor(name, parentId = null, typeIds = [], id = null, childrenIds = {}, manualFulfillment = null) {
     this.name = name;
     this.id = id || crypto.randomUUID();
-    this.parent = parent;
-    this.parentId = () => parent ? parent.id : null;
+    this._parent = null; // The actual parent reference
+    this.parentId = parentId; // Store the parentId directly
     this.points = 0;
+    
+    // Change from Map to direct storage of object references (for now)
+    // We'll use the addNodeChild and related methods to maintain both
+    // our internal model and the Gun-compatible structure
     this.children = new Map();
-    this.childrenIds = childrenIds;
-    this.isContributor = !this.parent;
+    
+    // Gun-style direct childrenIds object with {[id]: true} structure
+    this.childrenIds = childrenIds || {};
+    
+    this.isContributor = !this.parentId; // If no parentId, it's a root node
     this.manualFulfillment = manualFulfillment;
     
-    // Initialize types as a Set
-    this.types = new Set(types);
+    // Change typeIds from Set to object with {[id]: true} structure
+    this.typeIds = {};
+    if (Array.isArray(typeIds)) {
+      typeIds.forEach(id => this.typeIds[id] = true);
+    } else if (typeof typeIds === 'object') {
+      this.typeIds = {...typeIds}; // Copy the object
+    }
     
-    // Map of type -> Set of instances
-    this.typeIndex = parent ? this.root.typeIndex : new Map();
+    // Map of typeId -> Set of instance ids (for our internal model)
+    // Only create a new Map if this is a root node (no parentId)
+    this.typeIndex = this.parentId ? null : new Map();
     
-    // Then add types after store is ready
-    if (types.length > 0) {
-      // Use Promise.all to handle async type additions
-      Promise.all(types.map(type => this.addType(type)))
-        .catch(err => console.error('Error adding types:', err));
+    // Add each typeId - we'll do this after we resolve the parent reference
+  }
+
+  // Get and set parent to update parentId automatically
+  get parent() {
+    return this._parent;
+  }
+
+  set parent(newParent) {
+    this._parent = newParent;
+    this.parentId = newParent ? newParent.id : null;
+    
+    // Update typeIndex reference
+    if (newParent) {
+      this.typeIndex = this.root.typeIndex;
     }
   }
 
   save() {
     if (this.root.store && !this.root.initializing) {
-      console.log('saving node', this.name, 'to store', this.root.store);
+      // console.log('saving node', this.name, 'to store', this.root.store);
       this.root.store.saveQueue.add(this);
     }
   }
@@ -43,55 +66,90 @@ export class Node {
     return this.parent ? this.parent.root : this;
   }
 
-  // Helper method to get all types in the system
-  get rootTypes() {
-    return Array.from(this.typeIndex.keys());
+  // Helper method to get all typeIds in the system
+  get rootTypeIds() {
+    return this.typeIndex ? Array.from(this.typeIndex.keys()) : [];
   }
 
   // Add this node as an instance of the given type
-  addType(type) {
-    if (!this.typeIndex.has(type)) {
-      this.typeIndex.set(type, new Set());
+  addType(typeId) {
+    // Make sure typeIndex is available
+    if (!this.typeIndex) {
+      if (this.parent) {
+        this.typeIndex = this.root.typeIndex;
+      } else {
+        this.typeIndex = new Map();
+      }
     }
-    this.typeIndex.get(type).add(this);
-    this.types.add(type);
     
-    if (type.isContributor) {
+    if (!this.typeIndex.has(typeId)) {
+      this.typeIndex.set(typeId, new Set());
+    }
+    this.typeIndex.get(typeId).add(this.id);
+    
+    // Update the Gun-compatible structure
+    this.typeIds[typeId] = true;
+    
+    // Check if this is a contributor type by looking it up in the store
+    const type = this.root.store?.nodes.get(typeId);
+    if (type?.isContributor) {
       this.isContributor = true;
     }
+    
     this.save();
     this.root.initializing ? null : this.root.updateNeeded = true
     return this;
   }
 
-  removeType(type) {
-    // Remove from node's types Set
-    this.types.delete(type);
-    if (this.typeIndex.has(type)) {
-      this.typeIndex.get(type).delete(this);
+  removeType(typeId) {
+    // Remove from Gun-compatible structure
+    delete this.typeIds[typeId];
+    
+    // Remove from internal typeIndex
+    if (this.typeIndex.has(typeId)) {
+      this.typeIndex.get(typeId).delete(this.id);
     }
 
     // Recheck contributor status
     if (!this.parent) {
       this.isContributor = true;
     } else {
-      this.isContributor = Array.from(this.types).some(t => t.isContributor);
+      // Look up each type in store to check contributor status
+      this.isContributor = Object.keys(this.typeIds).some(tid => {
+        const type = this.root.store?.nodes.get(tid);
+        return type?.isContributor;
+      });
     }    
     this.save();
     this.root.initializing ? null : this.root.updateNeeded = true
     return this;
   }
 
-  addChild(name, points = 0, types = [], id, childrenIds = {}, manualFulfillment = null) {
-    if (this.parent && this.isContributor) {
+  addChild(name, points = 0, typeIds = [], id, childrenIds = {}, manualFulfillment = null) {
+    if (this.parentId && this.isContributor) {
       throw new Error(
         `Node ${this.name} is an instance of a contributor and cannot have children.`
       );
     }
 
-    const child = new Node(name, this, types, id, childrenIds, manualFulfillment);
+    // Create child with this node's ID as parentId
+    const child = new Node(name, this.id, typeIds, id, childrenIds, manualFulfillment);
+    
+    // Resolve references to set up the parent-child relationship
+    child._parent = this;
+    
+    // Initialize typeIndex if the child will need it
+    if (Object.keys(child.typeIds).length > 0) {
+      child.typeIndex = this.root.typeIndex;
+      Object.keys(child.typeIds).forEach(typeId => child.addType(typeId));
+    }
 
+    // Add to internal children Map
     this.children.set(child.id, child);
+    
+    // Add to Gun-compatible childrenIds structure
+    this.childrenIds[child.id] = true;
+    
     if (points > 0) {
       child.setPoints(points);
     }
@@ -101,23 +159,42 @@ export class Node {
   }
 
   addNodeChild(node) {
-    node.parent = this;
+    // Set up the parent-child relationship
+    node._parent = this;
+    node.parentId = this.id;
+    
+    // Initialize typeIndex if needed
+    if (!node.typeIndex && Object.keys(node.typeIds).length > 0) {
+      node.typeIndex = this.root.typeIndex;
+      Object.keys(node.typeIds).forEach(typeId => node.addType(typeId));
+    }
+    
+    // Add the child ID to our childrenIds object (primary storage)
+    this.childrenIds[node.id] = true;
+    
+    // Also maintain our children Map for backward compatibility
     this.children.set(node.id, node);
+    
     this.save();
     this.root.initializing ? null : this.root.updateNeeded = true
     return node;
   }
 
   removeChild(childId) {
-    const child = this.children.get(childId);
-    if (child) {
-      if (child.points > 0) {
-        this.totalChildPoints -= child.points;
+    const childToRemove = this.root.store?.nodes.get(childId) || this.children.get(childId);
+    if (childToRemove) {
+      // Remove from typeIndex
+      if (this.typeIndex) {
+        this.typeIndex.forEach(instances => {
+          instances.delete(childToRemove.id);
+        });
       }
-      this.typeIndex.forEach(instances => {
-        instances.delete(child);
-      });
-      this.children.delete(child.id);
+      
+      // Remove from Gun-compatible childrenIds structure (primary)
+      delete this.childrenIds[childToRemove.id];
+      
+      // Also remove from children Map for backward compatibility
+      this.children.delete(childToRemove.id);
     }
     this.save();
     this.root.initializing ? null : this.root.updateNeeded = true
@@ -132,12 +209,12 @@ export class Node {
   }
 
   get totalChildPoints() {
-    return this.children.values().reduce((sum, child) => sum + child.points, 0) || 0;
+    return Array.from(this.children.values()).reduce((sum, child) => sum + child.points, 0) || 0;
   }
 
   // Helper method to get all instances of a given type
-  getInstances(type) {
-    return this.typeIndex.get(type) || new Set();
+  getInstances(typeId) {
+    return this.typeIndex.get(typeId) || new Set();
   }
 
   get weight() {
@@ -173,7 +250,9 @@ export class Node {
         .filter(child => child.isContributor)
         .reduce((sum, child) => sum + child.points, 0);
 
-      return contributorPoints / this.totalChildPoints;
+      const totalPoints = this.totalChildPoints;
+      // Return 0 if no children points to avoid division by zero
+      return totalPoints > 0 ? contributorPoints / totalPoints : 0;
   };
 
   get contributorChildrenFulfillment() {
@@ -208,7 +287,7 @@ export class Node {
 
     get fulfilled() {
       // For leaf nodes (no children)
-      if (this.children.size === 0) {
+      if (Object.keys(this.childrenIds).length === 0) {
         return this.isContributor ? 1 : 0;
       }
 
@@ -267,12 +346,18 @@ export class Node {
     return this.fulfilled * this.weight;
   }
 
-  shareOfGeneralFulfillment(node) {
-    const instances = this.typeIndex.get(node) || new Set();
-    return Array.from(instances).reduce((sum, instance) => {
-        // Convert types Set to Array before filtering
-        const contributorTypesCount = Array.from(instance.types)
-            .filter(type => type.isContributor)
+  shareOfGeneralFulfillment(nodeId) {
+    const instances = this.typeIndex.get(nodeId) || new Set();
+    return Array.from(instances).reduce((sum, instanceId) => {
+        const instance = this.root.store?.nodes.get(instanceId);
+        if (!instance) return sum;
+
+        // Count contributor types
+        const contributorTypesCount = Object.keys(instance.typeIds)
+            .filter(tid => {
+                const type = this.root.store?.nodes.get(tid);
+                return type?.isContributor;
+            })
             .length;
 
         const fulfillmentWeight = instance.fulfilled * instance.weight;
@@ -287,30 +372,29 @@ export class Node {
   }
 
   get shareOfGeneralFulfillmentDistribution() {
-    const types = Array.from(this.typeIndex.keys())
+    const typeIds = Array.from(this.typeIndex.keys());
 
-    return types.map(type => ({
-        type,
-        value: this.shareOfGeneralFulfillment(type),
+    return typeIds.map(typeId => ({
+        typeId,
+        value: this.shareOfGeneralFulfillment(typeId),
     })).filter(entry => entry.value > 0);
   }
 
-  mutualFulfillment(node) {
-    const recognitionFromHere = this.shareOfGeneralFulfillment(node);
-    const recognitionFromThere = node.shareOfGeneralFulfillment(this);
+  mutualFulfillment(nodeId) {
+    const recognitionFromHere = this.shareOfGeneralFulfillment(nodeId);
+    const recognitionFromThere = this.root.store?.nodes.get(nodeId)?.shareOfGeneralFulfillment(this.id) || 0;
     return Math.min(recognitionFromHere, recognitionFromThere);
   }
 
   get mutualFulfillmentDistribution() {
-    // Convert typeIndex keys to Array
-    const types = Array.from(this.typeIndex.keys()).filter(
-        type => this.getInstances(type).size > 0
+    const typeIds = Array.from(this.typeIndex.keys()).filter(
+        typeId => (this.typeIndex.get(typeId)?.size || 0) > 0
     );
 
-    const rawDistribution = types
-        .map(type => ({
-            type,
-            value: this.mutualFulfillment(type),
+    const rawDistribution = typeIds
+        .map(typeId => ({
+            typeId,
+            value: this.mutualFulfillment(typeId),
         }))
         .filter(entry => entry.value > 0);
 
@@ -318,21 +402,23 @@ export class Node {
 
     return new Map(
         rawDistribution.map(entry => [
-            entry.type,
+            entry.typeId,
             total > 0 ? entry.value / total : 0,
         ])
     );
   }
 
-
-      // D3 Compatibility Methods
+  
+  // D3 Compatibility Methods
     get value() {
         return this.points;
     }
 
     get childrenArray() {
-        const result = Array.from(this.children.values());
-        return result;
+        // Convert from childrenIds object to array of node objects
+        return Object.keys(this.childrenIds)
+          .map(id => this.root.store?.nodes.get(id))
+          .filter(node => node !== undefined);
     }
 
     get data() {
@@ -340,7 +426,7 @@ export class Node {
     }
 
     get hasChildren() {
-        return this.children.size > 0;
+        return Object.keys(this.childrenIds).length > 0;
     }
     
     get descendants() {

@@ -1,5 +1,5 @@
-import * as GunX from './Gun';
-import { Node } from './Node';
+import * as GunX from '../Gun';
+import { Node } from '../previous/Node';
 
 /*
 TARGET STRUCTURE:

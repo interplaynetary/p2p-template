@@ -202,8 +202,7 @@ if (!GunX.user.is) {
     // Handle already logged in case
     (async () => {
         try {
-            const example = await initializeExampleData(app);
-            app = example.app;
+            await initializeExampleData(app?.root);
             console.log('App initialized for logged in user:', app);
             setupUIHandlers();
         } catch (error) {

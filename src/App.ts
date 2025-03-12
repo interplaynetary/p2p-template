@@ -1,101 +1,96 @@
 import * as GunX from './models/Gun';
-import { Node } from './models/Node';
-import { Store } from './models/Store';
-import { createTreemap } from './visualizations/RecursiveTreeMap';
+import { GunStore, TreeNode } from './Free';
+import { createTreemap } from './visualizations/TreeMap';
 import { createPieChart } from './visualizations/PieChart';
 import { initializeExampleData } from './example';
 
-export class App extends Node {
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export class App {
     initializing: boolean
     _updateNeeded: boolean
     _pieUpdateNeeded: boolean
-    store: Store
     updateInterval: any
     saveInterval: any
     treemap: ReturnType<typeof createTreemap>
-
+    window: Window
+    store: GunStore
+    rootId: string
+    name: string
     constructor() {
         console.log('App constructor started');
         if (!GunX.user.is) {
             throw new Error('Must be logged in before initializing App');
         }
-        
-        super(
-            GunX.user.is.alias,
-            null, 
-            [], 
-            GunX.user.is.pub
-        );
+        this.rootId = GunX.user.is.pub as string
+        this.name = GunX.user.is.alias as string
         // Initialize store first
-        this.store = new Store(this);
         this._updateNeeded = true
-        this._pieUpdateNeeded = true
-        this.initializing = true
+        this._pieUpdateNeeded = true;
+        this.initializing = true;
+
+        (window as any).app = this;
+    }
+
+    get root() {
+        return this.store.root
     }
 
     // New method to properly initialize app
     async initialize() {
         console.log('Starting app initialization...');
 
+        this.store = await GunStore.create({id: this.rootId, name: this.name, points: 0, manualFulfillment: 0})
+
         console.log('App init started');
         const container = document.getElementById('treemap-container');
-        console.log('Container found:', !!container);
+        //console.log('Container found:', !!container);
         
-        if (container) {
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-            
-            console.log('Creating treemap with dimensions:', width, height);
-            console.log('Pre-treemap children count:', this.children.size);
-            console.log('Pre-treemap children:', Array.from(this.children.entries()));
-            
-            // Store treemap reference on the instance
-            this.treemap = createTreemap(this, width, height);
-            console.log('Treemap created:', !!this.treemap);
-            
-            container.appendChild(this.treemap.element);
-        }
+        const width = container.clientWidth;
+        const height = container.clientHeight;
         
-        this.updatePieChart();
+        //console.log('Creating treemap with dimensions:', width, height);
+        //console.log('Pre-treemap children count:', Object.keys(this.childrenIds).length);
+        //console.log('Pre-treemap children:', this.childrenArray);
+        
+        // Store treemap reference on the instance
 
-        console.log('App init completed');
+        //console.log('Treemap created:', !!this.treemap);
+        
+
+        // this.updatePieChart(); // temporarily disabled
+
 
         // Wait for store to fully sync and load existing data
-        await this.store.sync()
+        await this.store.initialize()
             .then(async (loaded) => {
-                console.log('Store sync complete, loaded', loaded, 'nodes');
-                
-                
-                // Now that sync is complete, check if we need example data
-                if (this.children.size === 0) {
-                    this.initializing = false
-                    console.log('No existing data found, initializing example data...');
-                    await initializeExampleData(this);
-                    this.initializing = true
-                }
-            
-                
+                console.log('Store initialization complete');
+                // console.log('App children:', this.childrenArray);
+                await initializeExampleData(this.root);
+                // await sleep(200)
+                this.treemap = createTreemap(this.root, width, height);
+                container.appendChild(this.treemap.element);
+
+                let rootIdentity = this.root
+
                 // Start update cycle
                 this.updateInterval = setInterval(() => {
-                    if (this.updateNeeded) {
-                        console.log('Tree update needed, refreshing visualizations');
-                        try {
-                            this.updateTreeMap();
-                        } finally {
-                            this.updateNeeded = false;
-                        }
+                    const newRootIdentity = this.root
+                    if (newRootIdentity !== rootIdentity) {
+                        console.log('Root identity changed, refreshing visualizations');
+                        rootIdentity = newRootIdentity
+                        this.updateTreeMap()
+                        // this.updatePieChart(); Temporarily disabled
                     }
-                    if (this.pieUpdateNeeded) {
-                        console.log('Pie update needed, refreshing pie chart');
-                        this.updatePieChart();
-                        this.pieUpdateNeeded = false;
-                    }
-                }, 60);
+                }, 1000);
 
                 this.initializing = false;
                 return loaded;
-            });
+            }) 
             
+        console.log('App init completed');
     }
 
     get updateNeeded() {
@@ -147,7 +142,6 @@ export class App extends Node {
         
         try {
             console.log('Starting visualization update');
-            console.log('Children before update:', Array.from(this.children.entries()));
             
             if (this.updateNeeded) {
                 try {
@@ -161,7 +155,6 @@ export class App extends Node {
                 this.pieUpdateNeeded = false;
             }
             
-            console.log('Children after update:', Array.from(this.children.entries()));
         } finally {
             console.log('Visualization update completed');
         }
@@ -171,21 +164,22 @@ export class App extends Node {
         console.log('updateTreeMap called');
         const container = document.getElementById('treemap-container');
         if (container && this.treemap) {
-            console.log('Updating treemap with children:', Array.from(this.children.entries()));
+            //console.log('Updating treemap with children:', this.childrenArray);
+            this.treemap.destroy();
             container.innerHTML = '';
-            this.treemap = createTreemap(this, container.clientWidth, container.clientHeight);
+            this.treemap = createTreemap(this.root, container.clientWidth, container.clientHeight);
             container.appendChild(this.treemap.element);
         }
     }
 
     updatePieChart() {
         console.log('updatePieChart started');
-        // console.log('Current app children:', Array.from(this.children.entries()));
+        // console.log('Current app children:', this.childrenArray);
         // console.log('Current mutual fulfillment distribution:', this.mutualFulfillmentDistribution);
-        
         const pieContainer = document.getElementById('pie-container');
+        this.treemap.destroy();
         pieContainer.innerHTML = '';
-        const newPieChart = createPieChart(this);
+        const newPieChart = createPieChart(this.root);
         pieContainer.appendChild(newPieChart);
     }
 
@@ -193,13 +187,5 @@ export class App extends Node {
     destroy() {
         clearInterval(this.updateInterval);
         clearInterval(this.saveInterval);
-    }
-
-    // Add debug method
-    async inspectGunState() {
-        console.log('=== Current Gun Database State ===');
-        const nodes = await GunX.inspectDatabase();
-        console.log('Total nodes:', Object.keys(nodes).length);
-        return nodes;
     }
 }

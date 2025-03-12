@@ -3,6 +3,9 @@ import { getColorForName } from '../utils/colorUtils.js';
 import { calculateFontSize } from '../utils/fontUtils.js';
 
 // lets just visualize: shareOfGeneralFulfillment(rootNode) for the proportions!
+// and the mutual-recognition of each relation!
+// lets display each role, and see the state for desire, mutual-desire, playing, mutual-playing, surplus
+// lets display the incoming char-stream for each node! (messaging)
 
 export function createTreemap(rootNode, width, height) {
     // Validate input

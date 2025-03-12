@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { getColorForName } from '../utils/colorUtils.js';
+import { getColorForName } from '../utils/colorUtils';
 
 export function createPieChart(data) {
     // Get the container dimensions

@@ -40,6 +40,6 @@ export function calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentV
 }
 
 // Helper function to get the full name path
-function name(d) {
+export function name(d) {
     return d.data.ancestors.reverse().map(d => d.name).join(" / ");
 }

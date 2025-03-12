@@ -9,14 +9,17 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.16",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
   },
   "dependencies": {
     "@peculiar/webcrypto": "^1.5.0",
     "@types/jquery": "^3.5.32",
+    "@use-gesture/vanilla": "^10.3.1",
     "d3": "^7.9.0",
     "gun": "^0.2020.1240",
-    "jquery": "^3.7.1"
+    "jquery": "^3.7.1",
+    "lodash": "^4.17.21"
   }
 }
