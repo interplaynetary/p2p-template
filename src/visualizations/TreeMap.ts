@@ -1,28 +1,30 @@
 import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
 import { calculateFontSize } from '../utils/fontUtils';
-import { TreeNode } from '../Free';
+import { TreeNode } from '../models/TreeNode';
+
+// when we navigate into a type, the backbutton no longer works
 
 export function createTreemap(data: TreeNode, width: number, height: number) {
     // State variables for growth animation
-    let growthInterval = null;
-    let growthTimeout = null;
-    const GROWTH_RATE = (d) => d.data.points * 0.05;
+    let growthInterval: number | null = null;
+    let growthTimeout: number | null = null;
+    const GROWTH_RATE = (d: TreeNode) => d.data.points * 0.05;
     const GROWTH_TICK = 50;
     const GROWTH_DELAY = 500;
     let isGrowing = false;
-    const SHRINK_RATE = (d) => d.data.points * -0.05; // Negative growth rate for shrinking
+    const SHRINK_RATE = (d: TreeNode) => d.data.points * -0.05; // Negative growth rate for shrinking
 
     // Helper functions
     const uid = (function() {
         let id = 0;
-        return function(prefix) {
+        return function(prefix: string) {
             const uniqueId = `${prefix}-${++id}`;
             return { id: uniqueId, href: `#${uniqueId}` };
         };
     })();
 
-    const name = d => d.data.ancestors.reverse().map(d => d.name).join(" / ");
+    const name = (d: TreeNode) => d.data.ancestors.reverse().map(d => d.name).join(" / ");
 
     // Create scales
     const x = d3.scaleLinear().rangeRound([0, width]);
@@ -31,7 +33,7 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
     // Create hierarchy
     let hierarchy = d3.hierarchy(data, d => d.childrenArray)
         .sum(d => d.data.points)
-        .each(d => { d.value = d.data.points || 0; });
+        .each(d => { d.value || 0; });
 
     // Create treemap layout
     let root = d3.treemap().tile(tile)(hierarchy);
@@ -212,7 +214,7 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
         const spacing = circleRadius * 2.5;
         
         // Debug the types data
-        console.log('Types for node:', d.data.name, d.data.types);
+        // console.log('Types for node:', d.data.name, d.data.types);
         
         const circles = container.selectAll("circle")
             .data(d.data.types)
@@ -281,6 +283,9 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
 
     node.filter(d => true)
         .attr("cursor", "pointer")
+        .on("contextmenu", (event) => {
+            event.preventDefault(); // This prevents the context menu from showing up
+        })
         .on("mousedown touchstart", (event, d) => {
             event.preventDefault();
             
@@ -386,12 +391,10 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
                     }, GROWTH_DELAY);
                 }
             }
-        })
+        }, { passive: false })
         .on("mouseup touchend touchcancel", (event) => {
             // Only handle if not in contributor tree
-            if (!isInContributorTree()) {
-                event.preventDefault();
-                
+            if (!isInContributorTree()) {                
                 // Clear all states
                 isTouching = false;
                 activeNode = null;
@@ -402,7 +405,7 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
                 growthInterval = null;
                 isGrowing = false;
             }
-        })
+        }, { passive: true })
         .on("click touchend", (event, d) => {
             event.preventDefault();
             
@@ -418,7 +421,7 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
                 if (d === root && d.parent) {
                     console.log('Attempting zoom out from:', d.data.name);
                     zoomout(root);
-                } else if (d !== root && !d.data.isContributor) {  // Check isContributor directly
+                } else if (d !== root && !d.data.isContribution) {  // Check isContribution directly
                     console.log('Attempting zoom in to:', d.data.name);
                     zoomin(d);
                 }
@@ -433,7 +436,7 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
                 activeNode = null;
                 isGrowing = false;
             }
-        });
+        }, { passive: false });
 
         if (root.data.children.size === 0 && root !== data) {  // Check if view is empty and not root
             group.append("text")
@@ -549,8 +552,8 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
         getRoot: () => root,
         zoomin,
         zoomout,
-        update: (newWidth, newHeight) => {
-            console.log('Update called with dimensions:', newWidth, height);
+        update: (newWidth: number, newHeight: number) => {
+            console.log('Update called with dimensions:', newWidth, newHeight);
             
             // Update scales
             x.rangeRound([0, newWidth]);

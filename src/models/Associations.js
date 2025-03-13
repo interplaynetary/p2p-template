@@ -107,10 +107,10 @@ class SocialNode extends Node {
 
 
 class Association extends Node {
-constructor(name, totalShares, initialHolder, composes = []) {
-    this.name = name;
-    this.associations = [];
-    this.compositions = composes;
+    constructor(name, totalShares, initialHolder, composes = []) {
+        super(name, null, [], true);
+        this.associations = [];
+        this.compositions = composes;
 
     // Create initial share associations
     for (let i = 0; i < totalShares; i++) {

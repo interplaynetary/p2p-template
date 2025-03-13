@@ -6,6 +6,15 @@ This requires more than mere abstract agreement or forced cooperation - it deman
 
 **In this free association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-fulfillment!** (mutual-recognition of contribution towards each other's self-actualization)
 
+    Mutual-Recognition: MR(A, B) = min(B-share-of-A's-total-recognition, A-share-of-B's-total-recognition)
+
+    A's share of B's surplus = MR(A, B) / Σ MR(B, X), where X includes all others B recognizes.
+    B's share of A's surplus = MR(A, B) / Σ MR(A, X), where X includes all others A recognizes.
+
+More generally:
+
+  	Share(Receiver ← Giver) = MR(Receiver, Giver) / Sum(MR(Giver, Other) for all Others Giver Recognizes)
+
 **Surplus flows according to mutual-recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures.**
 
 Simple math will reveal how in free association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free association necessarily tend towards social-material-truth.
@@ -50,7 +59,7 @@ This approach represents a fundamental shift from traditional charity or market-
 2. B can (re)-attribute to A a share of B's total-recognition
 
 **Let:**
-- **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition,  A-share-of-B's-total-recognition) = Mutual-Contributions towards eachother's self-actualization
+- **Mutual-Recognition(A, B)** = min(B-share-of-A's-total-recognition, A-share-of-B's-total-recognition) = Mutual-Contributions towards eachother's self-actualization
 
 **For example:** If you are 50% of my total-recognition, and I am 10% of your total-recognition, our mutual-recognition is 10%, the minimum of the both.
 

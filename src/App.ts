@@ -1,24 +1,28 @@
 import * as GunX from './models/Gun';
-import { GunStore, TreeNode } from './Free';
+import { GunStore } from './models/Store';
+import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './visualizations/TreeMap';
 import { createPieChart } from './visualizations/PieChart';
 import { initializeExampleData } from './example';
 
+/*
+Simulating throttle in network can be used to discover race conditions!
 function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+*/
 
 export class App {
     initializing: boolean
     _updateNeeded: boolean
     _pieUpdateNeeded: boolean
-    updateInterval: any
-    saveInterval: any
-    treemap: ReturnType<typeof createTreemap>
-    window: Window
-    store: GunStore
-    rootId: string
-    name: string
+    updateInterval: any = null
+    saveInterval: any = null
+    treemap!: ReturnType<typeof createTreemap>
+    window!: Window
+    store!: GunStore
+    rootId: string = ''
+    name: string = ''
     constructor() {
         console.log('App constructor started');
         if (!GunX.user.is) {
@@ -42,55 +46,67 @@ export class App {
     async initialize() {
         console.log('Starting app initialization...');
 
-        this.store = await GunStore.create({id: this.rootId, name: this.name, points: 0, manualFulfillment: 0})
+        try {
+            // Create the store with user identity as root
+            this.store = await GunStore.create({
+                id: this.rootId, 
+                name: this.name, 
+                points: 0, 
+                manualFulfillment: 0
+            });
 
-        console.log('App init started');
-        const container = document.getElementById('treemap-container');
-        //console.log('Container found:', !!container);
-        
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        
-        //console.log('Creating treemap with dimensions:', width, height);
-        //console.log('Pre-treemap children count:', Object.keys(this.childrenIds).length);
-        //console.log('Pre-treemap children:', this.childrenArray);
-        
-        // Store treemap reference on the instance
-
-        //console.log('Treemap created:', !!this.treemap);
-        
-
-        // this.updatePieChart(); // temporarily disabled
-
-
-        // Wait for store to fully sync and load existing data
-        await this.store.initialize()
-            .then(async (loaded) => {
-                console.log('Store initialization complete');
-                // console.log('App children:', this.childrenArray);
-                await initializeExampleData(this.root);
-                // await sleep(200)
-                this.treemap = createTreemap(this.root, width, height);
-                container.appendChild(this.treemap.element);
-
-                let rootIdentity = this.root
-
-                // Start update cycle
-                this.updateInterval = setInterval(() => {
-                    const newRootIdentity = this.root
-                    if (newRootIdentity !== rootIdentity) {
-                        console.log('Root identity changed, refreshing visualizations');
-                        rootIdentity = newRootIdentity
-                        this.updateTreeMap()
-                        // this.updatePieChart(); Temporarily disabled
-                    }
-                }, 1000);
-
-                this.initializing = false;
-                return loaded;
-            }) 
+            console.log('App init started');
+            const container = document.getElementById('treemap-container');
             
-        console.log('App init completed');
+            if (!container) {
+                throw new Error('Treemap container element not found');
+            }
+            
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            // Wait for root to be available - try multiple times if needed
+            const rootNode = await this.waitForRoot(10); // Try up to 10 times
+            if (!rootNode) {
+                throw new Error('Root node is null after multiple attempts');
+            }
+            
+            console.log('Root node loaded successfully:', rootNode.name, 'ID:', rootNode.id);
+            
+            // Initialize example data if needed
+            console.log('Initializing example data...');
+            await initializeExampleData(rootNode);
+            
+            // Add a delay to ensure all data is loaded before visualization
+            console.log('Waiting for data to stabilize before creating visualization...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            console.log('Creating visualization...');
+            // Create visualization with the loaded root
+            this.treemap = createTreemap(rootNode, width, height);
+            if (!this.treemap?.element) {
+                throw new Error('Treemap element is null'); 
+            }
+            container.appendChild(this.treemap.element);
+
+            let rootIdentity = rootNode;
+
+            // Start update cycle
+            this.updateInterval = setInterval(() => {
+                const newRootIdentity = this.root;
+                if (newRootIdentity && newRootIdentity !== rootIdentity) {
+                    console.log('Root identity changed, refreshing visualizations');
+                    rootIdentity = newRootIdentity;
+                    this.updateTreeMap();
+                }
+            }, 1000);
+
+            this.initializing = false;
+            console.log('App init completed successfully');
+        } catch (error) {
+            console.error('App initialization failed:', error);
+            throw error;
+        }
     }
 
     get updateNeeded() {
@@ -107,7 +123,7 @@ export class App {
 
     set pieUpdateNeeded(value) {
         this._pieUpdateNeeded = value;
-    } 
+    }
 
     get currentView() {
         console.log('currentView getter called, treemap exists:', !!this.treemap);
@@ -121,12 +137,16 @@ export class App {
     }
 
     get currentViewData() {
-        return this.currentView.data
+        return (this.currentView as any).data;
     }
 
     handleResize() {
         console.log('Resize handler triggered');
         const container = document.getElementById('treemap-container');
+        if (!container) {
+            console.warn('Treemap container not found');
+            return;
+        }
         const width = container.clientWidth;
         const height = container.clientHeight;
 
@@ -167,8 +187,10 @@ export class App {
             //console.log('Updating treemap with children:', this.childrenArray);
             this.treemap.destroy();
             container.innerHTML = '';
-            this.treemap = createTreemap(this.root, container.clientWidth, container.clientHeight);
-            container.appendChild(this.treemap.element);
+            this.treemap = createTreemap(this.root!, container.clientWidth, container.clientHeight);
+            if (this.treemap.element) {
+                container.appendChild(this.treemap.element);
+            }
         }
     }
 
@@ -177,9 +199,23 @@ export class App {
         // console.log('Current app children:', this.childrenArray);
         // console.log('Current mutual fulfillment distribution:', this.mutualFulfillmentDistribution);
         const pieContainer = document.getElementById('pie-container');
-        this.treemap.destroy();
+        if (!pieContainer) {
+            console.error('Pie container element not found');
+            return;
+        }
+        
+        if (this.treemap) {
+            this.treemap.destroy();
+        }
+
         pieContainer.innerHTML = '';
-        const newPieChart = createPieChart(this.root);
+        
+        const newPieChart = createPieChart(this.root!);
+        if (!newPieChart) {
+            console.error('Failed to create pie chart');
+            return;
+        }
+
         pieContainer.appendChild(newPieChart);
     }
 
@@ -187,5 +223,44 @@ export class App {
     destroy() {
         clearInterval(this.updateInterval);
         clearInterval(this.saveInterval);
+    }
+
+    /**
+     * Tries to get the root node multiple times, with delays between attempts
+     * @param maxAttempts Maximum number of attempts to get the root
+     * @param delayMs Milliseconds to wait between attempts
+     * @returns The root TreeNode or null if still not available after all attempts
+     */
+    async waitForRoot(maxAttempts = 5, delayMs = 300): Promise<TreeNode | null> {
+        let attempts = 0;
+        
+        console.log(`Waiting for root node with ID: ${this.store.rootId}`);
+        
+        // First check if we have any nodes in cache
+        if (this.store.cache.size > 0) {
+            console.log(`Store cache has ${this.store.cache.size} nodes`);
+            // Log all nodes in cache
+            this.store.cache.forEach((node, id) => {
+                console.log(`Cache node: ${node.name}, ID: ${id}`);
+            });
+        } else {
+            console.log('Store cache is empty');
+        }
+        
+        while (attempts < maxAttempts) {
+            const root = this.store.root;
+            if (root) {
+                console.log(`Root node found on attempt ${attempts + 1}: ${root.name}, ID: ${root.id}`);
+                return root; // Success! Root node found
+            }
+            
+            console.log(`Root not available yet, attempt ${attempts + 1}/${maxAttempts}. Waiting...`);
+            // Wait before trying again
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            attempts++;
+        }
+        
+        console.error('Failed to get root node after', maxAttempts, 'attempts');
+        return null; // Still not available after all attempts
     }
 }

@@ -5,22 +5,25 @@ import './style.css';
 import $ from 'jquery';
 let app: App | undefined;
 
-async function handleAuth(event) {
+async function handleAuth(event: Event) {
     event.preventDefault();
     console.log('Auth handler started');
     const username = (document.getElementById('username') as HTMLInputElement).value;
     const password = (document.getElementById('password') as HTMLInputElement).value;
 
     try {
-        await GunX.login(username, password);
+        await GunX.authenticate(username, password);
         console.log('Login successful');
-    } catch {
-        console.log('Login failed, attempting creation');
-        await GunX.create(username, password);
-        console.log('Account creation successful');
+    } catch(error) {
+        console.log('Auth failed:', error);
     }
 
-    document.getElementById('auth-container').classList.add('hidden');
+    const authContainer = document.getElementById('auth-container');
+    if (!authContainer) {
+        console.error('Auth container not found');
+        return;
+    }
+    authContainer.classList.add('hidden');
     console.log('Auth container hidden');
 
     try {
@@ -158,7 +161,7 @@ function setupUIHandlers() {
 
     function generateQRCode() {
         // Use the existing 'player' Gun reciever instance
-        const publicKey = GunX.user.is.pub;  // Add optional chaining for safety
+        const publicKey = GunX.user.is?.pub;  // Add optional chaining for safety
         
         if (!publicKey) {
             console.log('Reciever not logged in yet');
@@ -183,10 +186,12 @@ function setupUIHandlers() {
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             const treemap = app?.treemap;  // Get treemap instance from app
-            const currentView = treemap.getCurrentView();  // Use treemap's method to get current view
-            
-            if (currentView && currentView.parent) {
-                treemap.zoomout(currentView);  // Use treemap's zoomout method directly
+            if (treemap) {
+                const currentView = treemap.getCurrentView();  // Use treemap's method to get current view
+                
+                if (currentView && currentView.parent) {
+                    treemap.zoomout(currentView);  // Use treemap's zoomout method directly
+                }
             }
         }
     });
@@ -194,17 +199,25 @@ function setupUIHandlers() {
 
 // Initial setup for already logged in users
 if (!GunX.user.is) {
-    document.getElementById('auth-container').classList.remove('hidden');
-    document.getElementById('auth-form')
-        .addEventListener('submit', handleAuth);
+    const authContainer = document.getElementById('auth-container');
+    const authForm = document.getElementById('auth-form');
+    if (authContainer && authForm) {
+        authContainer.classList.remove('hidden');
+        authForm.addEventListener('submit', handleAuth);
+    }
 } else {
-    document.getElementById('auth-container').classList.add('hidden');
+    const authContainer = document.getElementById('auth-container');
+    if (authContainer) {
+        authContainer.classList.add('hidden');
+    }
     // Handle already logged in case
     (async () => {
         try {
-            await initializeExampleData(app?.root);
-            console.log('App initialized for logged in user:', app);
-            setupUIHandlers();
+            if (app?.root) {
+                await initializeExampleData(app.root);
+                console.log('App initialized for logged in user:', app);
+                setupUIHandlers();
+            }
         } catch (error) {
             console.error('Failed to initialize app for logged in user:', error);
         }
@@ -212,9 +225,13 @@ if (!GunX.user.is) {
 }
 
 // Add this to your existing script section
-document.getElementById('message-input').addEventListener('input', function(e) {
-    // Reset height to auto to get the right scrollHeight
-    this.style.height = 'auto';
-    // Set new height based on content
-    this.style.height = (this.scrollHeight) + 'px';
-});
+const messageInput = document.getElementById('message-input');
+if (messageInput) {
+    messageInput.addEventListener('input', function(e) {
+        // Reset height to auto to get the right scrollHeight
+        this.style.height = 'auto';
+        // Set new height based on content
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+}
+

@@ -1,9 +1,13 @@
 import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
+import { TreeNode } from '../models/TreeNode';
 
-export function createPieChart(data) {
+export function createPieChart(data: TreeNode) {
     // Get the container dimensions
     const container = document.getElementById('pie-container');
+    if (!container) {
+        throw new Error('Could not find pie-container element');
+    }
     const width = container.clientWidth;
     const height = container.clientHeight;
     const radius = Math.min(width, height) / 2;
@@ -16,7 +20,7 @@ export function createPieChart(data) {
     console.log('mutualFulfillmentDistribution for pie:', mutualFulfillmentDistribution);
 
     // Create pie layout
-    const pie = d3.pie()
+    const pie = d3.pie<[TreeNode, number]>()
         .value(d => d[1])  // Use the mutualFulfillmentDistribution value
         .sort(null);  // Maintain original order
 
@@ -31,7 +35,7 @@ export function createPieChart(data) {
         .attr("height", height)
         .attr("viewBox", [-width/2, -height/2, width, height])
         .style("font", "12px sans-serif");
-
+        
     // Create pie segments from mutualFulfillmentDistribution
     const arcs = pie(Array.from(mutualFulfillmentDistribution.entries()));
 
@@ -40,8 +44,8 @@ export function createPieChart(data) {
         .data(arcs)
         .join("path")
         .attr("fill", d => getColorForName(d.data[0].name))  // Use same color function
-        .attr("d", arc)
-        .append("title")
+        .attr("d", d => arc(d as any))  // Type assertion to fix type error
+        .append("title") 
         .text(d => `${d.data[0].name}: ${(d.data[1] * 100).toFixed(1)}%`);
 
     // Add labels
@@ -49,7 +53,7 @@ export function createPieChart(data) {
         .data(arcs)
         .join("text")
         .attr("transform", d => {
-            const [x, y] = arc.centroid(d);  // This gives us the center of the arc
+            const [x, y] = arc.centroid(d as any);  // Type assertion to fix type error
             return `translate(${x},${y})`;
         })
         .attr("dy", "0.35em")
