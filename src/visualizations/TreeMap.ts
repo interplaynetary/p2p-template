@@ -241,13 +241,15 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
             // Clear existing content and recreate group
             group.selectAll("*").remove();
             
-            // Create new hierarchy using childrenArray for D3Node
+            /*
+            // COMMENTED: Create new hierarchy using childrenArray for D3Node
             hierarchy = d3.hierarchy(type, d => d.childrenArray)
                 .sum(d => d.points)
                 .each(node => {
                     node.value = node.data.points || 0;
                 });
-            
+            */
+
             // Apply treemap layout
             const treemap = d3.treemap().tile(tile);
             root = treemap(hierarchy);
@@ -325,12 +327,14 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
                                 const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
                                 d.data.setPoints(newPoints);
                                 
+                                /*
                                 // Recompute hierarchy ensuring values match points
                                 hierarchy.sum(node => node.data.points)
                                     .each(node => {
                                         // Force value to exactly match points
-                                        node.value = node.data.points || 0;
+                                        node.data.points || 0;
                                     });
+                                */
                                 
                                 // Apply treemap
                                 const treemap = d3.treemap().tile(tile);
@@ -478,11 +482,13 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
                             // Clear existing content
                             group.selectAll("*").remove();
                             
-                            // Reset to original data
+                            /*
+                            // COMMENTED: Reset to original data
                             hierarchy = d3.hierarchy(data, d => d.childrenArray)
                                 .sum(d => d.data.points)
                                 .each(d => { d.value = d.data.points || 0; });
-                            
+                            */
+
                             // Apply treemap layout
                             const treemap = d3.treemap().tile(tile);
                             root = treemap(hierarchy);

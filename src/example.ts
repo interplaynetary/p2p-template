@@ -22,7 +22,7 @@ export async function initializeExampleData(root: TreeNode) {
   if (space) {
     // Space & Environment children
     const indoorSpace = await space.addChild("Indoor/Outdoor Space", 15, 0);
-    const seating = await space.addChild("Comfortable Seating", 15, 0);P
+    const seating = await space.addChild("Comfortable Seating", 15, 0);
     const lighting = await space.addChild("Lighting", 12, 0);
     const temperature = await space.addChild("Temperature Control", 12, 0);
     const bathroom = await space.addChild("Bathroom Access", 12, 0);
