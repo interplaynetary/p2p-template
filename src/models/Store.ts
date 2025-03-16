@@ -3,8 +3,10 @@ import { user } from './Gun'
 import _ from 'lodash'
 
 
-// free-association is an iminantly sublated critique of the existing society.
-
+// free-association is an imminantly sublated critique of the existing society.
+// It is as if marx does the social-materialist inversion of hegels master-slave dialectic through the categories of political economy.
+// Whereas free-association does the social-materialist inversion of the solution (as presented by hegel) of the master-slave dialectic!
+// It's as if Marx does the social-materialist inversion of the problem, and free-association does the social-materialist inversion of the solution!
 
 
 // From Gun:
@@ -140,20 +142,8 @@ export interface InterfaceStore {
         this.update({id: nodeId, type: 'node', data: {...node, points}, structural: true})
       }
   
-      async addChild(parentId: string | null = this.rootId, init: GunNodeInit) {
-        // First check if a child with the same name already exists
-        const existingChild = await this.findChildByName(parentId, init.name);
-        
-        if (existingChild) {
-          console.log(`Found existing child with name "${init.name}", returning it instead of creating a new one`);
-          // Return the TreeNode representation of the existing child
-          const parentNode = this.tree(parentId);
-          return parentNode?.children.get(existingChild.id);
-        }
-        
-        // No existing child found, create a new one
-        console.log(`Creating new child "${init.name}" for parent ${parentId}`);
-        
+      async addChild(parentId: string | null = this.rootId, init: GunNodeInit) {        
+
         // First create the node in GUN to get a Soul
         const gunNodeRef = user.get('nodes').set({
           name: init.name,
@@ -189,22 +179,6 @@ export interface InterfaceStore {
         // Return the TreeNode representation of the child
         const t = this.tree(parentId);
         return t?.children.get(child.id)!;
-      }
-  
-      // Helper method to find a child by name
-      async findChildByName(parentId: string | null, name: string): Promise<GunNode | null> {
-        if (!parentId) return null;
-        
-        const childrenIds = this.lookUpRelation<string[]>(`${parentId}_children`) || [];
-        
-        for (const childId of childrenIds) {
-          const childNode = this.cache.get(childId);
-          if (childNode && childNode.name === name) {
-            return childNode;
-          }
-        }
-        
-        return null;
       }
   
       async removeChild(parentId: string | null = this.rootId, childId: string) {
@@ -248,47 +222,6 @@ export class GunStore extends Store {
       let existingRootSoul: string | null = null;
       const existingSouls: string[] = [];
       
-      // Look for existing nodes with the same name
-      await new Promise<void>(resolve => {
-        let nodesChecked = 0;
-        let totalNodes = 0;
-        
-        // First count the total nodes to check
-        user.get('nodes').map().once((data: any) => {
-          if (data) totalNodes++;
-        });
-        
-        // If no nodes found, resolve immediately
-        if (totalNodes === 0) {
-          setTimeout(resolve, 100);
-          return;
-        }
-        
-        // Then check each node
-        user.get('nodes').map().once((data: any, id: string) => {
-          nodesChecked++;
-          
-          if (data && data.name === rootNode.name && id && id !== '_' && !id.startsWith('_')) {
-            const soul = data._?.['#'] || id;
-            console.log(`Found potential root node: ${data.name}, Soul ID: ${soul}`);
-            existingSouls.push(soul);
-            
-            // Save the first one we find
-            if (!existingRootSoul) {
-              existingRootSoul = soul;
-            }
-          }
-          
-          // Only resolve when we've checked all nodes
-          if (nodesChecked >= totalNodes) {
-            setTimeout(resolve, 100);
-          }
-        });
-        
-        // Ensure we don't wait forever
-        setTimeout(resolve, 1000);
-      });
-      
       let store: GunStore;
       
       if (existingRootSoul) {
@@ -324,6 +257,7 @@ export class GunStore extends Store {
     async initialize() {
       console.log('Initializing GunStore with root ID:', this.rootId);
       
+      /*
       // Improved debugging: Log all nodes with their Soul IDs
       user.get('nodes').map().once((data, id) => {
         if (data && typeof data === 'object' && id && id !== '_') {
@@ -331,19 +265,20 @@ export class GunStore extends Store {
           console.log(`Found node: ${data.name || 'unnamed'}, Soul ID: ${soul}, Data:`, data);
         }
       });
+      */
 
       // Track the nodes we've seen to prevent duplicate processing
       const processedNodes = new Map();
       
-      // Listen for node data from GUN
+      // Modify the listener to handle timestamps correctly
       user.get('nodes').map().on((nodeData: any, nodeId: string) => {
         // Skip if null, metadata, or not a valid node
-        if (!nodeData || !nodeId || nodeId === '_' || nodeId.startsWith('_')) {
+        if (!nodeData || !nodeId || nodeId === '_' || nodeId.startsWith('_') || typeof nodeId === 'number') {
           return;
         }
 
-        // Ensure we're using the correct Soul ID
-        const soul = nodeData._?.['#'] || nodeId;
+        // Ensure we're using the correct Soul ID and convert to string
+        const soul = String(nodeData._?.['#'] || nodeId);
         
         // Create a hash of the data to check if it has changed
         const dataString = JSON.stringify({
@@ -489,20 +424,6 @@ export class GunStore extends Store {
           user.get('nodes').get(nodeId).get(relationName).put(update.value);
         }
       }
-    }
-    async findChildByName(parentId: string | null, name: string): Promise<GunNode | null> {
-      if (!parentId) return null;
-      
-      const childrenIds = this.lookUpRelation<string[]>(`${parentId}_children`) || [];
-      
-      for (const childId of childrenIds) {
-        const childNode = this.cache.get(childId);
-        if (childNode && childNode.name === name) {
-          return childNode;
-        }
-      }
-      
-      return null;
     }
   }
   

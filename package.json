@@ -17,8 +17,6 @@
   },
   "dependencies": {
     "@peculiar/webcrypto": "^1.5.0",
-    "@types/d3": "^7.4.3",
-    "@types/jquery": "^3.5.32",
     "@use-gesture/vanilla": "^10.3.1",
     "d3": "^7.9.0",
     "gun": "^0.2020.1240",

@@ -42,7 +42,7 @@ async function handleAuth(event: Event) {
 // Move all UI handlers into a separate function
 function setupUIHandlers() {
     // Define texts array
-    const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire'];
+    const addNodeTexts = ['Add Value', 'Add Goal', 'Add Dependency', 'Add Desire', 'Add Strategy'];
     let currentTextIndex = 0;
 
     // Menu button and drop-zone handlers

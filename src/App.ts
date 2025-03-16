@@ -13,9 +13,9 @@ function sleep(ms: number) {
 */
 
 export class App {
-    initializing: boolean
-    _updateNeeded: boolean
-    _pieUpdateNeeded: boolean
+    initializing: boolean = true
+    _updateNeeded: boolean = true
+    _pieUpdateNeeded: boolean = true
     updateInterval: any = null
     saveInterval: any = null
     treemap!: ReturnType<typeof createTreemap>
@@ -30,10 +30,6 @@ export class App {
         }
         this.rootId = GunX.user.is.pub as string
         this.name = GunX.user.is.alias as string
-        // Initialize store first
-        this._updateNeeded = true
-        this._pieUpdateNeeded = true;
-        this.initializing = true;
 
         (window as any).app = this;
     }

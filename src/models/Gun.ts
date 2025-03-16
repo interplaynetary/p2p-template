@@ -59,8 +59,3 @@ export const getNodesGraph = async () => {
   const path = await getPath('nodes')
   return path ? user.get(path) : null
 }
-
-export const getTypesGraph = async () => {
-  const path = await getPath('types')
-  return path ? user.get(path) : null
-}

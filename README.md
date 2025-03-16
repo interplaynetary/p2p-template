@@ -6,15 +6,6 @@ This requires more than mere abstract agreement or forced cooperation - it deman
 
 **In this free association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-fulfillment!** (mutual-recognition of contribution towards each other's self-actualization)
 
-    Mutual-Recognition: MR(A, B) = min(B-share-of-A's-total-recognition, A-share-of-B's-total-recognition)
-
-    A's share of B's surplus = MR(A, B) / Σ MR(B, X), where X includes all others B recognizes.
-    B's share of A's surplus = MR(A, B) / Σ MR(A, X), where X includes all others A recognizes.
-
-More generally:
-
-  	Share(Receiver ← Giver) = MR(Receiver, Giver) / Sum(MR(Giver, Other) for all Others Giver Recognizes)
-
 **Surplus flows according to mutual-recognition of real contributions, relations activate only through genuine desire and participation, and these properties persist even as relations compose into complex social structures.**
 
 Simple math will reveal how in free association: false recognition/relations naturally decay while true recognition/relations strengthens - that recognition and social-relations organized on the basis of this free association necessarily tend towards social-material-truth.
@@ -104,6 +95,13 @@ Surplus can be distributed directly/transitively via *Mutual-Recognition Distrib
 
 *"From each according to his ability, to each according to his needs!"*
 
+**Surplus Distribution**
+- A's share of B's surplus = MR(A, B) / Σ MR(B, X), where X includes all others B recognizes.
+- B's share of A's surplus = MR(A, B) / Σ MR(A, X), where X includes all others A recognizes.
+
+More generally:
+- Share(Receiver ← Giver) = MR(Receiver, Giver) / Sum(MR(Giver, Other) for all Others Giver Recognizes)
+
 *The distribution of surplus-roles through networks of mutual-contribution is a form of distributed-peer-discovery/offering/matching! Finding collaborators who directly/transitively contribute to your eachother's self-actualization!*
 
 *What one is actually distributing surplus to is one's **direct/transitive mutual-self-actualization***
@@ -121,9 +119,13 @@ Surplus can be distributed directly/transitively via *Mutual-Recognition Distrib
 5. Relations can be composed into larger structures while maintaining these properties
 
 <details>
-  <summary><b><i>Why Roles? Beyond Obligation</i></b></summary>
+  <summary><b><i>Forms of surplus: Why Roles? Beyond Obligations</i></b></summary>
 
-A lot of civil-society is organized around mutually-referencing right-obligation pairs.
+For starters we should clarify that when we speak of distributing surplus (via free-association digital interface) we ARE NOT speaking of distributing physical objects (manually distributing real objects) according to digitially derived mutual-fulfillment distributions. We are distributing digital representations of relations of object/use provisioning.
+
+Various economic-protocols have taken the approach of transferring *rights* to underlying objects/provisionings, where some party has (the perhaps transferable) *obligation* to provision the object.
+
+A lot of civil-society is organized around such *mutually-referencing right-obligation pairs*.
 
 Some examples:
 - The right to a loan carries with it the corresponding obligation to repay, the right was obtained by granting the right to seize collateral to the lender and taking on the obligation to comply with any such seizures.
@@ -159,14 +161,16 @@ So these role-relations are less about property, rights/obligations and are more
 - ∴ ↑False Recognition = ↓True Recognition
 - ∴ ↓Mutual-Recognition with Real Contributors
 - ∴ ↓Surplus-Roles from Real Contributors
-- ∴ ↓Access to Real Social-Material Coordination via Surplus-Roles from Real Contributors
+- ∴ ↓Real Relations with Real Contributors
+- ∴ ↓Access to Real Social-Material-Coordination
 - ∴ ↓Real Social-Material Basis for Self-Actualization
 
 ∴ social-material-truth is realized through Free Association because also:
 - ∴ ↑True Recognition = ↓False Recognition
 - ∴ ↑Mutual-Recognition with Real Contributors
 - ∴ ↑Surplus-Roles from Real Contributors
-- ∴ ↑Access to Real Social-Material Coordination via Surplus-Roles from Real Contributors
+- ∴ ↑Real Relations with Real Contributors
+- ∴ ↑Access to Real Social-Material Coordination
 - ∴ ↑Real Social-Material Basis for Self-Actualization
 
 *Note: True/False recognition is not binary, nor is it necessrily an expressed proposition. The question is what % of your recognition feels true/false to you? How true is this? To what degree?*
