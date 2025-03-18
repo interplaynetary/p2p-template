@@ -1,13 +1,11 @@
 import { TreeNode } from './TreeNode'
-import { user } from './Gun'
+import { user } from '../Gun'
 import _ from 'lodash'
-
 
 // free-association is an imminantly sublated critique of the existing society.
 // It is as if marx does the social-materialist inversion of hegels master-slave dialectic through the categories of political economy.
 // Whereas free-association does the social-materialist inversion of the solution (as presented by hegel) of the master-slave dialectic!
 // It's as if Marx does the social-materialist inversion of the problem, and free-association does the social-materialist inversion of the solution!
-
 
 // From Gun:
 export interface GunNode {

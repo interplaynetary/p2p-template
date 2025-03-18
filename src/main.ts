@@ -3,6 +3,7 @@ import { App } from './App';
 import * as GunX from './models/Gun';
 import './style.css';
 import $ from 'jquery';
+
 let app: App | undefined;
 
 async function handleAuth(event: Event) {

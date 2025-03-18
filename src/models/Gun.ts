@@ -1,15 +1,15 @@
 import Gun from 'gun/gun'
 import SEA from 'gun/sea.js'
-import 'gun/lib/radix'
-import 'gun/lib/radisk'
-import 'gun/lib/store'
-import 'gun/lib/rindexed'
-import 'gun/lib/webrtc'
+// import 'gun/lib/radix'
+// import 'gun/lib/radisk'
+// import 'gun/lib/store'
+// import 'gun/lib/rindexed'
+// import 'gun/lib/webrtc'
 
 // Initialize Gun with SEA
 console.log('Initializing Gun with peer:', ['http://127.0.0.1:5500/gun']);
 
-let gun = Gun({
+export let gun = Gun({
   peers: ['http://127.0.0.1:5500/gun'],
   localStorage: true
 })

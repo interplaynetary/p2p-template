@@ -5,7 +5,18 @@ import { TreeNode } from '../models/TreeNode';
 
 // when we navigate into a type, the backbutton no longer works
 
-export function createTreemap(data: TreeNode, width: number, height: number) {
+// Create a type for the treemap return value
+type TreemapInstance = {
+    element: HTMLElement;
+    update: (width: number, height: number) => void;
+    destroy: () => void;
+    getCurrentView: () => TreeNode;
+    getCurrentData: () => TreeNode;
+    zoomin: (node: TreeNode) => void;
+    zoomout: (node: TreeNode) => void;
+};
+
+export function createTreemap(data: TreeNode, width: number, height: number): TreemapInstance {
     // State variables for growth animation
     let growthInterval: number | null = null;
     let growthTimeout: number | null = null;
@@ -424,7 +435,7 @@ export function createTreemap(data: TreeNode, width: number, height: number) {
             if (touchDuration < GROWTH_DELAY && !isGrowing) {
                 if (d === root && d.parent) {
                     console.log('Attempting zoom out from:', d.data.name);
-                    zoomout(root);
+                    zoomout(d);
                 } else if (d !== root && !d.data.isContribution) {  // Check isContribution directly
                     console.log('Attempting zoom in to:', d.data.name);
                     zoomin(d);
