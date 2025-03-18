@@ -4,6 +4,18 @@ import { TreeNode } from './models/TreeNode.ts';
 export async function initializeExampleData(root: TreeNode) {
   console.log("Checking for existing data before initialization...");
   
+  /*
+  // Initialize data structure
+  const environmentalist = new TreeNode('environmentalist');
+  const clownsWithoutBorders = new TreeNode('clowns4all', null, [environmentalist]);
+  const researcher = new TreeNode('researcher', null, [environmentalist]);
+  const educator = new TreeNode('educator', null, [environmentalist]);
+
+  // Our main nodes with multiple types
+  const whalewatch = new TreeNode('whalewatch', null, [researcher]);  // is a contributor
+  const alice = new TreeNode('alice', null, [researcher]);  // is a contributor
+  */
+
   // Check if the major categories already exist
   const existingChildren = root.childrenArray.map(child => child.name);
   console.log(`Root has ${existingChildren.length} existing children: ${existingChildren.join(', ')}`);
@@ -12,7 +24,7 @@ export async function initializeExampleData(root: TreeNode) {
   let space;
   if (!existingChildren.includes("Space & Environment")) {
     console.log("Creating Space & Environment node");
-    space = await root.addChild("Space & Environment", 25, 0);
+    space = await root.addChild("Space & Environment", 25);
   } else {
     console.log("Space & Environment already exists, using existing node");
     space = root.childrenArray.find(child => child.name === "Space & Environment");
@@ -21,45 +33,45 @@ export async function initializeExampleData(root: TreeNode) {
   // Only proceed with creating children if we have a valid space node
   if (space) {
     // Space & Environment children
-    const indoorSpace = await space.addChild("Indoor/Outdoor Space", 15, 0);
-    const seating = await space.addChild("Comfortable Seating", 15, 0);
-    const lighting = await space.addChild("Lighting", 12, 0);
-    const temperature = await space.addChild("Temperature Control", 12, 0);
-    const bathroom = await space.addChild("Bathroom Access", 12, 0);
-    const waterAccess = await space.addChild("Water Access", 12, 0);
-    const cleaning = await space.addChild("Cleaning Supplies", 11, 0);
-    const waste = await space.addChild("Trash/Recycling", 11, 0);
+    const indoorSpace = await space.addChild("Indoor/Outdoor Space", 15);
+    const seating = await space.addChild("Comfortable Seating", 15);
+    const lighting = await space.addChild("Lighting", 12);
+    const temperature = await space.addChild("Temperature Control", 12);
+    const bathroom = await space.addChild("Bathroom Access", 12);
+    const waterAccess = await space.addChild("Water Access", 12);
+    const cleaning = await space.addChild("Cleaning Supplies", 11);
+    const waste = await space.addChild("Trash/Recycling", 11);
     
-    const hosts = await indoorSpace.addChild("Space Providers/Hosts", 14, 0);
-    const infrastructure = await indoorSpace.addChild("Infra(de)structure & Bottom-secret Spaces", 25, 0);
+    const hosts = await indoorSpace.addChild("Space Providers/Hosts", 14);
+    const infrastructure = await indoorSpace.addChild("Infra(de)structure & Bottom-secret Spaces", 25);
 
     // Main Categories with their percentage weights
-    const subverse = await root.addChild("Subverse 🌌", 25, 0);
+    const subverse = await root.addChild("Subverse 🌌", 25);
 	
-    const magicalTech = await subverse.addChild("Magical Technologies & Systems", 25, 0);
-    const substances = await subverse.addChild("Transformative Substances", 20, 0);
-    const realityHacking = await subverse.addChild("Reality Hacking & Manifestation", 20, 0);
-    const loreSystem = await subverse.addChild("Lore & Knowledge Systems", 10, 0);
+    const magicalTech = await subverse.addChild("Magical Technologies & Systems", 25);
+    const substances = await subverse.addChild("Transformative Substances", 20);
+    const realityHacking = await subverse.addChild("Reality Hacking & Manifestation", 20);
+    const loreSystem = await subverse.addChild("Lore & Knowledge Systems", 10);
 
-    const money = await root.addChild("Money", 10, 0)
-    const freeAssociation = await root.addChild("Free Association", 10, 0)
+    const money = await root.addChild("Money", 10)
+    const freeAssociation = await root.addChild("Free Association", 10)
 
-    const automation = await root.addChild("Automation of Useful-repetitive Tasks", 10, 0)
-    const commons = await root.addChild("Socialization of Land & Means of Production", 10, 0)
-    const property = await root.addChild("Maintaining Personal Property Relations", 10, 0)
+    const automation = await root.addChild("Automation of Useful-repetitive Tasks", 10)
+    const commons = await root.addChild("Socialization of Land & Means of Production", 10)
+    const property = await root.addChild("Maintaining Personal Property Relations", 10)
     
-    const securingLaptop = await property.addChild("Securing my Laptop", 10, 0)
-    const securingBackpack = await property.addChild("Securing my Backpack", 10, 0)
+    const securingLaptop = await property.addChild("Securing my Laptop", 10)
+    const securingBackpack = await property.addChild("Securing my Backpack", 10)
 
-    const openCollective = await money.addChild("Playnet Open Collective", 10, 0)
-    const personalDonations = await money.addChild("Personal Donations", 10, 0)
+    const openCollective = await money.addChild("Playnet Open Collective", 10)
+    const personalDonations = await money.addChild("Personal Donations", 10)
 
-    const development = await freeAssociation.addChild("Development", 10, 0)
-    const communications = await freeAssociation.addChild("Communications", 10, 0)
+    const development = await freeAssociation.addChild("Development", 10)
+    const communications = await freeAssociation.addChild("Communications", 10)
 
     // Now using IDs instead of objects
-    communications.addType(money.id);
-    communications.addType(development.id);
+    communications.addType(money);
+    communications.addType(development);
 
     /*
     // Underground Networks contributions

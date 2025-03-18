@@ -336,7 +336,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                 // Calculate growth/shrink amount
                                 const rate = isShrinking ? SHRINK_RATE(d) : GROWTH_RATE(d);
                                 const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
-                                d.data.setPoints(newPoints);
+                                d.data.points = newPoints;
                                 
                                 /*
                                 // Recompute hierarchy ensuring values match points

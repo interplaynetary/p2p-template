@@ -1,8 +1,8 @@
-import * as GunX from './models/Gun';
+import * as GunX from '../Gun';
 import { GunStore, TreeNode } from './Free';
-import { createTreemap } from './visualizations/TreeMap';
-import { createPieChart } from './visualizations/PieChart';
-import { initializeExampleData } from './example';
+import { createTreemap } from '../../visualizations/TreeMap';
+import { createPieChart } from '../../visualizations/PieChart';
+import { initializeExampleData } from '../../example';
 
 function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
