@@ -11,6 +11,7 @@ import { writeToGunPath, readFromGunPath } from './FuncGun';
 export class TreeNode {
     id: string;
     name: string;
+    _points: number = 0;
     private _parent: TreeNode | null;
     children: Map<string, TreeNode> = new Map();
     manualFulfillment: number | null = null;
@@ -88,13 +89,13 @@ export class TreeNode {
   
     // Add this node as an instance of the given type
     addType(typeOrId: TreeNode | string): TreeNode {
-      const root = this.root;
+            const root = this.root;
       const typeId = typeof typeOrId === 'string' ? typeOrId : typeOrId.id;
 
       // Check if we already have this type before proceeding
       if (Array.from(this.types).some(t => t.id === typeId)) {
         console.log(`[TreeNode] Type ${typeId} already exists on node ${this.name}, skipping`);
-        return this;
+            return this;
       }
       
       // First get or load the type node
@@ -105,8 +106,10 @@ export class TreeNode {
         return typeOrId;
       };
       
-      // Add to Gun immediately
-      writeToGunPath([...this.typesPath, typeId], true, true);
+      // Add to Gun using proper relationship semantics:
+      // Use a string ID with set=true to create a proper Gun reference
+      console.log(`[TreeNode] Adding type ${typeId} to node ${this.name} using proper Gun relationship`);
+      writeToGunPath(this.typesPath, typeId, true);
       
       // Asynchronously update the type index when we have the type node
       getTypeNode().then(typeNode => {
@@ -131,8 +134,9 @@ export class TreeNode {
       const root = this.root;
       const typeId = typeof typeOrId === 'string' ? typeOrId : typeOrId.id;
       
-      // Remove from Gun
-      writeToGunPath([...this.typesPath, typeId], null, true);
+      // Remove from Gun - we need to remove the specific relationship
+      console.log(`[TreeNode] Removing type ${typeId} from node ${this.name}`);
+      writeToGunPath([...this.typesPath, typeId], null);
       
       // If we have a TreeNode object, update the type index right away
       if (typeof typeOrId !== 'string') {
@@ -149,7 +153,7 @@ export class TreeNode {
       this.app.pieUpdateNeeded = true;
       return this;
     }
-  
+
   
     async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0,): Promise<TreeNode> {
       if (this._parent && this.isContribution) {
@@ -181,8 +185,9 @@ export class TreeNode {
       // Add to local children map
       this.children.set(childId, child);
       
-      // Add child reference to parent in Gun
-      writeToGunPath([...this.childrenPath, childId], true, true);
+      // Add child reference to parent in Gun using proper relationship
+      console.log(`[TreeNode] Adding child ${childId} to node ${this.id} using proper Gun relationship`);
+      writeToGunPath(this.childrenPath, childId, true);
       
       // Update points
       if (points > 0) {
@@ -209,8 +214,10 @@ export class TreeNode {
         // Remove from children
         this.children.delete(childId);
         
-        // Remove from Gun (both directions)
-        writeToGunPath([...this.childrenPath, childId], null, true);
+        // Remove from Gun - we need to remove the specific relationship
+        console.log(`[TreeNode] Removing child ${childId} from node ${this.id}`);
+        writeToGunPath([...this.childrenPath, childId], null);
+        
         if (child.nodeSubscription && child.nodeSubscription.gunNodeRef) {
           child.unsubscribe();
         }
@@ -219,75 +226,79 @@ export class TreeNode {
       this.app.pieUpdateNeeded = true;
       return this;
     }
-  
-    set points(points: number) {
-      console.log(`[TreeNode] Setting points for ${this.name} to ${points}`);
-      this.points = points;
-      // Update in Gun
-      writeToGunPath(this.nodePath, { points });
-      this.app.pieUpdateNeeded = true;
+
+    get points(): number {
+      return this._points;
     }
 
+    set points(points: number) {
+      console.log(`[TreeNode] Setting points for ${this.name} to ${points}`);
+      this._points = points;
+      // Update in Gun
+      writeToGunPath(this.nodePath, { points: this.points });
+      this.app.pieUpdateNeeded = true;
+    }
+  
     get totalChildPoints() {
       return Array.from(this.children.values()).reduce((sum, child) => sum + child.points, 0) || 0;
     }
   
     get weight(): number {
-      if (!this._parent) return 1;
-      return this._parent.totalChildPoints === 0
+      if (!this.parent) return 1;
+      return this.parent.totalChildPoints === 0
         ? 0
-        : (this.points / this._parent.totalChildPoints) * this._parent.weight;
+        : (this.points / this.parent.totalChildPoints) * this.parent.weight;
     }
-
+  
     // shareOfParent() -> how many points this node has, as fraction of totalChildPoints.
     // used to distribute contribution/fulfillment upward or across siblings.
     get shareOfParent(): number {
-      if (!this._parent) return 1;
-      return this._parent.totalChildPoints === 0
-        ? 0
-        : this.points / this._parent.totalChildPoints;
+        if (!this.parent) return 1;
+        return this.parent.totalChildPoints === 0
+          ? 0
+          : this.points / this.parent.totalChildPoints;
     }
   
     get hasDirectContributionChild(): boolean {
-      return Array.from(this.children.values()).some(
-        child => child.isContribution
-      );
+        return Array.from(this.children.values()).some(
+          child => child.isContribution
+        );
     }
       
     get hasNonContributionChild(): boolean {
-      return Array.from(this.children.values()).some(
-        child => !child.isContribution
-      );
+        return Array.from(this.children.values()).some(
+          child => !child.isContribution
+        );
     }
   
     get contributionChildrenWeight(): number {
-      const contributionPoints = Array.from(this.children.values())
-        .filter(child => child.isContribution)
-        .reduce((sum, child) => sum + child.points, 0);
-      
-      return contributionPoints / this.totalChildPoints;
+        const contributionPoints = Array.from(this.children.values())
+          .filter(child => child.isContribution)
+          .reduce((sum, child) => sum + child.points, 0);
+  
+        return contributionPoints / this.totalChildPoints;
     }
   
     get contributionChildrenFulfillment(): number {
-      const contributionChildren = Array.from(this.children.values()).filter(
-        child => child.isContribution
-      );
-
-      return contributionChildren.reduce(
-        (sum, child) => sum + child.fulfilled * child.shareOfParent,
-        0
-      );
+        const contributionChildren = Array.from(this.children.values()).filter(
+          child => child.isContribution
+        );
+  
+        return contributionChildren.reduce(
+          (sum, child) => sum + child.fulfilled * child.shareOfParent,
+          0
+        );
     }
   
     get nonContributionChildrenFulfillment(): number {
       const nonContributionChildren = Array.from(this.children.values()).filter(
-        child => !child.isContribution
-      );
+          child => !child.isContribution
+        );
 
       return nonContributionChildren.reduce(
-        (sum, child) => sum + child.fulfilled * child.shareOfParent,
-        0
-      );
+          (sum, child) => sum + child.fulfilled * child.shareOfParent,
+          0
+        );
     }
       
     // The core method: fulfilled():
@@ -404,47 +415,47 @@ export class TreeNode {
         ])
       );
     }
-
-    // D3 Compatibility Methods
-    get value() {
-      return this.points;
-  }
-
-  get childrenArray() {
-      const result = Array.from(this.children.values());
-      return result;
-  }
-
-  get data() {
-      return this;
-  }
-
-  get hasChildren() {
-      return this.children.size > 0;
-  }
+    
+        // D3 Compatibility Methods
+      get value() {
+          return this.points;
+      }
   
-  get descendants() {
-      const result: TreeNode[] = [];
-      const stack: TreeNode[] = [this];
-      while (stack.length) {
-          const node = stack.pop();
-          if (!node) continue;
-          result.push(node);
-          stack.push(...node.childrenArray);
+      get childrenArray() {
+          const result = Array.from(this.children.values());
+          return result;
       }
-      return result;
-  }
-
-  get ancestors() {
-      const result: TreeNode[] = [];
-      let current: TreeNode = this;
-      while (current) {
-          result.push(current);
-          if (!current.parent) break;
-          current = current.parent;
+  
+      get data() {
+          return this;
       }
-      return result;
-  }
+  
+      get hasChildren() {
+          return this.children.size > 0;
+      }
+      
+      get descendants() {
+          const result: TreeNode[] = [];
+          const stack: TreeNode[] = [this];
+          while (stack.length) {
+              const node = stack.pop();
+              if (!node) continue;
+              result.push(node);
+              stack.push(...node.childrenArray);
+          }
+          return result;
+      }
+  
+      get ancestors() {
+          const result: TreeNode[] = [];
+          let current: TreeNode = this;
+          while (current) {
+              result.push(current);
+              if (!current.parent) break;
+              current = current.parent;
+          }
+          return result;
+      }
 
   // GUN Methods
 
@@ -463,24 +474,26 @@ export class TreeNode {
       console.log(`[TreeNode] Saved node data:`, data);
       
       // Save parent reference if it exists
-      if (this._parent) {
-        console.log(`[TreeNode] Saving parent reference: ${this._parent.id}`);
-        writeToGunPath([...this.nodePath, 'parent'], this._parent.id);
+      if (this.parent) {
+        console.log(`[TreeNode] Saving parent reference: ${this.parent.id}`);
+        writeToGunPath([...this.nodePath, 'parent'], this.parent.id);
       }
       
-      // Save children references
+      // Save children references using proper relationships
       if (this.children.size > 0) {
         console.log(`[TreeNode] Saving ${this.children.size} children references`);
         Array.from(this.children.values()).forEach(child => {
-          writeToGunPath([...this.childrenPath, child.id], true, true);
+          console.log(`[TreeNode] Saving child reference: ${child.id}`);
+          writeToGunPath(this.childrenPath, child.id, true);
         });
       }
       
-      // Save type references
+      // Save type references using proper relationships
       if (this.types.size > 0) {
         console.log(`[TreeNode] Saving ${this.types.size} type references`);
         Array.from(this.types).forEach(type => {
-          writeToGunPath([...this.typesPath, type.id], true, true);
+          console.log(`[TreeNode] Saving type reference: ${type.id}`);
+          writeToGunPath(this.typesPath, type.id, true);
         });
       }
       
@@ -505,7 +518,7 @@ export class TreeNode {
             }
             
             if (typeof data.points === 'number') {
-              this.points = data.points;
+              this._points = data.points;
             }
             
             if (data.manualFulfillment !== undefined) {

@@ -4,11 +4,12 @@ import { user, gun } from './Gun'
  * Writes data to a specified path in Gun database.
  * 
  * @param paths Array of path segments to navigate to the target location
- * @param data Data to write at the target location
+ * @param data Data to write at the target location. If a string and set=true, treats it as a node reference ID
  * @param set If true, uses Gun's set() method; otherwise uses put()
+ * @param refRoot Optional root path for references (defaults to 'nodes'), used when data is a string ID
  * @returns Gun reference to the written data
  */
-export function writeToGunPath(paths = [], data = null, set = false) {
+export function writeToGunPath(paths = [], data = null, set = false, refRoot = 'nodes') {
   if (paths.length === 0) {
     console.log('[FuncGun] Cannot write to empty path');
     return undefined;
@@ -52,15 +53,28 @@ export function writeToGunPath(paths = [], data = null, set = false) {
   }
   
   console.log(`[FuncGun] Final gunRef after traversal:`, gunRef);
-  console.log(`[FuncGun] Writing to path [${paths.join('/')}]`, data);
   
-  // Apply the operation based on set parameter
+  // Handle the data differently based on type and operation
   if (set) {
-    // @ts-ignore - Gun types are complicated, but this works at runtime
-    console.log(`[FuncGun] Using set() with data:`, data);
-    return gunRef.set(data);
+    // Special case: if data is a string and set=true, treat it as a node reference ID
+    if (typeof data === 'string' && data) {
+      console.log(`[FuncGun] Creating relationship with node: ${refRoot}/${data}`);
+      // Get a reference to the target node
+      // @ts-ignore - Gun types are complicated
+      let targetRef = refRoot === 'user' ? user.get(data) : gun.get(refRoot).get(data);
+      
+      // @ts-ignore - Gun types are complicated
+      console.log(`[FuncGun] Using set() with node reference for ${data}`);
+      return gunRef.set(targetRef);
+    } else {
+      // Regular set operation
+      // @ts-ignore - Gun types are complicated
+      console.log(`[FuncGun] Using set() with data:`, data);
+      return gunRef.set(data);
+    }
   } else {
-    // @ts-ignore - Gun types are complicated, but this works at runtime
+    // Regular put operation
+    // @ts-ignore - Gun types are complicated
     console.log(`[FuncGun] Using put() with data:`, data);
     return gunRef.put(data);
   }
@@ -147,8 +161,6 @@ export function readFromGunPath(paths = [], subscribe = false) {
     data: undefined,
     key: undefined
   };
-
-  console.log('[FuncGun] ReturnObject:', returnObject);
   
   if (subscribe) {
     // @ts-ignore - Gun types are complicated, but this works at runtime
@@ -165,6 +177,8 @@ export function readFromGunPath(paths = [], subscribe = false) {
       returnObject.key = key;
     });
   }
+
+  console.log('[FuncGun] ReturnObject:', returnObject);
   
   return returnObject;
 }
