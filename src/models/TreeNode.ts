@@ -1,20 +1,41 @@
 import { App } from '../App';
 import { writeToGunPath, readFromGunPath } from './FuncGun';
 
-// how does our random Id generation work? Is it used? Why not use gun's?
 
 // we get duplicate types! on our nodes! (lets use Sets!)
 // But why do we get this in the first place?
 
 // Are our nodes saving to the gun-space or the user-space
 
+// How do we now test for multiple users?
+
+// Do our root objects correspond to the user? Are we using the wrong ID? That doesnt correspond to the soul of our root?
+// Whats up with random ID generation? Why are we using it?
+
+// We woudln't just reproduce their state in our cache?
+
+// Or would we?
+
+// Create a tree for all those we recognize and subscribe to their changes so that we can calculate mutual-recognition
+
+// So we know we need to mantain in our own cache, the trees of:
+// - All nodes we recognize
+// THAT IS IT.
+
+// How do i discover another user? Peering with the QR Codes?
+
+// It seems like something broke our interaction, causing growing touch to stop mid-touch. The previous commits were working and after comparisions, I find that the only difference is that the previous important commits were
+// in oldFuncGun.ts
+
 export class TreeNode {
     id: string;
     name: string;
-    _points: number = 0;
+    private _points: number = 0;
+    // pointCache: number = 0;
     private _parent: TreeNode | null;
     children: Map<string, TreeNode> = new Map();
     manualFulfillment: number | null = null;
+    // fulfillmentCache: number = 0;
     types: Set<TreeNode> = new Set();
     typeIndex: Map<TreeNode, Set<TreeNode>>;
     app: App;
@@ -58,13 +79,16 @@ export class TreeNode {
       return this._parent;
     }
 
+    set parent(parent: TreeNode | null) {
+      this._parent = parent
+    }   
     // Helper method to get all types in the system
     get rootTypes(): TreeNode[] {
       return Array.from(this.root.typeIndex.keys());
     }
 
     get isContributor() : boolean {
-      return !this.parent
+      return !this._parent
       // will be changed with Gun logic!
     }
     
@@ -164,8 +188,8 @@ export class TreeNode {
   
       // Create the child node in Gun first
       const childNodeRef = writeToGunPath(['nodes'], {
-        name,
-        points,
+        name: name,
+        points: points,
         manualFulfillment: null
       }, true);
       
@@ -235,7 +259,7 @@ export class TreeNode {
       console.log(`[TreeNode] Setting points for ${this.name} to ${points}`);
       this._points = points;
       // Update in Gun
-      writeToGunPath(this.nodePath, { points: this.points });
+      writeToGunPath([...this.nodePath, 'points'], this._points);
       this.app.pieUpdateNeeded = true;
     }
   
@@ -247,7 +271,7 @@ export class TreeNode {
       if (!this.parent) return 1;
       return this.parent.totalChildPoints === 0
         ? 0
-        : (this.points / this.parent.totalChildPoints) * this.parent.weight;
+        : (this._points / this._parent.totalChildPoints) * this._parent.weight;
     }
   
     // shareOfParent() -> how many points this node has, as fraction of totalChildPoints.
@@ -256,7 +280,7 @@ export class TreeNode {
         if (!this.parent) return 1;
         return this.parent.totalChildPoints === 0
           ? 0
-          : this.points / this.parent.totalChildPoints;
+          : this._points / this._parent.totalChildPoints;
     }
   
     get hasDirectContributionChild(): boolean {
@@ -465,7 +489,7 @@ export class TreeNode {
       
       const data = {
         name: this.name,
-        points: this.points,
+        points: this._points,
         manualFulfillment: this.manualFulfillment,
       };
       
@@ -474,9 +498,9 @@ export class TreeNode {
       console.log(`[TreeNode] Saved node data:`, data);
       
       // Save parent reference if it exists
-      if (this.parent) {
-        console.log(`[TreeNode] Saving parent reference: ${this.parent.id}`);
-        writeToGunPath([...this.nodePath, 'parent'], this.parent.id);
+      if (this._parent) {
+        console.log(`[TreeNode] Saving parent reference: ${this._parent.id}`);
+        writeToGunPath([...this.nodePath, 'parent'], this._parent.id);
       }
       
       // Save children references using proper relationships

@@ -16,7 +16,7 @@ export let gun = Gun({
 
 // Get authenticated user space
 export const user = gun.user();
-// user.recall({sessionStorage: true}) // Stay logged in across sessions
+user.recall({sessionStorage: true}) // Stay logged in across sessions
 
 /*
 var SEA = Gun.SEA;
