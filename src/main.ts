@@ -3,6 +3,9 @@ import { App } from './App';
 import * as GunX from './models/Gun';
 import './style.css';
 import $ from 'jquery';
+import encodeQR from '@paulmillr/qr';
+import decodeQR from '@paulmillr/qr/decode.js';
+import { Bitmap } from '@paulmillr/qr';
 
 let app: App | undefined;
 
@@ -170,16 +173,11 @@ function setupUIHandlers() {
         }
         
         $('#qr-code').empty();
-        /*
-        new QRCode(document.getElementById("qr-code"), {
-            text: publicKey,
-            width: 200,
-            height: 200,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: 2,
-            useSVG: true
-        });*/
+        const qrSvg = encodeQR(publicKey, 'svg', { 
+            scale: 4, 
+            ecc: 'high' 
+        });
+        $('#qr-code').append(qrSvg);
         $('#public-key-text').text(publicKey);
     }
 
@@ -195,6 +193,103 @@ function setupUIHandlers() {
                 }
             }
         }
+    });
+
+    // QR code scanning functionality
+    let videoStream: MediaStream | null = null;
+    let scanInterval: number | null = null;
+
+    // QR Tab switching functionality
+    $('.tab-button').on('click', function() {
+        const tabId = $(this).data('tab');
+        $('.tab-button').removeClass('active');
+        $(this).addClass('active');
+        $('.tab-content').hide();
+        $(`#${tabId}`).show();
+    });
+
+    // Start camera for QR scanning
+    $('.menu-button[data-form="scanQR"]').on('click', function() {
+        startQRScanner();
+    });
+
+    function startQRScanner() {
+        const video = document.getElementById('qr-video') as HTMLVideoElement;
+        const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d');
+        const scanResult = document.getElementById('scan-result');
+
+        if (!ctx || !scanResult) return;
+
+        // Stop any existing scanner
+        stopQRScanner();
+
+        // Request camera access
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                videoStream = stream;
+                video.srcObject = stream;
+                video.play();
+
+                // Set canvas size to match video
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
+
+                // Start scanning for QR codes
+                scanInterval = window.setInterval(() => {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        
+                        try {
+                            const result = decodeQR(imageData);
+                            if (result) {
+                                stopQRScanner();
+                                scanResult.textContent = `Found: ${result}`;
+                                $('#manual-key').val(result);
+                            }
+                        } catch (error) {
+                            // No QR code found yet, continue scanning
+                        }
+                    }
+                }, 200);
+            })
+            .catch(error => {
+                console.error('Error accessing camera:', error);
+                scanResult.textContent = 'Error: Could not access camera. Please enter the key manually.';
+            });
+    }
+
+    function stopQRScanner() {
+        if (scanInterval) {
+            clearInterval(scanInterval);
+            scanInterval = null;
+        }
+        
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+    }
+
+    // Handle connecting to peer
+    $('#connect-peer').on('click', function() {
+        const manualKey = $('#manual-key').val() as string;
+        if (manualKey) {
+            // TODO: Implement the actual connection logic with the peer key
+            console.log('Connecting to peer with key:', manualKey);
+            alert(`Connected to peer with key: ${manualKey}`);
+            $('.node-popup').removeClass('active');
+        } else {
+            alert('Please scan a QR code or enter a public key');
+        }
+    });
+
+    // Stop scanner when form is closed
+    $('#scanQRForm .cancel').on('click', function() {
+        stopQRScanner();
     });
 }
 

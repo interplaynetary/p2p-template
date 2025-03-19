@@ -25,7 +25,7 @@
                 </div>
                 <div id="pie-container">
                 </div>
-                <div class="drop-zone bottom-left" data-form="revealQR">
+                <div class="drop-zone bottom-left" data-form="peerOptions">
                     <span>Peer</span>
                 </div>
             </div>
@@ -64,7 +64,33 @@
                         <button type="button" class="cancel">Close</button>
                     </div>
                 </form>
-    
+
+                <!-- Scan QR Code Form -->
+                <form id="scanQRForm" class="popup-form" style="display: none;">
+                    <h2>Connect with Peer</h2>
+                    <div class="form-tabs">
+                        <button type="button" class="tab-button active" data-tab="scan-tab">Scan QR</button>
+                        <button type="button" class="tab-button" data-tab="manual-tab">Enter Key</button>
+                    </div>
+                    <div id="scan-tab" class="tab-content">
+                        <div class="camera-container">
+                            <video id="qr-video" autoplay playsinline></video>
+                            <canvas id="qr-canvas" style="display: none;"></canvas>
+                        </div>
+                        <div id="scan-result"></div>
+                    </div>
+                    <div id="manual-tab" class="tab-content" style="display: none;">
+                        <div class="form-group">
+                            <label for="manual-key">Public Key:</label>
+                            <input type="text" id="manual-key" placeholder="Paste public key here">
+                        </div>
+                    </div>
+                    <div class="form-buttons">
+                        <button type="button" id="connect-peer" class="primary">Connect</button>
+                        <button type="button" class="cancel">Close</button>
+                    </div>
+                </form>
+
                 <!-- Give Surplus Form -->
                 <form id="giveSurplusForm" class="popup-form" style="display: none;">
                     <h2>Give Surplus to Direct/Transitive-Mutual-Self-Fulfillment</h2>
@@ -117,6 +143,22 @@
                         </button>
                         <button type="button" class="menu-button" data-form="giveSurplus">
                             <span>Give Surplus</span>
+                        </button>
+                    </div>
+                    <div class="form-buttons">
+                        <button type="button" class="cancel">Close</button>
+                    </div>
+                </form>
+
+                <!-- Peer Options Form -->
+                <form id="peerOptionsForm" class="popup-form" style="display: none;">
+                    <h2>Peer Options</h2>
+                    <div class="menu-buttons">
+                        <button type="button" class="menu-button" data-form="revealQR">
+                            <span>Show My QR</span>
+                        </button>
+                        <button type="button" class="menu-button" data-form="scanQR">
+                            <span>Scan QR</span>
                         </button>
                     </div>
                     <div class="form-buttons">
