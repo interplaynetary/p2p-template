@@ -275,12 +275,26 @@ function setupUIHandlers() {
     }
 
     // Handle connecting to peer
-    $('#connect-peer').on('click', function() {
+    $('#connect-peer').on('click', async function() {
         const manualKey = $('#manual-key').val() as string;
         if (manualKey) {
-            // TODO: Implement the actual connection logic with the peer key
+            // Replace the TODO with actual connection logic
             console.log('Connecting to peer with key:', manualKey);
-            alert(`Connected to peer with key: ${manualKey}`);
+            
+            if (!app) {
+                alert('App not initialized yet');
+                return;
+            }
+            
+            const success = await app.connectToPeer(manualKey);
+            
+            if (success) {
+                alert(`Connected to peer with key: ${manualKey}`);
+                // You might want to add the peer to a list in the UI
+            } else {
+                alert(`Failed to connect to peer with key: ${manualKey}`);
+            }
+            
             $('.node-popup').removeClass('active');
         } else {
             alert('Please scan a QR code or enter a public key');

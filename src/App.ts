@@ -23,6 +23,7 @@ export class App {
     rootNode: TreeNode | null = null
     rootId: string = ''
     name: string = ''
+    peerTrees: Map<string, TreeNode> = new Map();
     
     constructor() {
         console.log('[App] Constructor started');
@@ -310,10 +311,66 @@ export class App {
         pieContainer.appendChild(newPieChart);
     }
 
+    // Add a method to connect to another user's tree
+    async connectToPeer(peerPublicKey: string): Promise<boolean> {
+        console.log(`[App] Connecting to peer: ${peerPublicKey}`);
+        
+        // Skip if already connected
+        if (this.peerTrees.has(peerPublicKey)) {
+            console.log(`[App] Already connected to peer: ${peerPublicKey}`);
+            return true;
+        }
+        
+        try {
+            // Load the peer's root node
+            const peerRootNode = await Promise.race([
+                TreeNode.fromId(peerPublicKey),
+                new Promise<null>(resolve => setTimeout(() => {
+                    console.log(`[App] Timeout waiting for peer ${peerPublicKey}`);
+                    resolve(null);
+                }, 5000))
+            ]);
+            
+            if (!peerRootNode) {
+                console.log(`[App] Failed to load peer tree: ${peerPublicKey}`);
+                return false;
+            }
+            
+            // Store the peer's tree
+            this.peerTrees.set(peerPublicKey, peerRootNode);
+            console.log(`[App] Successfully connected to peer: ${peerRootNode.name}`);
+            console.log(`[App] Peer trees:`, this.peerTrees);
+            // Update UI to reflect new connection
+            this.updateNeeded = true;
+            
+            return true;
+        } catch (error) {
+            console.error(`[App] Error connecting to peer: ${error}`);
+            return false;
+        }
+    }
+    
+    // Add a method to disconnect from a peer
+    disconnectPeer(peerPublicKey: string): boolean {
+        const peerTree = this.peerTrees.get(peerPublicKey);
+        if (peerTree) {
+            this.cleanupTreeSubscriptions(peerTree);
+            this.peerTrees.delete(peerPublicKey);
+            this.updateNeeded = true;
+            return true;
+        }
+        return false;
+    }
+
     // Cleanup
     destroy() {
         // Clean up subscriptions in our tree
         this.cleanupTreeSubscriptions(this.rootNode);
+        
+        // Add cleanup for peer trees
+        for (const [_, peerTree] of this.peerTrees) {
+            this.cleanupTreeSubscriptions(peerTree);
+        }
         
         clearInterval(this.updateInterval);
         clearInterval(this.saveInterval);

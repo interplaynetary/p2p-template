@@ -1,7 +1,6 @@
 import { App } from '../App';
 import { writeToGunPath, readFromGunPath } from './FuncGun';
 
-
 // we get duplicate types! on our nodes! (lets use Sets!)
 // But why do we get this in the first place?
 
