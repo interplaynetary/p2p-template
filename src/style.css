@@ -6,6 +6,7 @@ body {
   height: 100vh;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  user-select: none;  /* Prevent text selection by default */
 }
 
 /* Main visualization container */
@@ -129,6 +130,8 @@ svg {
   word-break: break-all;
   max-width: 80%;
   font-family: inherit;
+  user-select: text;  /* Allow text selection for the public key */
+  cursor: text;
 }
 
 .menu-button {
@@ -137,12 +140,13 @@ svg {
   border: none;
   border-radius: 4px;
   background: #4CAF50;
-  color: white;
+  color: #fff;  /* Make text white for better contrast */
   cursor: pointer;
   transition: background 0.3s;
   font-family: inherit;
   font-size: 14px;
   font-weight: 500;
+  user-select: none;  /* Prevent text selection */
 }
 
 .menu-button:hover {
@@ -183,6 +187,7 @@ svg {
   text-align: center;
   width: 100%;
   padding: 0 0 5px;
+  user-select: none;  /* Prevent text selection */
 }
 
 .form-group {
@@ -195,6 +200,7 @@ svg {
   font-weight: 500;
   color: #555;
   font-size: 14px;
+  user-select: none;  /* Prevent text selection */
 }
 
 .form-group input {
@@ -204,6 +210,8 @@ svg {
   border-radius: 4px;
   font-family: inherit;
   font-size: 14px;
+  user-select: text;  /* Allow text selection in inputs */
+  cursor: text;
 }
 
 .form-buttons {
@@ -271,6 +279,7 @@ svg {
   align-items: center;
   justify-content: center;
   text-align: center;
+  user-select: none;  /* Prevent text selection */
 }
 
 .drop-zone:hover {
@@ -448,6 +457,8 @@ svg {
   font-size: 14px;
   line-height: 20px;
   overflow-y: hidden; /* Hide scrollbar */
+  user-select: text;  /* Allow text selection in inputs */
+  cursor: text;
 }
 
 #message-input:focus {
@@ -458,6 +469,7 @@ svg {
 #char-count {
   font-size: 12px;
   color: #999;
+  user-select: none;  /* Prevent text selection */
 }
 
 #send-message {
@@ -527,6 +539,8 @@ svg {
   border-radius: 12px;
   transition: all 0.2s ease;
   background: #f8f8f8;
+  user-select: text;  /* Allow text selection in inputs */
+  cursor: text;
 }
 
 #auth-form input:focus {
@@ -579,11 +593,14 @@ svg {
     border: none;
     cursor: pointer;
     opacity: 0.7;
+    color: #333;  /* Make text dark */
+    user-select: none;  /* Prevent text selection */
 }
 
 .tab-button.active {
     opacity: 1;
     border-bottom: 2px solid var(--accent-color, #0078d7);
+    color: #000;  /* Make active tab text darker */
 }
 
 .tab-content {
@@ -625,6 +642,8 @@ svg {
     padding: 0.5rem;
     background: #f5f5f5;
     border-radius: 4px;
+    user-select: text;  /* Allow text selection for the public key */
+    cursor: text;
 }
 
 .menu-buttons {
@@ -646,8 +665,24 @@ svg {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
+    color: #333;  /* Make text dark for better legibility */
+    user-select: none;  /* Prevent text selection */
 }
 
 .menu-buttons .menu-button:hover {
     background: #e5e5e5;
+    color: #000;  /* Even darker on hover */
+}
+
+/* Update user list styles */
+.user-list {
+    list-style: none;
+    padding: 0;
+    user-select: none;  /* Prevent text selection */
+}
+
+.user-list li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    user-select: none;  /* Prevent text selection */
 }

@@ -1,9 +1,9 @@
-import * as GunX from './models/Gun';
+import { gun, user } from './models/Gun';
 import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './visualizations/TreeMap';
 import { createPieChart } from './visualizations/PieChart';
 import { initializeExampleData } from './example';
-import { readFromGunPath, writeToGunPath } from './models/FuncGun';
+import $ from 'jquery';
 
 /*
 Simulating throttle in network can be used to discover race conditions!
@@ -12,28 +12,35 @@ function sleep(ms: number) {
 }
 */
 
+// Why is that we ever even end up in the fixing missing name situation?
+
+// We currently arent using handleResize, but we should probably use it?
+
 export class App {
+    name: string = ''
+    rootId: string = ''
+    rootNode: TreeNode | null = null
     initializing: boolean = true
+    treemap!: ReturnType<typeof createTreemap>
     _updateNeeded: boolean = true
     _pieUpdateNeeded: boolean = true
     updateInterval: any = null
     saveInterval: any = null
-    treemap!: ReturnType<typeof createTreemap>
     window!: Window
-    rootNode: TreeNode | null = null
-    rootId: string = ''
-    name: string = ''
+    gunRef: any = null
+    // Map to store peer trees indexed by their public key
     peerTrees: Map<string, TreeNode> = new Map();
     
     constructor() {
         console.log('[App] Constructor started');
-        if (!GunX.user.is) {
+        if (!user.is) {
             console.error('[App] User not logged in!');
             throw new Error('Must be logged in before initializing App');
         }
-        this.rootId = GunX.user.is.pub as string
-        this.name = GunX.user.is.alias as string
-        console.log('[App] User information:', { rootId: this.rootId, name: this.name });
+        this.name = user.is.alias as string
+        this.rootId = user.is.pub as string
+        this.gunRef = gun.get('users').get(this.rootId)
+        console.log('[App] User information:', { name: this.name, rootId: this.rootId });
 
         (window as any).app = this;
         console.log('[App] App instance attached to window.app');
@@ -48,32 +55,8 @@ export class App {
         console.log('[App] Starting initialization');
 
         try {
-            // Check if user has a root node ID stored
-            console.log('[App] Checking for stored root node ID in user data');
-            const userRootData = await Promise.race([
-                new Promise<any>(resolve => {
-                    const userRootRef = readFromGunPath(['user', this.rootId, 'root']);
-                    userRootRef.gunNodeRef.once((data, key) => {
-                        console.log('[App] User root data:', data);
-                        resolve(data);
-                    });
-                }),
-                // Add a 3-second timeout
-                new Promise<null>(resolve => setTimeout(() => {
-                    console.log('[App] Timeout waiting for user root data, assuming none exists');
-                    resolve(null);
-                }, 3000))
-            ]);
-            
-            if (userRootData && typeof userRootData === 'string') {
-                console.log('[App] Found stored root node ID:', userRootData);
-                this.rootId = userRootData;
-            } else {
-                console.log('[App] No stored root node ID found, using user ID:', this.rootId);
-            }
-
-            // Try to load existing root node first
-            console.log('[App] Attempting to load existing root node from path:', ['nodes', this.rootId]);
+            // Try to load existing root node first - using user public key as the node ID
+            console.log('[App] Attempting to load existing root node from path:', ['users', this.rootId]);
             this.rootNode = await Promise.race([
                 TreeNode.fromId(this.rootId),
                 // Add a 5-second timeout
@@ -89,17 +72,18 @@ export class App {
                 this.rootNode = new TreeNode(this.name, this.rootId, null);
                 console.log('[App] New root node created with ID:', this.rootNode.id);
                 
-                // Explicitly save the name to ensure it's stored properly
-                console.log('[App] Explicitly saving name to Gun for root node');
-                writeToGunPath(['nodes', this.rootId], { 
+                // Explicitly save the user data using direct Gun approach
+                console.log('[App] Explicitly saving user data to Gun for root node');
+                this.gunRef.put({ 
                     name: this.name,
                     points: 0,
-                    manualFulfillment: null
+                    manualFulfillment: null,
+                    lastSeen: Date.now()
                 });
+
+                // Add a reference to the nodes collection
+                gun.get('nodes').set(this.gunRef);
                 
-                // The new root node needs to be linked to the user's ID
-                console.log('[App] Linking new root node to user');
-                writeToGunPath(['user', this.rootId, 'root'], this.rootNode.id);
                 console.log('[App] Root node linked to user');
             } else {
                 console.log('[App] Existing root node loaded successfully:', {
@@ -107,14 +91,12 @@ export class App {
                     name: this.rootNode.name,
                     childrenCount: this.rootNode.children.size
                 });
-                
-                // Update the name if it's incorrect (e.g., showing as "Unnamed")
-                if (this.rootNode.name === 'Unnamed' && this.name) {
-                    console.log(`[App] Fixing missing name: updating from "${this.rootNode.name}" to "${this.name}"`);
-                    this.rootNode.name = this.name;
-                    writeToGunPath(['nodes', this.rootId], { name: this.name });
-                }
             }
+
+            // Regular ping to update lastSeen status
+            this.saveInterval = setInterval(() => {
+                this.gunRef.get('lastSeen').put(Date.now());
+            }, 60000); // Update every minute
 
             console.log('[App] Root node setup complete, initializing UI');
             const container = document.getElementById('treemap-container');
@@ -138,8 +120,7 @@ export class App {
             console.log('[App] Checking for children in Gun...');
             const childrenCheck = await Promise.race([
                 new Promise<boolean>(resolve => {
-                    const childrenRef = readFromGunPath(['nodes', this.rootId, 'children']);
-                    childrenRef.gunNodeRef.once((data) => {
+                    this.gunRef.get('children').once((data) => {
                         console.log('[App] Children data in Gun:', data);
                         // Check if data exists and has properties other than '_'
                         const hasChildren = data && typeof data === 'object' && 
@@ -204,6 +185,31 @@ export class App {
         }
     }
 
+    get currentView() {
+        console.log('currentView getter called, treemap exists:', !!this.treemap);
+        if (!this.treemap) {
+            console.warn('Treemap not initialized');
+            return this;
+        }
+        const view = this.treemap.getCurrentView() || this;
+        console.log('currentView returning:', view);
+        return view;
+    }
+
+    handleResize() {
+        console.log('Resize handler triggered');
+        const container = document.getElementById('treemap-container');
+        if (!container) {
+            console.warn('Treemap container not found');
+            return;
+        }
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        this.treemap.update(width, height);
+    }
+
+    
     get updateNeeded() {
         return this._updateNeeded;
     }
@@ -220,33 +226,6 @@ export class App {
         this._pieUpdateNeeded = value;
     }
 
-    get currentView() {
-        console.log('currentView getter called, treemap exists:', !!this.treemap);
-        if (!this.treemap) {
-            console.warn('Treemap not initialized');
-            return this;
-        }
-        const view = this.treemap.getCurrentView() || this;
-        console.log('currentView returning:', view);
-        return view;
-    }
-
-    get currentViewData() {
-        return (this.currentView as any).data;
-    }
-
-    handleResize() {
-        console.log('Resize handler triggered');
-        const container = document.getElementById('treemap-container');
-        if (!container) {
-            console.warn('Treemap container not found');
-            return;
-        }
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-
-        this.treemap.update(width, height);
-    }
 
     async updateVisualizations() {
         console.log('App.updateVisualizations called');
@@ -322,6 +301,9 @@ export class App {
         }
         
         try {
+            // Directly try to load the peer's root node using their public key
+            console.log(`[App] Loading peer root node directly with ID: ${peerPublicKey}`);
+            
             // Load the peer's root node
             const peerRootNode = await Promise.race([
                 TreeNode.fromId(peerPublicKey),
@@ -340,6 +322,7 @@ export class App {
             this.peerTrees.set(peerPublicKey, peerRootNode);
             console.log(`[App] Successfully connected to peer: ${peerRootNode.name}`);
             console.log(`[App] Peer trees:`, this.peerTrees);
+            
             // Update UI to reflect new connection
             this.updateNeeded = true;
             
@@ -361,19 +344,70 @@ export class App {
         }
         return false;
     }
+    
+    // Add a method to App class
+    listConnectedPeers() {
+        return Array.from(this.peerTrees.keys()).map(key => ({
+          id: key,
+          name: this.peerTrees.get(key)?.name || 'Unknown'
+        }));
+    }
 
-    // Cleanup
-    destroy() {
-        // Clean up subscriptions in our tree
-        this.cleanupTreeSubscriptions(this.rootNode);
-        
-        // Add cleanup for peer trees
-        for (const [_, peerTree] of this.peerTrees) {
-            this.cleanupTreeSubscriptions(peerTree);
-        }
-        
-        clearInterval(this.updateInterval);
-        clearInterval(this.saveInterval);
+    // Add a method to discover other users
+    async discoverUsers(): Promise<{id: string, name: string, lastSeen: number}[]> {
+        console.log('[App] Discovering other users');
+        return new Promise((resolve) => {
+            const users: {id: string, name: string, lastSeen: number}[] = [];
+            const seenIds = new Set<string>();
+            
+            // Use on() instead of once() to get live updates
+            gun.get('users').map().on((data, key) => {
+                if (data && key !== this.rootId && !seenIds.has(key)) {
+                    console.log(`[App] Found user: ${data.name} (${key})`);
+                    seenIds.add(key);
+                    users.push({
+                        id: key,
+                        name: data.name || 'Unknown',
+                        lastSeen: data.lastSeen || 0
+                    });
+                    
+                    // Update the UI when we find new users
+                    if (document.getElementById('user-list')) {
+                        const userListHtml = users.map(user => {
+                            const lastSeenDate = user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'Unknown';
+                            return `
+                                <li>
+                                    <div>${user.name}</div>
+                                    <div>Last seen: ${lastSeenDate}</div>
+                                    <button class="connect-to-user" data-id="${user.id}">Connect</button>
+                                </li>
+                            `;
+                        }).join('');
+                        
+                        $('#user-list').html(userListHtml);
+                        
+                        // Re-add click handlers
+                        $('.connect-to-user').off('click').on('click', async function() {
+                            const userId = $(this).data('id');
+                            const success = await (window as any).app.connectToPeer(userId);
+                            
+                            if (success) {
+                                alert(`Connected to ${$(this).parent().find('div').first().text()}`);
+                                $('.node-popup').removeClass('active');
+                            } else {
+                                alert('Failed to connect to user');
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // Return initial results after a timeout
+            setTimeout(() => {
+                console.log(`[App] Discovered ${users.length} users so far`);
+                resolve(users);
+            }, 1000);
+        });
     }
     
     // Recursively cleanup subscriptions throughout the tree
@@ -387,5 +421,19 @@ export class App {
         for (const child of Array.from(node.children.values())) {
             this.cleanupTreeSubscriptions(child);
         }
+    }
+
+    // Cleanup
+    destroy() {
+        // Clean up subscriptions in our tree
+        this.cleanupTreeSubscriptions(this.rootNode);
+        
+        // Add cleanup for peer trees
+        for (const [_, peerTree] of this.peerTrees) {
+            this.cleanupTreeSubscriptions(peerTree);
+        }
+        
+        clearInterval(this.updateInterval);
+        clearInterval(this.saveInterval);
     }
 }

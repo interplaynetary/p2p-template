@@ -75,7 +75,7 @@ function setupUIHandlers() {
 
         if (formId === 'addNode') {
             const hasChildren = app?.currentView?.hasChildren;
-            console.log('currentViewData:', app?.currentViewData);  // Debug log
+            console.log('currentViewData:', app?.currentView.data);  // Debug log
             console.log('currentView:', app?.currentView.data.name);  // Debug log
         
             $('#percentageGroup').toggle(hasChildren);
@@ -97,7 +97,7 @@ function setupUIHandlers() {
         console.log('app exists:', app);
         console.log('app treemap exists:', (app?.treemap));
         const name = $('#nodeName').val();
-        const currentViewData = app?.currentViewData;
+        const currentViewData = app?.currentView.data;
         
         const hasChildren = currentViewData.hasChildren;
         const percentage = hasChildren ? Number($('#nodePercentage').val()) : 100;
@@ -301,9 +301,65 @@ function setupUIHandlers() {
         }
     });
 
+    // Add discover users functionality
+    $('.discover-users').on('click', async function() {
+        if (!app) {
+            alert('App not initialized yet');
+            return;
+        }
+
+        // Show loading state
+        $('#user-list').html('<li>Searching for users...</li>');
+        
+        try {
+            const users = await app.discoverUsers();
+            
+            if (users.length === 0) {
+                $('#user-list').html('<li>No users found</li>');
+                return;
+            }
+            
+            // Format and display the list of users
+            const listHtml = users.map(user => {
+                const lastSeenDate = user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'Unknown';
+                return `
+                    <li>
+                        <div>${user.name}</div>
+                        <div>Last seen: ${lastSeenDate}</div>
+                        <button class="connect-to-user" data-id="${user.id}">Connect</button>
+                    </li>
+                `;
+            }).join('');
+            
+            $('#user-list').html(listHtml);
+            
+            // Add click handlers for the connect buttons
+            $('.connect-to-user').on('click', async function() {
+                const userId = $(this).data('id');
+                const success = await app.connectToPeer(userId);
+                
+                if (success) {
+                    alert(`Connected to ${$(this).parent().find('div').first().text()}`);
+                    $('.node-popup').removeClass('active');
+                } else {
+                    alert('Failed to connect to user');
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error discovering users:', error);
+            $('#user-list').html('<li>Error discovering users</li>');
+        }
+    });
+
     // Stop scanner when form is closed
     $('#scanQRForm .cancel').on('click', function() {
         stopQRScanner();
+    });
+
+    // Add tab button in main.ts
+    $('.tab-button[data-tab="discover-tab"]').on('click', function() {
+        $('.discover-users').trigger('click');
     });
 }
 

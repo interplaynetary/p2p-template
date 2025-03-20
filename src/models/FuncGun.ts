@@ -15,7 +15,7 @@ export function writeToGunPath(paths = [], data = null, set = false, refRoot = '
     return undefined;
   }
 
-  console.log('[FuncGun] Starting path traversal for write:', paths);
+  // console.log('[FuncGun] Starting path traversal for write:', paths);
   
   // Determine starting reference based on the path
   // If path starts with 'user', use user reference
@@ -24,82 +24,58 @@ export function writeToGunPath(paths = [], data = null, set = false, refRoot = '
   let startIndex = 0;
   
   if (paths[0] === 'user') {
-    console.log('[FuncGun] Using user reference as starting point');
+    // console.log('[FuncGun] Using user reference as starting point');
     gunRef = user;
     startIndex = 1; // Skip 'user' in the path
-  } else if (paths[0] === 'nodes') {
-    console.log('[FuncGun] Using gun reference for nodes');
-    gunRef = gun;
   } else {
-    console.log('[FuncGun] Using gun reference as general starting point');
+    // console.log('[FuncGun] Using gun reference as general starting point');
     gunRef = gun;
   }
   
-  console.log(`[FuncGun] Initial reference:`, gunRef);
+  // console.log(`[FuncGun] Initial reference:`, gunRef);
   
   // Traverse through the path segments
   for (let i = startIndex; i < paths.length; i++) {
     const segment = paths[i];
-    console.log(`[FuncGun] Traversing path segment [${i}]: '${segment}'`);
+    // console.log(`[FuncGun] Traversing path segment [${i}]: '${segment}'`);
     
     // Debug current reference before getting next segment
-    console.log(`[FuncGun] Current gunRef before .get('${segment}'):`, gunRef);
+    // console.log(`[FuncGun] Current gunRef before .get('${segment}'):`, gunRef);
     
     // @ts-ignore - Gun types are complicated, but this works at runtime
     gunRef = gunRef.get(segment);
     
     // Debug new reference after getting segment
-    console.log(`[FuncGun] New gunRef after .get('${segment}'):`, gunRef);
+    // console.log(`[FuncGun] New gunRef after .get('${segment}'):`, gunRef);
   }
   
-  console.log(`[FuncGun] Final gunRef after traversal:`, gunRef);
+  // console.log(`[FuncGun] Final gunRef after traversal:`, gunRef);
   
   // Handle the data differently based on type and operation
   if (set) {
     // Special case: if data is a string and set=true, treat it as a node reference ID
     if (typeof data === 'string' && data) {
-      console.log(`[FuncGun] Creating relationship with node: ${refRoot}/${data}`);
+      // console.log(`[FuncGun] Creating relationship with node: ${refRoot}/${data}`);
       // Get a reference to the target node
       // @ts-ignore - Gun types are complicated
       let targetRef = refRoot === 'user' ? user.get(data) : gun.get(refRoot).get(data);
       
       // @ts-ignore - Gun types are complicated
-      console.log(`[FuncGun] Using set() with node reference for ${data}`);
+      // console.log(`[FuncGun] Using set() with node reference for ${data}`);
       return gunRef.set(targetRef);
     } else {
       // Regular set operation
       // @ts-ignore - Gun types are complicated
-      console.log(`[FuncGun] Using set() with data:`, data);
+      // console.log(`[FuncGun] Using set() with data:`, data);
       return gunRef.set(data);
     }
   } else {
     // Regular put operation
     // @ts-ignore - Gun types are complicated
-    console.log(`[FuncGun] Using put() with data:`, data);
+    // console.log(`[FuncGun] Using put() with data:`, data);
     return gunRef.put(data);
   }
 }
-
-/*
-writeToGunPath([
-  'nodes',
-  'GunSoulID'
-], {
-    set: true,
-    value: {
-        id: 'GunSoulID',
-        name: 'test',
-        points: 100,
-        manualFulfillment: 0,
-        children: [
-          'GunSoulID2'
-        ],
-        types: [
-          'GunSoulID3'
-        ]
-    }
-})
-*/
 
 /**
  * Reads data from a specified path in Gun database.
@@ -114,7 +90,7 @@ export function readFromGunPath(paths = [], subscribe = false) {
     return undefined;
   }
 
-  console.log('[FuncGun] Starting read path traversal:', paths);
+  // console.log('[FuncGun] Starting read path traversal:', paths);
   
   // Determine starting reference based on the path
   // If path starts with 'user', use user reference
@@ -123,36 +99,33 @@ export function readFromGunPath(paths = [], subscribe = false) {
   let startIndex = 0;
   
   if (paths[0] === 'user') {
-    console.log('[FuncGun] Using user reference as starting point for read');
+    // console.log('[FuncGun] Using user reference as starting point for read');
     gunRef = user;
     startIndex = 1; // Skip 'user' in the path
-  } else if (paths[0] === 'nodes') {
-    console.log('[FuncGun] Using gun reference for nodes');
-    gunRef = gun;
   } else {
-    console.log('[FuncGun] Using gun reference as general starting point for read');
+    // console.log('[FuncGun] Using gun reference as general starting point for read');
     gunRef = gun;
   }
   
-  console.log(`[FuncGun] Initial read reference:`, gunRef);
+  // console.log(`[FuncGun] Initial read reference:`, gunRef);
   
   // Traverse through the path segments
   for (let i = startIndex; i < paths.length; i++) {
     const segment = paths[i];
-    console.log(`[FuncGun] Reading path segment [${i}]: '${segment}'`);
+    // console.log(`[FuncGun] Reading path segment [${i}]: '${segment}'`);
     
     // Debug current reference before getting next segment
-    console.log(`[FuncGun] Current read gunRef before .get('${segment}'):`, gunRef);
+    // console.log(`[FuncGun] Current read gunRef before .get('${segment}'):`, gunRef);
     
     // @ts-ignore - Gun types are complicated, but this works at runtime
     gunRef = gunRef.get(segment);
     
     // Debug new reference after getting segment
-    console.log(`[FuncGun] New read gunRef after .get('${segment}'):`, gunRef);
+    // console.log(`[FuncGun] New read gunRef after .get('${segment}'):`, gunRef);
   }
   
-  console.log(`[FuncGun] Final read gunRef after traversal:`, gunRef);
-  console.log(`[FuncGun] Reading from path [${paths.join('/')}], subscribe=${subscribe}`);
+  // console.log(`[FuncGun] Final read gunRef after traversal:`, gunRef);
+  // console.log(`[FuncGun] Reading from path [${paths.join('/')}], subscribe=${subscribe}`);
   
   const returnObject = { 
     paths: paths,
@@ -165,20 +138,20 @@ export function readFromGunPath(paths = [], subscribe = false) {
   if (subscribe) {
     // @ts-ignore - Gun types are complicated, but this works at runtime
     returnObject.readFunction = gunRef.on((data, key) => {
-      console.log(`[FuncGun] Subscription update from [${paths.join('/')}]:`, { data, key });
+      // console.log(`[FuncGun] Subscription update from [${paths.join('/')}]:`, { data, key });
       returnObject.data = data;
       returnObject.key = key;
     });
   } else {
     // @ts-ignore - Gun types are complicated, but this works at runtime
     returnObject.readFunction = gunRef.once((data, key) => {
-      console.log(`[FuncGun] One-time read from [${paths.join('/')}]:`, { data, key });
+      // console.log(`[FuncGun] One-time read from [${paths.join('/')}]:`, { data, key });
       returnObject.data = data;
       returnObject.key = key;
     });
   }
 
-  console.log('[FuncGun] ReturnObject:', returnObject);
+  // console.log('[FuncGun] ReturnObject:', returnObject);
   
   return returnObject;
 }

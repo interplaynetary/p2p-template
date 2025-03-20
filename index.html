@@ -72,6 +72,10 @@
                         <button type="button" class="tab-button active" data-tab="scan-tab">Scan QR</button>
                         <button type="button" class="tab-button" data-tab="manual-tab">Enter Key</button>
                     </div>
+                    <div id="discover-tab" class="tab-content" style="display: none;">
+                        <button class="discover-users">Search for Users</button>
+                        <ul id="user-list" class="user-list"></ul>
+                    </div>
                     <div id="scan-tab" class="tab-content">
                         <div class="camera-container">
                             <video id="qr-video" autoplay playsinline></video>
@@ -159,6 +163,9 @@
                         </button>
                         <button type="button" class="menu-button" data-form="scanQR">
                             <span>Scan QR</span>
+                        </button>
+                        <button type="button" class="menu-button discover-users">
+                            <span>Find Users</span>
                         </button>
                     </div>
                     <div class="form-buttons">
