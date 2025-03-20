@@ -152,7 +152,14 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         node.selectAll("text").remove();
 
         node.append("rect")
-            .attr("id", d => (d.leafUid = uid("leaf")).id)
+            .attr("id", d => {
+                d.leafUid = uid("leaf");
+                
+                // Also add the node's actual ID to make it findable for drag-drop
+                if (d === root) return d.leafUid.id;
+                if (d.data && d.data.id) return `leaf-${d.data.id}`;
+                return d.leafUid.id;
+            })
             .attr("fill", d => {
                 if (d === root) return "#fff";
                 return getColorForName(d.data.name);

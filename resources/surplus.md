@@ -138,6 +138,8 @@ The result? A world where:
 
 This is why contributing to free association isn't just about direct relationships—it's about participating in and strengthening a network that can ultimately connect all of humanity through mutual recognition and surplus distribution. Your contributions don't just help immediate recipients; they help build and strengthen pathways through which humanity's cooperative wealth can flow more freely.
 
+Note: this level of access to the wealth of social-abundance can be overwhelming for inviduals! Various organizational elements, games, organizations, structures, algorithms, interface extensions should be explored to help individuals navigate and interact with this abundance of access while minimizing overwhelm. When indivudals form communities that freely associate with eachother, communal organization of surplus can help minimize the burden on individuals to need to process the whole of this abundance. Free association between individuals, between organizations, between individuals and organizations, between organizations and individuals.
+
 ## Current Needs for Free Association Development
 
 The free association project currently seeks support in:

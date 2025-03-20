@@ -157,7 +157,7 @@ export class TreeNode {
     async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0,): Promise<TreeNode> {
       if (this._parent && this.isContribution) {
         throw new Error(
-          `Node ${this.name} is an instance of a contributor and cannot have children.`
+          `Node ${this.name} is an instance of a contributor/contribution and cannot have children.`
         );
       }
   
@@ -189,15 +189,10 @@ export class TreeNode {
         this.gunRef.get('children').set(childNodeRef);
       
       // Step 4: Create the TreeNode instance
-      const child = new TreeNode(name, childId, this, [], manualFulfillment);
+      const child = new TreeNode(name, childId, this, [], manualFulfillment, points);
       
       // Step 5: Add to local children map
       this.children.set(childId, child);
-      
-      // Step 6: Update points if needed
-      if (points > 0) {
-        child.points = points;
-      }
       
       // Step 7: Add types by ID
       for (const typeId of typeIds) {

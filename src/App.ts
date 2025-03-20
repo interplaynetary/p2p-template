@@ -3,6 +3,7 @@ import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './visualizations/TreeMap';
 import { createPieChart } from './visualizations/PieChart';
 import { initializeExampleData } from './example';
+import { createUserCardsGrid } from './components/UserCards';
 import $ from 'jquery';
 
 /*
@@ -16,6 +17,11 @@ function sleep(ms: number) {
 
 // We currently arent using handleResize, but we should probably use it?
 
+// reactive component displaying all users (nodes) in a grid (each user/node) should be represented by a card!
+// these cards should be small and square! (displaying name)
+// we want these cards to be draggable, so that we can drop them over the treemap to addTypes to a node!
+// when we drag a card over the treemap, we want to highlight the node that the card will be added to!
+
 export class App {
     name: string = ''
     rootId: string = ''
@@ -26,6 +32,7 @@ export class App {
     _pieUpdateNeeded: boolean = true
     updateInterval: any = null
     saveInterval: any = null
+    userCardsGrid: any = null
     window!: Window
     gunRef: any = null
     // Map to store peer trees indexed by their public key
@@ -161,6 +168,9 @@ export class App {
             container.appendChild(this.treemap.element);
             console.log('[App] Treemap added to container');
 
+            // Initialize user cards grid
+            this.initializeUserCards();
+
             // Set up a reactive update system that will respond to changes
             console.log('[App] Setting up reactive update system');
             this.updateInterval = setInterval(() => {
@@ -183,6 +193,44 @@ export class App {
             console.error('[App] Initialization failed with error:', error);
             throw error;
         }
+    }
+
+    // Initialize user cards grid
+    initializeUserCards() {
+        console.log('[App] Initializing user cards grid');
+        
+        // Create the grid
+        this.userCardsGrid = createUserCardsGrid(this);
+        
+        // Find or create container for user cards
+        let userCardsContainer = document.getElementById('user-cards-container');
+        
+        if (!userCardsContainer) {
+            // Create the container if it doesn't exist
+            userCardsContainer = document.createElement('div');
+            userCardsContainer.id = 'user-cards-container';
+            userCardsContainer.style.height = '300px'; // Set initial height
+            userCardsContainer.style.width = '100%';
+            userCardsContainer.style.marginTop = '10px';
+            
+            // Add to menu section
+            const menuSection = document.getElementById('menu-section');
+            if (menuSection) {
+                // Add it after the pie container
+                const pieContainer = document.getElementById('pie-container');
+                if (pieContainer) {
+                    menuSection.insertBefore(userCardsContainer, pieContainer.nextSibling);
+                } else {
+                    menuSection.appendChild(userCardsContainer);
+                }
+            }
+        }
+        
+        // Clear and append the user cards grid
+        userCardsContainer.innerHTML = '';
+        userCardsContainer.appendChild(this.userCardsGrid.element);
+        
+        console.log('[App] User cards grid initialized');
     }
 
     get currentView() {
