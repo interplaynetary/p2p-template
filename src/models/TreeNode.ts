@@ -33,7 +33,9 @@ export class TreeNode {
     children: Map<string, TreeNode> = new Map();
     private _manualFulfillment: number | null = null;
     // fulfillmentCache: number = 0;
-    types: Set<TreeNode> = new Set();
+    
+    // Store types in a Map with ID as key to prevent duplicates
+    private _typesMap: Map<string, TreeNode> = new Map();
     typeIndex: Map<TreeNode, Set<TreeNode>>;
     app: App;
     
@@ -66,9 +68,18 @@ export class TreeNode {
       // Map of type -> Set of instances (shared at root level)
       this.typeIndex = parent ? parent.root.typeIndex : new Map();
   
+      // Initialize _typesMap with passed types, indexed by ID
       if (types.length > 0) {
-        this.types = new Set(types);
+        // Create a map of type ID to type
         types.forEach(type => {
+          if (type && type.id) {
+            this._typesMap.set(type.id, type);
+            // Don't need to call addType here since we're just initializing
+          }
+        });
+        
+        // Now add each type to Gun
+        Array.from(this._typesMap.values()).forEach(type => {
           this.addType(type);
         });
       }
@@ -139,8 +150,8 @@ export class TreeNode {
     
     get isContribution(): boolean {
       // A node is a contribution if it has any types that are contributors
-      if (this.types.size === 0) return false;
-      return Array.from(this.types).some(type => type.isContributor);
+      if (this._typesMap.size === 0) return false;
+      return Array.from(this._typesMap.values()).some(type => type.isContributor);
     }
   
     async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0,): Promise<TreeNode> {
@@ -227,13 +238,18 @@ export class TreeNode {
       return this;
     }
 
+    // Getter to return a Set of types for backward compatibility
+    get types(): Set<TreeNode> {
+      return new Set(this._typesMap.values());
+    }
+    
     // Add this node as an instance of the given type
     addType(typeOrId: TreeNode | string): TreeNode {
       const root = this.root;
       const typeId = typeof typeOrId === 'string' ? typeOrId : typeOrId.id;
 
-      // Check if we already have this type before proceeding
-      if (Array.from(this.types).some(t => t.id === typeId)) {
+      // Check if we already have this type ID before proceeding
+      if (this._typesMap.has(typeId)) {
         console.log(`[TreeNode] Type ${typeId} already exists on node ${this.name}, skipping`);
         return this;
       }
@@ -258,8 +274,8 @@ export class TreeNode {
       // Asynchronously update the type index when we have the type node
       getTypeNode().then(typeNode => {
         if (typeNode) {
-          // Add to local types array if not already present
-          this.types.add(typeNode);
+          // Add to local types map if not already present
+          this._typesMap.set(typeId, typeNode);
           
           // Update type index
           if (!root.typeIndex.has(typeNode)) {
@@ -293,8 +309,8 @@ export class TreeNode {
         }
       }
       
-      // Remove from local types array
-      this.types = new Set(Array.from(this.types).filter(t => t.id !== typeId));
+      // Remove from local types map
+      this._typesMap.delete(typeId);
       
       this.app.updateNeeded = true;
       this.app.pieUpdateNeeded = true;
@@ -449,7 +465,7 @@ export class TreeNode {
     shareOfGeneralFulfillment(node: TreeNode): number {
       const instances = this.getInstances(node);
       return Array.from(instances).reduce((sum, instance) => {
-        const contributorTypesCount = Array.from(instance.types).filter(type => type.isContributor).length;
+        const contributorTypesCount = Array.from(instance._typesMap.values()).filter(type => type.isContributor).length;
 
         const fulfillmentWeight = instance.fulfilled * instance.weight;
 
@@ -573,10 +589,10 @@ export class TreeNode {
       }
       
       // Save type references using Gun's set operation
-      if (this.types.size > 0) {
-        console.log(`[TreeNode] Saving ${this.types.size} type references`);
+      if (this._typesMap.size > 0) {
+        console.log(`[TreeNode] Saving ${this._typesMap.size} type references`);
         
-        Array.from(this.types).forEach(type => {
+        Array.from(this._typesMap.values()).forEach(type => {
           console.log(`[TreeNode] Saving type reference: ${type.id}`);
           
           // Get reference to type node and add to types collection
@@ -663,8 +679,7 @@ export class TreeNode {
           console.log(`[TreeNode] Detected type with key ${key} and ID ${typeId} for node ${this.id}`);
           
           // Check if we already have this type
-          const hasType = Array.from(this.types).some(t => t.id === typeId);
-          if (hasType) {
+          if (this._typesMap.has(typeId)) {
             console.log(`[TreeNode] Type ${typeId} already loaded, skipping`);
             return;
           }
@@ -674,7 +689,7 @@ export class TreeNode {
           TreeNode.fromId(typeId).then(type => {
             if (type) {
               console.log(`[TreeNode] Type ${typeId} (${type.name}) loaded successfully for ${this.id}`);
-              this.types.add(type);
+              this._typesMap.set(typeId, type);
               
               // Update type index
               const root = this.root;
@@ -800,14 +815,17 @@ export class TreeNode {
                         
                         // For each valid type, add this node as an instance
                         validTypes.forEach(type => {
-                          node.types.add(type);
-                          
-                          // Update typeIndex at root level
-                          const root = node.root;
-                          if (!root.typeIndex.has(type)) {
-                            root.typeIndex.set(type, new Set());
+                          if (type) {
+                            // Store in _typesMap by ID to prevent duplicates
+                            node._typesMap.set(type.id, type);
+                            
+                            // Update typeIndex at root level
+                            const root = node.root;
+                            if (!root.typeIndex.has(type)) {
+                              root.typeIndex.set(type, new Set());
+                            }
+                            root.typeIndex.get(type)?.add(node);
                           }
-                          root.typeIndex.get(type)?.add(node);
                         });
                       });
                   }
