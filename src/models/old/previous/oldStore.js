@@ -1,4 +1,4 @@
-import * as GunX from '../Gun';
+import * as GunX from '../../Gun';
 import { Node } from './Node';
 
 /*

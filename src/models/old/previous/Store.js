@@ -1,5 +1,5 @@
 import { Node } from './Node';
-import * as GunX from '../Gun';
+import * as GunX from '../../Gun';
 
 /*
 Data can be in graphs that link across different spaces. So don't assume data is only in one space! For instance, user data can point to public data which can be edited by anyone, just not the link itself. Likewise, public data could link to frozen or user data, but anyone could edit the link itself. One very powerful combination is frozen links to user data, nobody can edit the link but the data itself can be updated by the owner.

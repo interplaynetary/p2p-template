@@ -1,5 +1,5 @@
 import * as GunX from '../Gun.js';
-import { Node } from '../previous/Node.js';
+import { Node } from './previous/Node.js';
 
 /*
 TARGET STRUCTURE:
