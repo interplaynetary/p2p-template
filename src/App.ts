@@ -1,7 +1,7 @@
 import { gun, user } from './models/Gun';
 import { TreeNode } from './models/TreeNode';
-import { createTreemap } from './visualizations/TreeMap';
-import { createPieChart } from './visualizations/PieChart';
+import { createTreemap } from './components/TreeMap';
+import { createPieChart } from './components/PieChart';
 import { initializeExampleData } from './example';
 // import { createUserCardsGrid } from './components/UserCards';
 import $ from 'jquery';

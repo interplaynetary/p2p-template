@@ -1,7 +1,7 @@
 import * as GunX from '../Gun';
 import { GunStore, TreeNode } from './Free';
-import { createTreemap } from '../../visualizations/TreeMap';
-import { createPieChart } from '../../visualizations/PieChart';
+import { createTreemap } from '../../components/TreeMap';
+import { createPieChart } from '../../components/PieChart';
 import { initializeExampleData } from '../../example';
 
 function sleep(ms: number) {

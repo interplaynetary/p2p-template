@@ -1,4 +1,4 @@
-import { gun } from '../Gun';
+import { gun } from '../../Gun';
 
 // Type definitions for Gun souls and node references
 type GunSoul = string;  // The Gun soul identifier (_["#"])

@@ -2,7 +2,7 @@ import * as GunX from '../../Gun.js';
 import { Node } from './Node.js';
 import { Store } from './Store.js';
 import { createTreemap } from '../../visualizations/RecursiveTreeMap.js';
-import { createPieChart } from '../../../visualizations/PieChart.js';
+import { createPieChart } from '../../../components/PieChart.js';
 import { initializeExampleData } from '../../../example.js';
 
 export class App extends Node {
