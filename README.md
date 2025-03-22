@@ -493,4 +493,8 @@ A To-Do list is being kept at [todo.md](todo.md).
 
 **A basic interface for free association is almost complete but we are seeking support in user-interface-development as well as support in the form of housing, food etc.**
 
-**Support Financially:** [opencollective.com/playnet](https://opencollective.com/playnet)
+## **Support Financially**
+
+<a href="https://opencollective.com/playnet">
+    <img width="300" src="https://opencollective.com/playnet/donate/button@2x.png?color=blue" />
+</a>

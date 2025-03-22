@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
 import { calculateFontSize } from '../utils/fontUtils';
 import { TreeNode } from '../models/TreeNode';
+import { gun } from '../models/Gun';
 
 // when we navigate into a type, the backbutton no longer works
 
@@ -110,11 +111,29 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
     }
   
     function position(group, root) {
-        // Update all g elements except the home button
-        group.selectAll("g:not(.home-button)")
+        // Update all g elements except the navigation buttons
+        group.selectAll("g:not(.home-button):not(.add-button):not(.peer-button)")
             .attr("transform", d => {
                 if (!d || typeof d.x0 === 'undefined') return '';
                 return d === root ? `translate(0,-50)` : `translate(${x(d.x0)},${y(d.y0)})`;
+            });
+
+        // Update home button position (keep it at the left)
+        group.selectAll(".home-button")
+            .attr("transform", "translate(20, 25)");
+            
+        // Update peer button position (keep it to the left of the add button)
+        group.selectAll(".peer-button")
+            .attr("transform", d => {
+                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                return `translate(${rectWidth - 60}, 25)`;
+            });
+            
+        // Update add button position (keep it at the right)
+        group.selectAll(".add-button")
+            .attr("transform", d => {
+                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                return `translate(${rectWidth - 20}, 25)`;
             });
 
         group.selectAll("rect")
@@ -127,12 +146,25 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 return d === root ? 50 : y(d.y1) - y(d.y0);
             });
 
-        // Update type indicators along with other elements
-        group.selectAll(".type-indicators")
+        // Update type tags container position
+        group.selectAll(".type-tags-container")
             .attr("transform", d => {
                 if (!d || typeof d.x0 === 'undefined') return '';
                 const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                return `translate(${rectWidth - 10}, 10)`;
+                const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                
+                // Position centered horizontally, below the text
+                // Calculate vertical position based on text lines
+                const textLines = d === root ? 1 : 
+                                  d.data.name.split(/(?=[A-Z][^A-Z])/g).length;
+                
+                // Offset from center - move down by half the text height plus padding
+                const fontSize = calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView);
+                const fontSizeNumber = typeof fontSize === 'number' ? 
+                    fontSize : 12; // Fallback to reasonable default
+                const verticalOffset = (textLines * 1.2 * fontSizeNumber / 2) + 10;
+                
+                return `translate(${rectWidth / 2}, ${rectHeight / 2 + verticalOffset})`;
             });
     }
   
@@ -215,73 +247,420 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
   
       group.call(position, root);
 
-    // Add type circles container after the rect
+    // Replace type circles container with tag pills container and add tag button
     const typeContainer = node.append("g")
-        .attr("class", "type-indicators")
+        .attr("class", "type-tags-container")
         .attr("transform", d => {
             const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-            return `translate(${rectWidth - 15}, 15)`; // Moved slightly more from edge
+            const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+            
+            // Position centered horizontally, below the text
+            // Calculate vertical position based on text lines
+            const textLines = d === root ? 1 : 
+                              d.data.name.split(/(?=[A-Z][^A-Z])/g).length;
+            
+            // Offset from center - move down by half the text height plus padding
+            const fontSize = calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView);
+            const fontSizeNumber = typeof fontSize === 'number' ? 
+                fontSize : 12; // Fallback to reasonable default
+            const verticalOffset = (textLines * 1.2 * fontSizeNumber / 2) + 10;
+            
+            return `translate(${rectWidth / 2}, ${rectHeight / 2 + verticalOffset})`;
         });
 
-    // Add circles for each type
+    // Add tag pills for each type
     typeContainer.each(function(d) {
-        if (!d.data.types) return;
+        if (!d.data || d === root) return; // Skip for root node
         
         const container = d3.select(this);
-        const circleRadius = 8;
-        const spacing = circleRadius * 2.5;
         
-        // Debug the types data
-        // console.log('Types for node:', d.data.name, d.data.types);
+        // Calculate rect dimensions for space check
+        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
         
-        const circles = container.selectAll("circle")
-            .data(d.data.types)
-            .join("circle")
-            .attr("cx", (_, i) => -i * spacing)
-            .attr("cy", 0)
-            .attr("r", circleRadius)
-            .attr("fill", type => getColorForName(type.name))
-            .attr("stroke", "#fff")
-            .attr("stroke-width", "2")
-            .attr("cursor", "pointer")
-            .style("pointer-events", "all"); // Ensure circles receive events
-
-        // Attach click handler separately
-        circles.on("click", function(event, type) {
-            console.log('Circle clicked!');
+        // Skip all additions if rect is too small
+        if (rectWidth < 60 || rectHeight < 60) return;
+        
+        // Get type array safely
+        const typesArray = d.data._typesMap ? Array.from(d.data._typesMap.values()) : [];
+        
+        // Create a tag wrapper to hold all pills in a flex layout
+        const tagWrapper = container.append("foreignObject")
+            .attr("class", "tag-wrapper")
+            .attr("x", -rectWidth / 2 + 10) // Adjust left position with padding
+            .attr("y", 0)
+            .attr("width", rectWidth - 20) // Full width minus padding
+            .attr("height", 60) // Fixed height to contain a couple rows of tags
+            .append("xhtml:div")
+            .style("display", "flex")
+            .style("flex-wrap", "wrap")
+            .style("justify-content", "center")
+            .style("gap", "4px")
+            .style("width", "100%")
+            .style("height", "100%")
+            .style("overflow", "hidden");
+        
+        // Add the "Add tag" button
+        const addTagButton = tagWrapper.append("div")
+            .attr("class", "add-tag-button")
+            .style("display", "flex")
+            .style("align-items", "center")
+            .style("justify-content", "center")
+            .style("border-radius", "10px")
+            .style("background", "#e0e0e0")
+            .style("padding", "2px 8px")
+            .style("margin", "2px")
+            .style("cursor", "pointer")
+            .style("height", "20px")
+            .style("font-size", "10px")
+            .style("white-space", "nowrap")
+            .style("color", "#333")
+            .text("+");
+        
+        // Add existing type pills
+        typesArray.forEach(type => {
+            const tagPill = tagWrapper.append("div")
+                .attr("class", "tag-pill")
+                .attr("data-type-id", type.id)
+                .style("display", "flex")
+                .style("align-items", "center")
+                .style("border-radius", "10px")
+                .style("background", getColorForName(type.name))
+                .style("padding", "2px 8px")
+                .style("margin", "2px")
+                .style("height", "20px")
+                .style("font-size", "10px")
+                .style("white-space", "nowrap");
+                
+            // Tag name
+            tagPill.append("span")
+                .style("color", "white")
+                .style("margin-right", "4px")
+                .style("text-shadow", "0 1px 1px rgba(0,0,0,0.3)")
+                .text(() => {
+                    // Truncate text if too long
+                    const name = type.name;
+                    return name.length > 10 ? name.substring(0, 8) + "..." : name;
+                });
+                
+            // X button
+            tagPill.append("span")
+                .attr("class", "remove-tag")
+                .style("cursor", "pointer")
+                .style("color", "white")
+                .style("font-size", "12px")
+                .style("line-height", "10px")
+                .style("opacity", "0.8")
+                .style("font-weight", "bold")
+                .text("×")
+                .on("click", (event) => {
+                    event.stopPropagation();
+                    console.log('Removing type:', type.name, 'from node:', d.data.name);
+                    
+                    // Remove the type from the node
+                    d.data.removeType(type);
+                    
+                    // Remove tag pill with animation
+                    d3.select(event.target.parentNode)
+                        .style("transition", "all 0.3s")
+                        .style("opacity", "0")
+                        .style("transform", "scale(0.8)")
+                        .remove();
+                });
+            
+            // Click handler for navigating to type's tree
+            tagPill.on("click", (event) => {
+                // Don't handle if clicking on X button
+                if (event.target.classList.contains("remove-tag")) return;
+                
+                console.log('Tag clicked, navigating to type:', type.name);
+                event.stopPropagation();
+                
+                // Update current view
+                currentView = type;
+                
+                // Clear existing content and recreate group
+                group.selectAll("*").remove();
+                
+                // Apply treemap layout
+                const treemap = d3.treemap().tile(tile);
+                root = treemap(hierarchy);
+                
+                // Reset domains
+                x.domain([root.x0, root.x1]);
+                y.domain([root.y0, root.y1]);
+                
+                // Render new view
+                render(group, root);
+            });
+            
+            // Add tooltip
+            tagPill.attr("title", `${type.name}: Click to view tree, click × to remove`);
+        });
+        
+        // Create search dropdown for add tag button
+        addTagButton.on("click", (event) => {
             event.stopPropagation();
             
-            console.log('Loading tree for type:', type.name);
+            // Remove any existing dropdown
+            d3.selectAll(".type-search-dropdown").remove();
             
-            // Update current view
-            currentView = type;
+            // Create dropdown container - attach to body instead of container to ensure it's on top
+            const dropdownContainer = d3.select("body").append("div")
+                .attr("class", "type-search-dropdown")
+                .style("position", "fixed") // Use fixed instead of absolute for better positioning
+                .style("top", `${event.clientY + 20}px`) // Use clientY instead of pageY for fixed positioning
+                .style("left", `${event.clientX - 100}px`)
+                .style("width", "200px")
+                .style("height", "250px")
+                .style("background", "white")
+                .style("border", "1px solid #ccc")
+                .style("border-radius", "4px")
+                .style("box-shadow", "0 4px 8px rgba(0,0,0,0.1)")
+                .style("overflow", "hidden")
+                .style("display", "flex")
+                .style("flex-direction", "column")
+                .style("z-index", "99999"); // Even higher z-index to ensure it's above everything
             
-            // Clear existing content and recreate group
-            group.selectAll("*").remove();
+            // Store any active gun subscriptions for cleanup
+            let gunSubscriptions = [];
             
-            /*
-            // COMMENTED: Create new hierarchy using childrenArray for D3Node
-            hierarchy = d3.hierarchy(type, d => d.childrenArray)
-                .sum(d => d.points)
-                .each(node => {
-                    node.value = node.data.points || 0;
+            // Function to clean up and close dropdown
+            function closeDropdown() {
+                // Unsubscribe from all Gun listeners
+                gunSubscriptions.forEach(unsub => {
+                    if (typeof unsub === 'function') {
+                        unsub();
+                    }
                 });
-            */
+                
+                // Remove dropdown element
+                dropdownContainer.remove();
+                
+                // Remove global click handler
+                d3.select("body").on("click.dropdown", null);
+            }
+            
+            // Add header with search input and close button
+            const headerContainer = dropdownContainer.append("div")
+                .style("display", "flex")
+                .style("align-items", "center")
+                .style("border-bottom", "1px solid #eee")
+                .style("padding", "4px");
+            
+            // Add search input
+            const searchInput = headerContainer.append("input")
+                .attr("type", "text")
+                .attr("placeholder", "Search users...")
+                .style("padding", "8px")
+                .style("border", "none")
+                .style("flex", "1")
+                .style("outline", "none")
+                .style("font-size", "12px");
+            
+            // Add close button
+            const closeButton = headerContainer.append("div")
+                .style("padding", "4px 8px")
+                .style("cursor", "pointer")
+                .style("color", "#666")
+                .style("font-weight", "bold")
+                .text("×")
+                .on("click", closeDropdown);
+            
+            // Create results container
+            const resultsContainer = dropdownContainer.append("div")
+                .style("overflow-y", "auto")
+                .style("flex", "1");
+                
+            // Function to load and filter users
+            function loadUsers(filterText = "") {
+                resultsContainer.html(""); // Clear previous results
+                
+                // Show loading indicator
+                const loadingIndicator = resultsContainer.append("div")
+                    .attr("class", "loading-indicator")
+                    .style("padding", "8px")
+                    .style("text-align", "center")
+                    .style("color", "#888")
+                    .style("font-size", "11px")
+                    .text("Loading...");
+                
+                // Collect users for batched display
+                const users = [];
+                let foundUsers = false;
+                let userCount = 0;
+                let completedQuery = false;
+                
+                // Get users from Gun
+                const gunQuery = gun.get('users').map().on((userData, userId) => {
+                    if (!userData || !userId || userId === d.data.app.rootId) return;
+                    
+                    const userName = userData.name || 'Unknown';
+                    
+                    // Filter by name if search text exists
+                    if (filterText && !userName.toLowerCase().includes(filterText.toLowerCase())) {
+                        return;
+                    }
+                    
+                    // Check if this user is already a type on the node
+                    const isAlreadyType = d.data._typesMap && d.data._typesMap.has(userId);
+                    if (isAlreadyType) return;
+                    
+                    // Add to users collection if not already there
+                    if (!users.some(u => u.id === userId)) {
+                        users.push({
+                            id: userId,
+                            name: userName
+                        });
+                        userCount++;
+                        foundUsers = true;
+                        
+                        // Update the display immediately
+                        updateUsersList();
+                    }
+                });
+                
+                // Add subscription to cleanup list
+                gunSubscriptions.push(gunQuery);
+                
+                // Function to update the displayed list
+                function updateUsersList() {
+                    // Only update if we have users
+                    if (users.length === 0) return;
+                    
+                    // Remove loading indicator once we have data
+                    if (loadingIndicator) {
+                        loadingIndicator.remove();
+                    }
+                    
+                    // Clear and recreate the list
+                    resultsContainer.html("");
+                    
+                    if (!foundUsers) {
+                        resultsContainer.append("div")
+                            .style("padding", "8px")
+                            .style("text-align", "center")
+                            .style("color", "#888")
+                            .style("font-size", "11px")
+                            .text(filterText ? "No matching users found" : "No users available");
+                        return;
+                    }
+                    
+                    // Sort users by name
+                    users.sort((a, b) => a.name.localeCompare(b.name));
+                    
+                    // Create user items for all found users
+                    users.forEach(user => {
+                        // Create user item
+                        const userItem = resultsContainer.append("div")
+                            .attr("class", "user-item")
+                            .attr("data-user-id", user.id)
+                            .style("padding", "6px 8px")
+                            .style("cursor", "pointer")
+                            .style("font-size", "12px")
+                            .style("border-bottom", "1px solid #f0f0f0")
+                            .style("display", "flex")
+                            .style("align-items", "center")
+                            .style("transition", "background 0.2s");
+                        
+                        // Add color dot
+                        userItem.append("div")
+                            .style("width", "10px")
+                            .style("height", "10px")
+                            .style("background", getColorForName(user.name))
+                            .style("border-radius", "50%")
+                            .style("margin-right", "6px");
+                        
+                        // Add name
+                        userItem.append("div")
+                            .text(user.name);
+                        
+                        // Hover effect
+                        userItem
+                            .on("mouseenter", function() {
+                                d3.select(this).style("background", "#f5f5f5");
+                            })
+                            .on("mouseleave", function() {
+                                d3.select(this).style("background", "white");
+                            });
+                        
+                        // Click to add as type
+                        userItem.on("click", () => {
+                            // Add as type
+                            d.data.addType(user.id);
+                            
+                            // Close dropdown
+                            closeDropdown();
+                            
+                            // Refresh tree to show new tag
+                            group.selectAll("*").remove();
+                            render(group, root);
+                        });
+                    });
+                    
+                    // Make sure dropdown is on top after updating
+                    if (dropdownContainer.node().parentNode !== document.body) {
+                        document.body.appendChild(dropdownContainer.node());
+                    }
+                    
+                    // Re-adjust position if needed after content changes
+                    adjustDropdownPosition();
+                }
+            }
+            
+            // Initial load of users
+            loadUsers();
+            
+            // Handle search input
+            searchInput.on("input", function() {
+                loadUsers(this.value);
+            });
+            
+            // Close dropdown when clicking outside
+            d3.select("body").on("click.dropdown", () => {
+                closeDropdown();
+            });
+            
+            // Prevent clicks inside dropdown from closing it
+            dropdownContainer.on("click", (event) => {
+                event.stopPropagation();
+            });
+            
+            // Focus search input
+            searchInput.node().focus();
+            
+            // Move the dropdown to the body's end to ensure it's on top of all elements
+            document.body.appendChild(dropdownContainer.node());
 
-            // Apply treemap layout
-            const treemap = d3.treemap().tile(tile);
-            root = treemap(hierarchy);
+            // Function to check and adjust dropdown position to keep in viewport
+            function adjustDropdownPosition() {
+                const dropdown = dropdownContainer.node();
+                if (!dropdown) return;
+                
+                const rect = dropdown.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Check right edge
+                if (rect.right > viewportWidth) {
+                    dropdownContainer.style("left", `${viewportWidth - rect.width - 10}px`);
+                }
+                
+                // Check bottom edge
+                if (rect.bottom > viewportHeight) {
+                    // If dropdown would go above the top, position it at the top with some padding
+                    if (event.clientY - rect.height < 10) {
+                        dropdownContainer.style("top", "10px");
+                    } else {
+                        // Otherwise, position above the click
+                        dropdownContainer.style("top", `${event.clientY - rect.height - 10}px`);
+                    }
+                }
+            }
             
-            // Reset domains
-            x.domain([root.x0, root.x1]);
-            y.domain([root.y0, root.y1]);
-            
-            // Render new view
-            render(group, root);
+            // Adjust position after creation
+            setTimeout(adjustDropdownPosition, 0);
         });
-
-        circles.append("title")
-            .text(type => `Click to view ${type.name}'s tree`);
     });
 
     // Add touch state tracking at the top
@@ -345,15 +724,6 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                 const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
                                 d.data.points = newPoints;
                                 
-                                /*
-                                // Recompute hierarchy ensuring values match points
-                                hierarchy.sum(node => node.data.points)
-                                    .each(node => {
-                                        // Force value to exactly match points
-                                        node.data.points || 0;
-                                    });
-                                */
-                                
                                 // Apply treemap
                                 const treemap = d3.treemap().tile(tile);
                                 treemap(hierarchy);
@@ -379,7 +749,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                     .attr("height", d => d === root ? 
                                         50 : 
                                         Math.max(0, y(d.y1) - y(d.y0)));
-                                
+
                                 // Update text positions
                                 nodes.select("text")
                                     .transition()
@@ -394,14 +764,58 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                         const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
                                         return calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView) + "px";
                                     });
-                                    
-                                // Add type indicator updates here
-                                nodes.select(".type-indicators")
+                                
+                                // Update tag container positions
+                                nodes.select(".type-tags-container")
                                     .transition()
                                     .duration(GROWTH_TICK)
                                     .attr("transform", d => {
                                         const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                        return `translate(${rectWidth - 10}, 10)`;
+                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                        
+                                        // Position centered horizontally, below the text
+                                        // Calculate vertical position based on text lines
+                                        const textLines = d === root ? 1 : 
+                                                          d.data.name.split(/(?=[A-Z][^A-Z])/g).length;
+                                        
+                                        // Offset from center - move down by half the text height plus padding
+                                        const fontSize = calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView);
+                                        const fontSizeNumber = typeof fontSize === 'number' ? 
+                                            fontSize : 12; // Fallback to reasonable default
+                                        const verticalOffset = (textLines * 1.2 * fontSizeNumber / 2) + 10;
+                                        
+                                        return `translate(${rectWidth / 2}, ${rectHeight / 2 + verticalOffset})`;
+                                    });
+                                
+                                // Update foreign object tag wrappers
+                                nodes.select(".tag-wrapper")
+                                    .transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("x", d => {
+                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        return -rectWidth / 2 + 10; // Adjust left position with padding
+                                    })
+                                    .attr("width", d => {
+                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        return rectWidth - 20; // Full width minus padding
+                                    });
+
+                                // Update peer button position during growth
+                                group.select(".peer-button")
+                                    .transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("transform", d => {
+                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        return `translate(${rectWidth - 60}, 25)`;
+                                    });
+
+                                // Update add button position during growth
+                                group.select(".add-button")
+                                    .transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("transform", d => {
+                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        return `translate(${rectWidth - 20}, 25)`;
                                     });
 
                                 // console.log("\nFinal values:");
@@ -488,6 +902,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     temp = temp.parent;
                 }
 
+                // Add home button only for contributor trees
                 if (isContributorTree) {
                     // Add home button
                     d3.select(this)
@@ -524,6 +939,97 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                         .attr("font-size", "20px")
                         .attr("dominant-baseline", "middle")  // Vertically center the text
                         .text("🏠");  // Unicode home emoji
+                }
+                
+                // Only add navigation buttons on our user's tree views (not contributor trees)
+                if (!isContributorTree) {
+                    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                    
+                    // Add peer button (on the left of the plus button)
+                    d3.select(this)
+                        .append("g")
+                        .attr("class", "peer-button")
+                        .attr("transform", `translate(${rectWidth - 60}, 25)`)  // Position it to the left of plus button
+                        .style("cursor", "pointer")
+                        .on("click", (event) => {
+                            event.stopPropagation();
+                            
+                            // Trigger the Peer Options form
+                            const peerOptionsTrigger = document.querySelector('.drop-zone[data-form="peerOptions"]');
+                            if (peerOptionsTrigger) {
+                                // Create and dispatch a click event
+                                const clickEvent = new MouseEvent('click', {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    view: window
+                                });
+                                peerOptionsTrigger.dispatchEvent(clickEvent);
+                            } else {
+                                // Directly show the peer options form if trigger not found
+                                const popup = document.querySelector('.node-popup');
+                                const peerOptionsForm = document.querySelector('#peerOptionsForm');
+                                
+                                if (popup && peerOptionsForm) {
+                                    // Hide all forms and show the peer options form
+                                    document.querySelectorAll('.popup-form').forEach(form => {
+                                        (form as HTMLElement).style.display = 'none';
+                                    });
+                                    (peerOptionsForm as HTMLElement).style.display = 'block';
+                                    
+                                    // Show the popup
+                                    popup.classList.add('active');
+                                }
+                            }
+                        })
+                        .append("text")
+                        .attr("fill", "#000")
+                        .attr("font-size", "20px")
+                        .attr("text-anchor", "middle")  // Center the text horizontally
+                        .attr("dominant-baseline", "middle")  // Center the text vertically
+                        .text("👥");  // Unicode people emoji for peer
+                    
+                    // Add plus button for adding values
+                    d3.select(this)
+                        .append("g")
+                        .attr("class", "add-button")
+                        .attr("transform", `translate(${rectWidth - 20}, 25)`)
+                        .style("cursor", "pointer")
+                        .on("click", (event) => {
+                            event.stopPropagation();
+                            
+                            // Trigger the Add Value form
+                            const addNodeTrigger = document.querySelector('.drop-zone[data-form="addNode"]');
+                            if (addNodeTrigger) {
+                                // Create and dispatch a click event
+                                const clickEvent = new MouseEvent('click', {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    view: window
+                                });
+                                addNodeTrigger.dispatchEvent(clickEvent);
+                            } else {
+                                // Directly show the add node form if trigger not found
+                                const popup = document.querySelector('.node-popup');
+                                const addNodeForm = document.querySelector('#addNodeForm');
+                                
+                                if (popup && addNodeForm) {
+                                    // Hide all forms and show the add node form
+                                    document.querySelectorAll('.popup-form').forEach(form => {
+                                        (form as HTMLElement).style.display = 'none';
+                                    });
+                                    (addNodeForm as HTMLElement).style.display = 'block';
+                                    
+                                    // Show the popup
+                                    popup.classList.add('active');
+                                }
+                            }
+                        })
+                        .append("text")
+                        .attr("fill", "#000")
+                        .attr("font-size", "20px")
+                        .attr("text-anchor", "middle")  // Center the text horizontally
+                        .attr("dominant-baseline", "middle")  // Center the text vertically
+                        .text("➕");  // Unicode plus emoji
                 }
             });
     }
@@ -577,7 +1083,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         zoomin,
         zoomout,
         update: (newWidth: number, newHeight: number) => {
-            console.log('Update called with dimensions:', newWidth, newHeight);
+            // console.log('Update called with dimensions:', newWidth, newHeight);
             
             // Update scales
             x.rangeRound([0, newWidth]);

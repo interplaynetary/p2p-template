@@ -3,7 +3,7 @@ import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './visualizations/TreeMap';
 import { createPieChart } from './visualizations/PieChart';
 import { initializeExampleData } from './example';
-import { createUserCardsGrid } from './components/UserCards';
+// import { createUserCardsGrid } from './components/UserCards';
 import $ from 'jquery';
 
 /*
@@ -32,7 +32,7 @@ export class App {
     _pieUpdateNeeded: boolean = true
     updateInterval: any = null
     saveInterval: any = null
-    userCardsGrid: any = null
+    // userCardsGrid: any = null
     window!: Window
     gunRef: any = null
     // Map to store peer trees indexed by their public key
@@ -169,7 +169,7 @@ export class App {
             console.log('[App] Treemap added to container');
 
             // Initialize user cards grid
-            this.initializeUserCards();
+            // this.initializeUserCards();
 
             // Set up a reactive update system that will respond to changes
             console.log('[App] Setting up reactive update system');
@@ -196,6 +196,7 @@ export class App {
     }
 
     // Initialize user cards grid
+    /*
     initializeUserCards() {
         console.log('[App] Initializing user cards grid');
         
@@ -232,6 +233,7 @@ export class App {
         
         console.log('[App] User cards grid initialized');
     }
+    */
 
     get currentView() {
         console.log('currentView getter called, treemap exists:', !!this.treemap);
@@ -248,13 +250,17 @@ export class App {
         console.log('Resize handler triggered');
         const container = document.getElementById('treemap-container');
         if (!container) {
-            console.warn('Treemap container not found');
+            console.error('Container not found');
             return;
         }
         const width = container.clientWidth;
         const height = container.clientHeight;
-
-        this.treemap.update(width, height);
+        console.log('Container resized to:', { width, height });
+        
+        if (this.treemap) {
+            this.treemap.update(width, height);
+            console.log('Treemap resized');
+        }
     }
 
     
@@ -483,5 +489,16 @@ export class App {
         
         clearInterval(this.updateInterval);
         clearInterval(this.saveInterval);
+        
+        // Clean up treemap if it exists
+        if (this.treemap && typeof this.treemap.destroy === 'function') {
+            this.treemap.destroy();
+        }
+        
+        /* Clean up user cards grid if it exists
+        if (this.userCardsGrid) {
+            this.userCardsGrid.destroy?.();
+        }
+        */
     }
 }
