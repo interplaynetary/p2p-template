@@ -57,14 +57,14 @@ body {
   height: 100%;
   background: #fff;
   min-height: 0;
-  overflow: auto; /* Change to auto to enable scrolling */
+  overflow: auto;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Changed from center to flex-start */
+  justify-content: center; /* Changed from flex-start to center */
   align-items: center;
   box-sizing: border-box;
   padding: 20px;
-  gap: 20px;  /* Increased gap for better spacing */
+  gap: 20px;
   
   /* Switch to row layout on mobile */
   @media (max-width: 768px) {
@@ -95,6 +95,7 @@ body {
   justify-content: center;
   user-select: none;
   cursor: pointer;
+  margin: auto; /* Add margin: auto to help with centering */
 }
 
 #pie-container svg {
