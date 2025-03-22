@@ -1,16 +1,3 @@
-Dear Friends,
-
-If you are receiving this message, it is because someone or something recognized that you might be interested in a different way of organizing human relationships - one based not on ownership, debt, or forced cooperation, but on genuine mutual recognition and support.
-
-This is not just another economic proposal. It is a mathematical framework for how humans can freely contribute to each other's self-actualization, where surplus flows naturally to where it's needed, and where relationships form through authentic recognition rather than obligation.
-
-What follows is both a technical specification and a vision of possibility. We invite you to read with both your analytical mind and your intuitive sense of what human relationships could be.
-
-With love and esteem,
-- Ruzgar Imski
-
----
-
 ## Free-Association: A Call for Mutual Self-Actualization
 
 We present a formulation of a legitimate alternative to capitalism that allows for the *spontaneous self-actualization of all through each other* without any centralized control, planning, private-property or state intervention!
@@ -178,7 +165,6 @@ In Free Association, your contributions become integrated into a network of mutu
 
 This transcends both traditional charity and market exchange by creating organic flows of surplus based on real contributions to each other's self-actualization. Your surplus becomes part of a living network that strengthens the social fabric while returning to you in unexpected ways.
 
-
 ### This Is Not Investment
 
 In traditional investment and equity structures, you provide capital expecting financial returns and ownership. You acquire equity — a fixed share that persists regardless of your ongoing contributions. The past (your initial investment) dominates the present.
@@ -215,3 +201,5 @@ This mathematical property ensures that inflating recognition or maintaining fal
 In Free Association, we are free! You don't own me, and I don't own you! We owe each other nothing!
 
 This is Hegel's resolution of the master-slave dialectic realized in practice: mutual recognition without ownership or domination. Your contributions don't buy you permanent shares — they participate in an evolving network of mutual-recognition that continuously adjusts to reflect real social-material contributions.
+
+

@@ -16,6 +16,20 @@ The Free Association project is not just another web application - it's a proof-
 
 4. **Joining a Mission-Driven Project** - Contributing to a project that aims to create a world where the free development of each is the condition for the free development of all
 
+### Getting Started
+
+To run the project locally:
+
+```bash
+# Install dependencies
+bun install
+
+# Start the development server
+bun run dev
+```
+
+This will start the application and make it available at http://localhost:3000 (or another port if specified).
+
 ### How This Document Helps
 
 This guide breaks down the core components of the application's architecture in progressive detail:
@@ -33,8 +47,9 @@ Let's build tools for a more collaborative future together!
 - [Project Structure and Tree-Based Calculations](#project-structure-and-tree-based-calculations)
   - [Tree Data Structure Overview](#tree-data-structure-overview)
   - [Core Components](#core-components)
-    - [Node Class](#node-class)
-    - [Tree Hierarchy](#tree-hierarchy)
+    - [TreeNode Class](#treenode-class)
+    - [App Class](#app-class)
+    - [Gun DB Integration](#gun-db-integration)
   - [Key Tree Calculations](#key-tree-calculatsions)
     - [Fulfillment Calculation](#fulfillment-calculation-recursive)
     - [Weight Calculation](#weight-calculation)
@@ -48,7 +63,7 @@ Let's build tools for a more collaborative future together!
   - [Initialization Flow](#initialization-flow)
   - [Update Cycle](#update-cycle)
   - [Bidirectional Communication](#bidirectional-communVication)
-  - [The Node Adapter Pattern](#the-node-adapter-pattern)
+  - [Gun DB Subscriptions](#gun-db-subscriptions)
 - [Understanding the TreeMap Visualization](#understanding-the-treemap-visualization)
   - [TreeMap Algorithm Basics](#treemap-algorithm-basics)
   - [TreeMap Creation Process](#treemap-creation-process)
@@ -61,112 +76,125 @@ Let's build tools for a more collaborative future together!
   - [State Management](#state-management)
   - [Debugging Tips](#debugging-tips)
 
-1. The Node class in Node.js is the fundamental structure. It represents a node in a tree with:
-   - name, id, parent, points, children (Map), types (Set)
-   - methods for calculating relationships between nodes
-   - methods for calculating shares and fulfillment
-
-2. The App class in App.js is the root of the application tree structure:
-   - It initializes the store
-   - Manages visualizations (TreeMap and PieChart)
-   - Handles updates and synchronization
-
-3. From the README, this is implementing a "Free Association" model where:
-   - Nodes recognize contributions from other nodes
-   - Mutual recognition = min(B's share of A's total recognition, A's share of B's total recognition)
-   - Surplus distribution follows mutual recognition
-
-Key tree-based calculations include:
-- Fulfillment calculations (recursive through the tree)
-- Weight calculations
-- Share calculations (proportional distribution)
-- Recognition relationships between nodes
-
 # Project Structure and Tree-Based Calculations
 
 ![Tree Structure](./resources/tree.png)
 
 ## Tree Data Structure Overview
 
-Free Association uses a tree-based data structure to represent nodes of contribution and their relationships. Understanding this tree structure is fundamental to understanding how the application works.
+Free Association uses a tree-based data structure to represent nodes of contribution and their relationships. The system is built on a peer-to-peer database (Gun DB) that enables real-time collaboration and data synchronization across users.
 
 ## Core Components
 
-### Node Class
+### TreeNode Class
 
-The `Node` class (in `src/models/Node.js`) is the fundamental building block of our tree structure:
+The `TreeNode` class (in `src/models/TreeNode.ts`) is the fundamental building block of our tree structure:
 
 ```
-Node
-├── name: String
-├── id: UUID
-├── parent: Node reference (null for root)
-├── points: Number
-├── children: Map<String, Node>
-├── types: Set<String>
-├── isContributor: Boolean
-└── _manualFulfillment: Number (nullable)
+TreeNode
+├── id: string
+├── _name: string
+├── _points: number
+├── gunRef: any
+├── _parent: TreeNode | null
+├── children: Map<string, TreeNode>
+├── _manualFulfillment: number | null
+├── _typesMap: Map<string, TreeNode>
+├── typeIndex: Map<TreeNode, Set<TreeNode>>
+├── app: App
+└── gunSubscriptions
 ```
 
-Each Node can:
-- Have one parent (except the root node)
-- Have multiple children (stored in a Map)
-- Belong to multiple types (stored in a Set)
-- Have points representing its contribution weight
+Each TreeNode:
+- Has a unique ID (used in Gun DB)
+- Has one parent (except the root node)
+- Can have multiple children (stored in a Map)
+- Can be associated with multiple types (stored in a Map)
+- Has points representing its contribution weight
+- Maintains persistent connections to the distributed database
 
-### Tree Hierarchy
+### App Class
 
-The application creates a hierarchical tree where:
-- The root node (`App` instance) represents the top-level container
-- Children nodes represent contributions/needs/categories
-- Leaf nodes (nodes without children) can be either contributors or non-contributors
-- Types provide a cross-cutting categorization across the tree
+The `App` class (in `src/App.ts`) serves as the application controller:
+
+```
+App
+├── name: string
+├── rootId: string
+├── rootNode: TreeNode | null
+├── treemap: ReturnType<typeof createTreemap>
+├── updateFlags and intervals
+├── userCardsGrid
+└── peerTrees: Map<string, TreeNode>
+```
+
+The App class:
+- Initializes the root node and UI
+- Manages visualizations (TreeMap and PieChart)
+- Handles updates and synchronization
+- Manages connections to peer trees
+
+### Gun DB Integration
+
+The application uses Gun DB, a decentralized graph database:
+
+- Each TreeNode has a corresponding entry in Gun DB
+- Changes are automatically synchronized across peers
+- Subscriptions ensure real-time updates
+- Data persists across sessions
 
 ## Key Tree Calculations
 
 ### Fulfillment Calculation (Recursive)
 
-The `fulfilled` property is calculated recursively through the tree:
+The `fulfilled` getter is calculated recursively through the tree:
 
 1. **For leaf nodes**:
-   - If a leaf is a contributor: fulfillment = 1.0
-   - If a leaf is not a contributor: fulfillment = 0
+   - If a leaf is a contribution: fulfillment = 1.0
+   - If a leaf is not a contribution: fulfillment = 0
 
 2. **For branch nodes**:
    - Either uses manual fulfillment (if set and has contributor children)
    - Or calculates as the weighted sum of children's fulfillment:
-     ```
-     fulfilled = sum(child.fulfilled * child.shareOfParent) for all children
+     ```javascript
+     fulfilled = Array.from(this.children.values()).reduce(
+       (sum, child) => sum + child.fulfilled * child.shareOfParent,
+       0
+     );
      ```
 
 3. **Hybrid cases** (nodes with both contributor and non-contributor children):
-   - Combines manual fulfillment for contributor children with calculated fulfillment for non-contributor children using proportional weighting
+   - Combines manual fulfillment for contributor children with calculated fulfillment for non-contributor children
 
 ### Weight Calculation
 
 The `weight` property represents a node's proportional importance in the entire tree:
 
 ```javascript
-weight = (parent) ? 
-  (this.points / parent.totalChildPoints) * parent.weight : 
-  1
+get weight(): number {
+  if (!this.parent) return 1;
+  return this.parent.totalChildPoints === 0
+    ? 0
+    : (this._points / this._parent.totalChildPoints) * this._parent.weight;
+}
 ```
-
-This creates a cascading distribution of weight from the root to all descendants.
 
 ### Share of Parent
 
 The `shareOfParent` property represents what fraction of the parent's total points a node contributes:
 
 ```javascript
-shareOfParent = (parent) ?
-  (parent.totalChildPoints === 0) ? 0 : this.points / parent.totalChildPoints :
-  1
+get shareOfParent(): number {
+  if (!this.parent) return 1;
+  return this.parent.totalChildPoints === 0
+    ? 0
+    : this._points / this._parent.totalChildPoints;
+}
 ```
 
 ### Mutual Recognition Calculations
 
-The system also computes "mutual recognition" between nodes, which is the bidirectional validation of contributions:
+The system computes "mutual recognition" between nodes:
 
 1. `shareOfGeneralFulfillment(node)` - What portion of recognition one node gives to another
 2. `mutualFulfillment(node)` - The minimum of bidirectional recognition between nodes
@@ -174,166 +202,160 @@ The system also computes "mutual recognition" between nodes, which is the bidire
 
 ## Visualization Components
 
-The tree is visualized through two main components:
+The tree structure is visualized through:
 
-1. **TreeMap** (`src/visualizations/TreeMap.js`):
-   - Renders the hierarchical structure of nodes
-   - Allows navigation up and down the tree
-   - Shows proportional areas based on node weights
+1. **TreeMap** (`src/visualizations/TreeMap.ts`):
+   - Renders the hierarchical structure as nested rectangles
+   - Enables navigation, growth/shrinking of nodes
+   - Interactive visualization of the tree structure
 
-2. **PieChart** (`src/visualizations/PieChart.js`):
-   - Displays the mutual fulfillment distribution
+2. **PieChart** (`src/visualizations/PieChart.ts`):
+   - Displays mutual fulfillment distribution
    - Shows relationships between different types
+
+3. **UserCards** (`src/components/UserCards.ts`):
+   - Displays available users and types
+   - Enables drag-and-drop for adding types to nodes
 
 ## Data Flow
 
-1. The `App` class initializes as the root node
-2. The `Store` handles persistence to the Gun database
-3. Changes to nodes trigger updates to the visualizations
-4. Visualizations represent the tree state and allow interaction
+1. The App initializes with a root TreeNode
+2. Changes to nodes are persisted to Gun DB
+3. Gun DB subscriptions ensure all peers receive updates
+4. UI components subscribe to changes and update accordingly
+5. Visualizations reflect the current state of the tree
 
 ## Recursive Proportion Distribution
 
-One of the key concepts in the tree is how shares and fulfillment propagate recursively:
+The propagation of fulfillment through the tree:
 
-1. A child's contribution to fulfillment is proportional to its share of the parent's total points
-2. Fulfillment flows upward from leaves to the root
+1. Children contribute to parent fulfillment proportionally to their share
+2. Fulfillment flows upward from leaves to root
 3. Recognition flows bidirectionally across the network
 
 ## Contributing to the Codebase
 
-When working with this tree structure, keep in mind:
+When working with this architecture:
 
-1. Changes to node properties may trigger cascading updates through the tree
-2. The `updateNeeded` and `pieUpdateNeeded` flags signal when visualizations need refreshing
+1. Changes to node properties automatically persist to Gun DB
+2. The `updateNeeded` and `pieUpdateNeeded` flags in App trigger visualization updates
+3. Subscriptions maintain real-time synchronization across components
 
 ## Data Flow Between App and TreeMap
 
-The interaction between the App (root node) and the TreeMap visualization is a critical part of the application. Understanding this data flow is essential for contributors:
+Understanding the data flow between components is crucial:
 
 ### Initialization Flow
 
-1. **App Creation**:
-   - The `App` class extends `Node` and becomes the root of the tree structure
-   - When initialized, it creates a `Store` instance to handle persistence
-   - The `initialize()` method sets up update cycles and triggers initial visualization
+1. **App Creation and Initialization**:
+   ```javascript
+   async initialize() {
+     // Load or create root node
+     this.rootNode = await TreeNode.fromId(this.rootId) || new TreeNode(this.name, this.rootId);
+     
+     // Create visualization
+     this.treemap = createTreemap(this.rootNode, width, height);
+     container.appendChild(this.treemap.element);
+     
+     // Set up update interval
+     this.updateInterval = setInterval(() => {
+       if (this._updateNeeded) {
+         this.updateTreeMap();
+         this._updateNeeded = false;
+       }
+       // ...other updates
+     }, 1000);
+   }
+   ```
 
 2. **TreeMap Creation**:
-   - The App calls `createTreemap(this, width, height)` passing itself as the root node
-   - The TreeMap converts our Node-based tree to a D3 hierarchy using compatibility methods
-   - D3's treemap layout algorithm is applied to calculate rectangular areas
-
-```javascript
-// App.js - TreeMap initialization
-this.treemap = createTreemap(this, width, height);
-container.appendChild(this.treemap.element);
-```
+   ```javascript
+   export function createTreemap(data: TreeNode, width: number, height: number): TreemapInstance {
+     // Convert TreeNode to D3 hierarchy
+     let hierarchy = d3.hierarchy(data, d => d.childrenArray)
+         .sum(d => d.data.points);
+     
+     // Apply treemap layout and create visualization
+     // ...
+   }
+   ```
 
 ### Update Cycle
 
 1. **State Changes**:
-   - Any modification to a Node (adding children, changing points, etc.) sets `updateNeeded = true`
-   - The App runs an interval that checks this flag: `setInterval(() => { if (this.updateNeeded) {...} }, 60)`
+   - Modifications to TreeNodes set `app.updateNeeded = true`
+   - Gun DB subscriptions update node properties when changes occur
 
 2. **Visualization Refresh**:
-   - When updates are needed, App calls `updateTreeMap()`
-   - This recreates the TreeMap with the current state of the nodes
-   - The TreeMap renders the new visualization based on the updated tree structure
-
-```javascript
-// App.js - Update cycle
-updateTreeMap() {
-    const container = document.getElementById('treemap-container');
-    if (container && this.treemap) {
-        container.innerHTML = '';
-        this.treemap = createTreemap(this, container.clientWidth, container.clientHeight);
-        container.appendChild(this.treemap.element);
-    }
-}
-```
+   ```javascript
+   updateTreeMap() {
+     if (container && this.treemap && this.rootNode) {
+       this.treemap.destroy();
+       container.innerHTML = '';
+       this.treemap = createTreemap(this.rootNode, container.clientWidth, container.clientHeight);
+       container.appendChild(this.treemap.element);
+     }
+   }
+   ```
 
 ### Bidirectional Communication
 
 1. **TreeMap to App**:
-   - User interactions in TreeMap (zooming, clicking) update the current view
-   - The App accesses this via `this.currentView` getter which calls `this.treemap.getCurrentView()`
-   - This ensures the App always knows which part of the tree the user is viewing
+   - User interactions in TreeMap update the current view
+   - The App accesses this via `this.currentView` getter
 
 2. **App to TreeMap**:
-   - Modifications to the tree structure flow naturally to the TreeMap on refresh
-   - The TreeMap uses D3 compatibility methods on Node to access the data:
-     - `childrenArray`: gets children as an array for D3
-     - `value`: maps to points for treemap area calculations
-     - `data`: provides access to the original Node object
+   - Tree structure modifications flow to the TreeMap on refresh
+   - TreeNode implements D3-compatible methods like `childrenArray`, `value`, etc.
+
+### Gun DB Subscriptions
+
+The TreeNode class maintains subscriptions to Gun DB:
 
 ```javascript
-// Node.js - D3 compatibility methods
-get childrenArray() {
-    return Array.from(this.children.values());
-}
-
-get value() {
-    return this.points;
+setupSubscriptions() {
+  // Subscribe to node data changes
+  this.nodeSubscription = readFromGunPath(['nodes', this.id], true);
+  this.nodeSubscription.gunNodeRef.on((data) => {
+    if (data) {
+      // Update local properties when data changes in Gun DB
+      if (data.name !== undefined) this._name = data.name;
+      if (typeof data.points === 'number') this._points = data.points;
+      // ...other properties
+    }
+  });
+  
+  // Subscribe to children and types changes
+  // ...
 }
 ```
 
-### The Node Adapter Pattern
-
-The Node class acts as an adapter between our domain model and D3's expectations:
-
-1. Node stores data in Maps and Sets for efficient operations
-2. D3 expects arrays and specific property names
-3. Node provides compatibility methods to bridge this gap
-4. This allows our domain model to remain clean while working with D3
-
-Understanding this flow helps when:
-- Debugging visualization issues
-- Adding new interactions or visualization features  
-- Optimizing performance by minimizing unnecessary updates
+This ensures all changes are synchronized across the application.
 
 ## Understanding the TreeMap Visualization
 
-The TreeMap is a core visualization component that represents the hierarchical node structure as nested rectangles. Understanding how it works is crucial for contributors working on the visualization aspects of the application.
+The TreeMap visualization renders the tree structure as nested rectangles:
 
 ### TreeMap Algorithm Basics
 
 1. **Hierarchical Representation**:
-   - The treemap divides available space into rectangles proportional to node values
-   - Parent nodes contain their children as nested rectangles
-   - Rectangle area corresponds to the node's points (value)
+   - Rectangles sized proportionally to node values
+   - Parent nodes contain nested children rectangles
+   - Area corresponds to the node's points
 
 2. **D3.js Implementation**:
-   - We use D3's treemap layout with a custom tile function
-   - The layout converts our hierarchical data into a set of rectangles with x/y coordinates
-   - Each rectangle's size is proportional to its value relative to siblings
+   - Custom tile function maintains exact proportions
+   - Layout converts hierarchical data into rectangles with coordinates
 
 ### TreeMap Creation Process
 
-```javascript
-// Simplified view of createTreemap function
-export function createTreemap(rootNode, width, height) {
-    // 1. Create scales for mapping data to screen coordinates
-    const x = d3.scaleLinear().rangeRound([0, width]);
-    const y = d3.scaleLinear().rangeRound([0, height]);
-    
-    // 2. Convert Node tree to D3 hierarchy
-    let hierarchy = d3.hierarchy(rootNode, d => d.childrenArray)
-        .each(d => { d.value = d.data.points || 0; });
-    
-    // 3. Apply treemap layout
-    let root = d3.treemap().tile(tile)(hierarchy);
-    
-    // 4. Create SVG element and render
-    const svg = d3.create("svg")
-        .attr("viewBox", [0.5, -50.5, width, height + 50]);
-        
-    // 5. Render nodes as rectangles
-    let group = svg.append("g").call(render, root);
-    
-    // Return public interface
-    return { element: svg.node(), /* other methods */ };
-}
-```
+The visualization goes through several steps:
+
+1. Create scales for mapping data to screen coordinates
+2. Convert TreeNode structure to D3 hierarchy
+3. Apply treemap layout with custom tile function
+4. Create SVG element and render rectangles
+5. Add interactive features (zooming, growth/shrinking)
 
 ### Custom Tiling Algorithm
 
@@ -365,117 +387,73 @@ This approach ensures the treemap reflects the exact point values from our Node 
 
 ### Interactive Features
 
-The TreeMap includes several key interactive features:
+The TreeMap includes:
 
 1. **Zooming Navigation**:
-   - Clicking a node zooms in to show its children in the full view
-   - Clicking the root rectangle zooms out to the parent
-   - A home button appears when viewing type-based trees
+   - Click to zoom in/out of nodes
+   - Home button to return to original view
 
 2. **Node Growth/Shrinking**:
-   - Long press on a node gradually increases its points
-   - Right-click or two-finger touch decreases points
-   - Points are updated in the model and the treemap adjusts in real-time
+   - Long press to increase points
+   - Right-click/two-finger touch to decrease points
 
 3. **Type Navigation**:
-   - Type indicators appear as colored circles
-   - Clicking a type circle navigates to a tree filtered by that type
+   - Type indicators as colored circles
+   - Click to filter by type
 
 ### Rendering Process
 
-The rendering process includes several steps:
+The rendering includes:
 
-1. **Create Node Elements**:
-   - Generate a group (`<g>`) element for each node
-   - Add rectangles sized according to the node's value
-   - Add text labels positioned centrally within each rectangle
-   - Scale text based on available space
-
-2. **Position Elements**:
-   - Position groups using the x/y coordinates from the treemap layout
-   - Size rectangles according to the x1-x0 and y1-y0 differences
-   - Apply transitions for smooth animations between states
-
-3. **Add Interactive Elements**:
-   - Attach event handlers for clicks, touch events, etc.
-   - Create type indicator circles
-   - Add navigation controls (home button, etc.)
+1. Creating group elements for each node
+2. Adding rectangles sized according to node values
+3. Adding text labels with dynamic sizing
+4. Attaching event handlers for interaction
 
 ### Zoom Transitions
 
-Zooming between different levels of the hierarchy uses D3 transitions for smooth animations:
+Smooth transitions between views:
 
 ```javascript
 function zoomin(d) {
-    // Update domains to the target node's boundaries
-    x.domain([d.x0, d.x1]);
-    y.domain([d.y0, d.y1]);
-    
-    // Create new group with the zoomed-in view
-    const group1 = group = svg.append("g").call(render, d);
-    
-    // Animate transition between views
-    svg.transition()
-        .duration(750)
-        .call(t => group0.transition(t).remove()
-            .call(position, d.parent))
-        .call(t => group1.transition(t)
-            .attrTween("opacity", () => d3.interpolate(0, 1))
-            .call(position, d));
+  // Update domains to node boundaries
+  x.domain([d.x0, d.x1]);
+  y.domain([d.y0, d.y1]);
+  
+  // Create new view and animate transition
+  // ...
 }
 ```
 
 ### Responsive Design
 
-The TreeMap adjusts to container size changes through the `update` method:
+The TreeMap adjusts to container size changes:
 
 ```javascript
 update: (newWidth, newHeight) => {
-    // Update scales with new dimensions
-    x.rangeRound([0, newWidth]);
-    y.rangeRound([0, newHeight]);
-    
-    // Update SVG viewBox
-    svg.attr("viewBox", [0.5, -50.5, newWidth, newHeight + 50]);
-    
-    // Re-render with current view
-    group.remove();
-    group = svg.append("g");
-    group.call(render, currentView);
+  // Update scales and SVG viewBox
+  x.rangeRound([0, newWidth]);
+  y.rangeRound([0, newHeight]);
+  svg.attr("viewBox", [0.5, -50.5, newWidth, newHeight + 50]);
+  
+  // Re-render current view
+  // ...
 }
 ```
 
-This ensures the visualization adapts to window resizing.
-
 ### Font Sizing Logic
 
-Text within each rectangle is sized dynamically based on the available space:
-
-```javascript
-// Simplified example
-.style("font-size", d => {
-    const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-    const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-    return calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView) + "px";
-})
-```
-
-The `calculateFontSize` function in `fontUtils.js` determines the optimal text size to fit within each rectangle.
+Text sizes adapt to available space using the `calculateFontSize` utility function.
 
 ### State Management
 
-The TreeMap maintains several important state variables:
-
-1. `currentView` - Tracks which node is currently being displayed at full view
-2. `root` - The root node of the current hierarchy 
-3. Growth-related states (`isGrowing`, `growthInterval`, etc.) for interactive resizing
-
-Understanding these state variables is crucial when modifying the TreeMap's behavior.
+The TreeMap maintains:
+- `currentView` - Currently displayed node
+- `root` - Root of the hierarchy
+- Growth-related states for interactive resizing
 
 ### Debugging Tips
 
-When working with the TreeMap, these debugging techniques are helpful:
-
-1. Use browser dev tools and console.logging to inspect the SVG structure (ctrl+shift+i)
-
-Understanding these aspects of the TreeMap will help contributors modify and extend the visualization functionality effectively.
+1. Use browser dev tools to inspect the SVG structure (ctrl+shift+i)
+2. Check TreeNode console.logs prefixed with `[TreeNode]`
+3. Review App logs prefixed with `[App]` for initialization and update issues
