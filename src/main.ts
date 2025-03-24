@@ -5,7 +5,6 @@ import './style.css';
 import $ from 'jquery';
 import encodeQR from '@paulmillr/qr';
 import decodeQR from '@paulmillr/qr/decode.js';
-import { Bitmap } from '@paulmillr/qr';
 
 let app: App | undefined;
 

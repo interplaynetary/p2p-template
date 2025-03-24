@@ -2,16 +2,8 @@ import { App } from '../App';
 import { readFromGunPath } from './FuncGun';
 import { gun } from './Gun';
 
-// we get duplicate types! on our nodes! (lets use Sets!)
-// But why do we get this in the first place?
-// Every time we reload the page, we repeat adding all the same types!
-
 // Are our nodes saving to the gun-space or the user-space
 // Late: From public to user-spaces (so that overwriting is not possible)
-
-// How do we now test for multiple users?
-
-// We woudln't just reproduce their state in our cache?
 
 // Create a tree for all those we recognize and subscribe to their changes so that we can calculate mutual-recognition
 
@@ -19,20 +11,19 @@ import { gun } from './Gun';
 // - All nodes we recognize
 // THAT IS IT.
 
-// It seems like something is causing growing touch to stop mid-touch.
-
-// we need to use gun.unset (for our unique sets!)
+// TODO:
+// isContribution should only be true if the node has a parent!
+// isContributor should only be true if it the root of a user!
+// can we remove the D3 compatibility methods (since value, and data are so simple)
 
 export class TreeNode {
     id: string;
     private _name: string = '';
     private _points: number = 0;
     private gunRef: any;
-    // pointCache: number = 0;
     private _parent: TreeNode | null;
     children: Map<string, TreeNode> = new Map();
     private _manualFulfillment: number | null = null;
-    // fulfillmentCache: number = 0;
     
     // Store types in a Map with ID as key to prevent duplicates
     private _typesMap: Map<string, TreeNode> = new Map();
@@ -152,6 +143,7 @@ export class TreeNode {
       // A node is a contribution if it has any types that are contributors
       if (this._typesMap.size === 0) return false;
       return Array.from(this._typesMap.values()).some(type => type.isContributor);
+      // And if it has a parent!
     }
   
     async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0,): Promise<TreeNode> {
@@ -452,7 +444,10 @@ export class TreeNode {
       // Update in Gun using direct approach
       this.gunRef.get('manualFulfillment').put(value);
       
-      this.app.pieUpdateNeeded = true;
+      // Only update pie chart if not in an active touch/growth interaction
+      if (!(this.app as any).isGrowingActive) { // TODO: make fulfillment specific
+        this.app.pieUpdateNeeded = true;
+      }
     }
 
     get fulfillmentWeight(): number {

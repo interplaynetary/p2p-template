@@ -3,24 +3,11 @@ import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
 import { initializeExampleData } from './example';
-// import { createUserCardsGrid } from './components/UserCards';
 import $ from 'jquery';
 
-/*
-Simulating throttle in network can be used to discover race conditions!
-function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-*/
-
-// Why is that we ever even end up in the fixing missing name situation?
-
+// TODO:
 // We currently arent using handleResize, but we should probably use it?
-
-// reactive component displaying all users (nodes) in a grid (each user/node) should be represented by a card!
-// these cards should be small and square! (displaying name)
-// we want these cards to be draggable, so that we can drop them over the treemap to addTypes to a node!
-// when we drag a card over the treemap, we want to highlight the node that the card will be added to!
+// Why is 
 
 export class App {
     name: string = ''
@@ -30,15 +17,14 @@ export class App {
     treemap!: ReturnType<typeof createTreemap>
     _updateNeeded: boolean = true
     _pieUpdateNeeded: boolean = true
+    isGrowingActive: boolean = false;
     updateInterval: any = null
     saveInterval: any = null
-    // userCardsGrid: any = null
     window!: Window
     gunRef: any = null
     // Map to store peer trees indexed by their public key
     peerTrees: Map<string, TreeNode> = new Map();
-    // Flag to track active growing/shrinking interactions
-    isGrowingActive: boolean = false;
+
     
     constructor() {
         console.log('[App] Constructor started');
@@ -180,9 +166,6 @@ export class App {
             container.appendChild(this.treemap.element);
             console.log('[App] Treemap added to container');
 
-            // Initialize user cards grid
-            // this.initializeUserCards();
-
             // Set up a reactive update system that will respond to changes
             console.log('[App] Setting up reactive update system');
             this.updateInterval = setInterval(() => {
@@ -211,46 +194,6 @@ export class App {
             throw error;
         }
     }
-
-    // Initialize user cards grid
-    /*
-    initializeUserCards() {
-        console.log('[App] Initializing user cards grid');
-        
-        // Create the grid
-        this.userCardsGrid = createUserCardsGrid(this);
-        
-        // Find or create container for user cards
-        let userCardsContainer = document.getElementById('user-cards-container');
-        
-        if (!userCardsContainer) {
-            // Create the container if it doesn't exist
-            userCardsContainer = document.createElement('div');
-            userCardsContainer.id = 'user-cards-container';
-            userCardsContainer.style.height = '300px'; // Set initial height
-            userCardsContainer.style.width = '100%';
-            userCardsContainer.style.marginTop = '10px';
-            
-            // Add to menu section
-            const menuSection = document.getElementById('menu-section');
-            if (menuSection) {
-                // Add it after the pie container
-                const pieContainer = document.getElementById('pie-container');
-                if (pieContainer) {
-                    menuSection.insertBefore(userCardsContainer, pieContainer.nextSibling);
-                } else {
-                    menuSection.appendChild(userCardsContainer);
-                }
-            }
-        }
-        
-        // Clear and append the user cards grid
-        userCardsContainer.innerHTML = '';
-        userCardsContainer.appendChild(this.userCardsGrid.element);
-        
-        console.log('[App] User cards grid initialized');
-    }
-    */
 
     get currentView() {
         console.log('currentView getter called, treemap exists:', !!this.treemap);
@@ -524,11 +467,5 @@ export class App {
         if (this.treemap && typeof this.treemap.destroy === 'function') {
             this.treemap.destroy();
         }
-        
-        /* Clean up user cards grid if it exists
-        if (this.userCardsGrid) {
-            this.userCardsGrid.destroy?.();
-        }
-        */
     }
 }
