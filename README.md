@@ -6,22 +6,37 @@ This requires more than mere abstract agreement or forced cooperation - it deman
 
 **In this free association, the share of each individual in the surplus-distribution of others is equal to their share of the other's total mutual-recognition of mutual-contribution!**
 
-**Mathematically defined:**
+### Here's how it works:
+
+1. One's Recognition is one's acknowledgment of *contributions towards one's own self-actualization*, and is always a *share* of one's *total-recognition*.
+
+2. One's Total-Recognition is always *100%*.
+
+3. Mutual Recognition between you and someone else is the *smaller* of these two values: *their share of your total-recognition, and your share of their total-recognition.*
+    - For example: If you are 50% of my total-recognition, and I am 10% of your total-recognition, our mutual-recognition is 10%, the minimum of the both.
+      - *Taking the minimum of both shares ensures reciprocity in proportion.*
+
+Surplus flows through *mutual-recognition of mutual-contribution*.
+
+4. Your Share of Anyone's Surplus equals *your mutual recognition with them, divided by the sum of all mutual recognition values between them and everyone they recognize.*
+    - For example: If we have 10% of mutual-recognition, and you are my only mutual-relationship, you would have 100% of my total-mutual-recognition (100% of my surplus-distribution). If I have two mutual-relationships each with 10% mutual-recognition, each would have 50% of my total-mutual-recognition (50% of my surplus-distribution).
+
+
+<details>
+  <summary><b><i>Mathematically defined:</i></b></summary>
+
 ```
 One's Recognition = one's acknowledgment of contributions towards one's own self-actualization
+
 One's Total-Recognition = 100%
+
 Mutual-Recognition(You, Them) = MR(You, Them) = minimum(Their-share-of-Your-total-recognition, Your-share-of-Their-total-recognition)
 
 Your share of anyone's surplus = MR(You, Them) / Σ MR(Them, Each-of-Those-They-Recognize)
 ```
+</details>
 
-**For example:** If you are 50% of my total-recognition, and I am 10% of your total-recognition, our mutual-recognition is 10%, the minimum of the both.
-
-*Taking the minimum of both shares ensures reciprocity in proportion.*
-
-Surplus flows through mutual-recognition of mutual-contribution.
-
-This is not a zero-sum game where one person's gain is another's loss.
+---
 
 To illustrate this by example: Imagine a potluck where pies you bake that you don't need (surplus) helps a neighbor spend less time cooking, *freeing their time* to fix their oven — the same oven that later bakes bread for your community garden party. That's mutual-fulfillment: Your surplus doesn't vanish — it flows to those who directly/indirectly align with your needs/desires/values/goals, creating a ripple effect of mutual-support that comes back to you in unexpected ways while strengthening the network.
 
@@ -89,7 +104,7 @@ Now combine this with a profound sociological discovery: everyone on Earth is co
    - Integration with global networks of mutual support
    - Each step exponentially increases available surplus
 
-This means that in free association, you're never more than six distributions away from accessing any surplus role in the entire human network! Unlike markets which restrict access through price mechanisms, or states which centrally plan distribution, free association creates organic flows based on real contributions to each other's self-actualization.
+This means that in free association, you're never more than six distributions away from accessing any surplus in the entire human network! Unlike markets which restrict access through price mechanisms, or states which centrally plan distribution, free association creates organic flows based on real contributions to each other's self-actualization.
 
 **The Mathematics of Network Growth:**
 ```
