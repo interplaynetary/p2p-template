@@ -41,7 +41,7 @@ export class TreeNode {
     // Helper to get a Gun reference and cache it
     static getGunRef(id: string): any {
         if (!this.gunRefCache.has(id)) {
-            console.log(`[TreeNode] Creating new Gun reference for node ${id}`);
+            console.log(`[TreeNode] Adding ${id} Gun reference to gunRefCache`);
             this.gunRefCache.set(id, gun.get('nodes').get(id));
         }
         return this.gunRefCache.get(id);
@@ -687,168 +687,152 @@ export class TreeNode {
     
     // Static method to create a TreeNode from Gun ID
     static async fromId(id: string): Promise<TreeNode | null> {
-      let timeoutId: any;
-      let resolved = false;
-
-      return new Promise<TreeNode | null>((resolve) => {
-        console.log(`[TreeNode] Attempting to load node with ID: ${id}`);
-        
-        // First try to load from the users path
-        const userRef = readFromGunPath(['users', id]);
-        userRef.gunNodeRef.once((userData, userKey) => {
-          if (resolved) return; // Skip if already resolved
+      return Promise.race([
+        new Promise<TreeNode | null>((resolve) => {
+          console.log(`[TreeNode] Attempting to load node with ID: ${id}`);
           
-          if (userData && Object.keys(userData).some(k => k !== '_')) {
-            console.log(`[TreeNode.fromId] Found node in users path: ${id}`);
-            
-            // Create the node
-            const node = new TreeNode(
-              userData.name || 'Unnamed',
-              id,
-              null,
-              []
-            );
-            
-            // Set initial properties
-            if (typeof userData.points === 'number') {
-              node._points = userData.points;
-            }
-            if (userData.manualFulfillment !== undefined) {
-              node._manualFulfillment = userData.manualFulfillment;
-            }
-            
-            resolved = true;
-            clearTimeout(timeoutId);
-            resolve(node);
-            return;
-          }
-          
-          // If not found in users, try in nodes
-          console.log(`[TreeNode.fromId] Node not found in users path, trying nodes: ${id}`);
-          const nodeRef = readFromGunPath(['nodes', id]);
-          nodeRef.gunNodeRef.once((data, key) => {
-            if (resolved) return; // Skip if already resolved
-            
-            if (!data) {
-              console.log(`[TreeNode] Node ${id} not found in Gun (data is falsy)`);
-              resolved = true;
-              clearTimeout(timeoutId);
-              resolve(null);
-              return;
-            }
-            
-            // Verify it has actual properties beyond Gun metadata
-            const hasValidData = Object.keys(data).some(k => k !== '_');
-            if (!hasValidData) {
-              console.log(`[TreeNode] Node ${id} exists but has no data properties`);
-              resolved = true;
-              clearTimeout(timeoutId);
-              resolve(null);
-              return;
-            }
-            
-            console.log(`[TreeNode.fromId] Raw data from Gun for node ${id}:`, data);
-            
-            // Clean up data handling - check for name explicitly 
-            const name = data.name;
-            console.log(`[TreeNode.fromId] Node name from Gun: "${name}" (${typeof name})`);
-            
-            if (name === undefined) {
-              console.warn(`[TreeNode.fromId] Name is undefined for node ${id}, will use 'Unnamed'`);
-            }
-            
-            const node = new TreeNode(
-              name || 'Unnamed',
-              id,
-              null, // Parent will be set by caller
-              [] // Types will be loaded via subscription
-            );
-            
-            console.log(`[TreeNode.fromId] Created node with name: "${node.name}" (ID: ${node.id})`);
-            
-            // Set initial properties
-            if (typeof data.points === 'number') {
-              node._points = data.points;
-            }
-            if (data.manualFulfillment !== undefined) {
-              node._manualFulfillment = data.manualFulfillment;
-            }
-            
-            // Load types immediately to populate typeIndex
-            const typesRef = readFromGunPath(['nodes', id, 'types']);
-            typesRef.gunNodeRef.once((typesData) => {
-              if (typesData && typeof typesData === 'object') {
-                // Filter out Gun metadata
-                const typeIds = Object.keys(typesData).filter(k => k !== '_');
-                
-                if (typeIds.length > 0) {
-                  console.log(`[TreeNode] Node ${id} has types: ${typeIds.join(', ')}`);
-                  
-                  // Handle each type key separately to get the referenced ID
-                  Promise.all(typeIds.map(typeKey => {
-                    return new Promise<string | null>((resolve) => {
-                      typesRef.gunNodeRef.get(typeKey).once((typeRefData) => {
-                        let typeId = typeKey;
-                        if (typeRefData && typeRefData._ && typeRefData._['#']) {
-                          typeId = typeRefData._['#'];
-                        }
-                        resolve(typeId);
-                      });
-                    });
-                  }))
-                  .then(extractedTypeIds => {
-                    // Filter out nulls and duplicates
-                    const validTypeIds = [...new Set(extractedTypeIds.filter(id => id !== null) as string[])];
-                    
-                    // Load each type node
-                    return Promise.all(validTypeIds.map(typeId => TreeNode.fromId(typeId)));
-                  })
-                  .then(loadedTypes => {
-                    // Filter out nulls
-                    const validTypes = loadedTypes.filter(t => t !== null) as TreeNode[];
-                    
-                    // For each valid type, add this node as an instance
-                    validTypes.forEach(type => {
-                      if (type) {
-                        console.log(`[TreeNode] Adding type ${type.id} (${type.name}) to node ${node.name}`);
-                        // Store in _typesMap by ID to prevent duplicates
-                        node._typesMap.set(type.id, type);
-                        
-                        // Update typeIndex at root level
-                        const root = node.root;
-                        if (!root.typeIndex.has(type)) {
-                          root.typeIndex.set(type, new Set());
-                        }
-                        root.typeIndex.get(type)?.add(node);
-                      }
-                    });
-                    
-                    // Update UI 
-                    node.app.updateNeeded = true;
-                    node.app.pieUpdateNeeded = true;
-                  })
-                  .catch(err => {
-                    console.error(`[TreeNode] Error loading types for node ${id}:`, err);
-                  });
-                }
+          // First try to load from the users path
+          const userRef = readFromGunPath(['users', id]);
+          userRef.gunNodeRef.once((userData, userKey) => {
+            console.log('INTERESTING INFO', userData, userKey)
+            if (userData && Object.keys(userData).some(k => k !== '_')) {
+              console.log(`[TreeNode.fromId] Found node in users path: ${id}`);
+              
+              // Create the node
+              const node = new TreeNode(
+                userData.name || 'Unnamed',
+                id,
+                null,
+                []
+              );
+              
+              // Set initial properties
+              if (typeof userData.points === 'number') {
+                node._points = userData.points;
               }
-            });
+              if (userData.manualFulfillment !== undefined) {
+                node._manualFulfillment = userData.manualFulfillment;
+              }
+              
+              resolve(node);
+              return;
+            }
             
-            resolved = true;
-            clearTimeout(timeoutId);
-            resolve(node);
+            // If not found in users, try in nodes
+            console.log(`[TreeNode.fromId] Node not found in users path, trying nodes: ${id}`);
+            const nodeRef = readFromGunPath(['nodes', id]);
+            nodeRef.gunNodeRef.once((data, key) => {
+              if (!data) {
+                console.log(`[TreeNode] Node ${id} not found in Gun (data is falsy)`);
+                resolve(null);
+                return;
+              }
+              
+              // Verify it has actual properties beyond Gun metadata
+              const hasValidData = Object.keys(data).some(k => k !== '_');
+              if (!hasValidData) {
+                console.log(`[TreeNode] Node ${id} exists but has no data properties`);
+                resolve(null);
+                return;
+              }
+              
+              console.log(`[TreeNode.fromId] Raw data from Gun for node ${id}:`, data);
+              
+              // Clean up data handling - check for name explicitly 
+              const name = data.name;
+              console.log(`[TreeNode.fromId] Node name from Gun: "${name}" (${typeof name})`);
+              
+              if (name === undefined) {
+                console.warn(`[TreeNode.fromId] Name is undefined for node ${id}, will use 'Unnamed'`);
+              }
+              
+              const node = new TreeNode(
+                name || 'Unnamed',
+                id,
+                null, // Parent will be set by caller
+                [] // Types will be loaded via subscription
+              );
+              
+              console.log(`[TreeNode.fromId] Created node with name: "${node.name}" (ID: ${node.id})`);
+              
+              // Set initial properties
+              if (typeof data.points === 'number') {
+                node._points = data.points;
+              }
+              if (data.manualFulfillment !== undefined) {
+                node._manualFulfillment = data.manualFulfillment;
+              }
+              
+              // Load types immediately to populate typeIndex
+              const typesRef = readFromGunPath(['nodes', id, 'types']);
+              typesRef.gunNodeRef.once((typesData) => {
+                if (typesData && typeof typesData === 'object') {
+                  // Filter out Gun metadata
+                  const typeIds = Object.keys(typesData).filter(k => k !== '_');
+                  
+                  if (typeIds.length > 0) {
+                    console.log(`[TreeNode] Node ${id} has types: ${typeIds.join(', ')}`);
+                    
+                    // Handle each type key separately to get the referenced ID
+                    Promise.all(typeIds.map(typeKey => {
+                      return new Promise<string | null>((resolve) => {
+                        typesRef.gunNodeRef.get(typeKey).once((typeRefData) => {
+                          let typeId = typeKey;
+                          if (typeRefData && typeRefData._ && typeRefData._['#']) {
+                            typeId = typeRefData._['#'];
+                          }
+                          resolve(typeId);
+                        });
+                      });
+                    }))
+                    .then(extractedTypeIds => {
+                      // Filter out nulls and duplicates
+                      const validTypeIds = [...new Set(extractedTypeIds.filter(id => id !== null) as string[])];
+                      
+                      // Load each type node
+                      return Promise.all(validTypeIds.map(typeId => TreeNode.fromId(typeId)));
+                    })
+                    .then(loadedTypes => {
+                      // Filter out nulls
+                      const validTypes = loadedTypes.filter(t => t !== null) as TreeNode[];
+                      
+                      // For each valid type, add this node as an instance
+                      validTypes.forEach(type => {
+                        if (type) {
+                          console.log(`[TreeNode] Adding type ${type.id} (${type.name}) to node ${node.name}`);
+                          // Store in _typesMap by ID to prevent duplicates
+                          node._typesMap.set(type.id, type);
+                          
+                          // Update typeIndex at root level
+                          const root = node.root;
+                          if (!root.typeIndex.has(type)) {
+                            root.typeIndex.set(type, new Set());
+                          }
+                          root.typeIndex.get(type)?.add(node);
+                        }
+                      });
+                      
+                      // Update UI 
+                      node.app.updateNeeded = true;
+                      node.app.pieUpdateNeeded = true;
+                    })
+                    .catch(err => {
+                      console.error(`[TreeNode] Error loading types for node ${id}:`, err);
+                    });
+                  }
+                }
+              });
+              
+              resolve(node);
+            });
           });
-        });
-
-        // Set up timeout
-        timeoutId = setTimeout(() => {
-          if (!resolved) {
-            console.log(`[TreeNode] Timeout loading node ${id}`);
-            resolved = true;
-            resolve(null);
-          }
-        }, 5000); // Increased timeout to 5 seconds
-      });
+        }),
+        // Add a timeout to prevent hanging
+        new Promise<null>(resolve => setTimeout(() => {
+          console.log(`[TreeNode] Timeout loading node ${id}, assuming it doesn't exist`);
+          resolve(null);
+        }, 3000))
+      ]);
     }
 
     // Getter for types map to allow access from TreeMap

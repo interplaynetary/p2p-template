@@ -62,20 +62,18 @@ export class App {
         try {
             // Try to load existing root node first - using user public key as the node ID
             console.log('[App] Attempting to load existing root node from path:', ['users', this.rootId]);
-            this.rootNode = await new Promise<TreeNode | null>(async (resolve) => {
-                // Attempt to load the root node
-                const node = await TreeNode.fromId(this.rootId);
-                if (node) {
-                    resolve(node);
-                } else {
-                    console.log('[App] Root node not found or timed out, will create a new one');
+            this.rootNode = await Promise.race([
+                TreeNode.fromId(this.rootId),
+                // Add a 5-second timeout
+                new Promise<null>(resolve => setTimeout(() => {
+                    console.log('[App] Timeout waiting for root node, will create a new one');
                     resolve(null);
-                }
-            });
+                }, 5000))
+            ]);
 
             // If root node doesn't exist, create it
             if (!this.rootNode) {
-                console.log('[App] Creating new root node with name:', this.name);
+                console.log('[App] Root node not found, creating new root node with name:', this.name);
                 this.rootNode = new TreeNode(this.name, this.rootId, null);
                 console.log('[App] New root node created with ID:', this.rootNode.id);
                 
@@ -125,32 +123,22 @@ export class App {
             
             // Check children path directly in Gun to verify data exists
             console.log('[App] Checking for children in Gun...');
-            const childrenCheck = await new Promise<boolean>((resolve) => {
-                let resolved = false;
-                let timeoutId: any;
-                
-                this.gunRef.get('children').once((data) => {
-                    if (resolved) return;
-                    
-                    console.log('[App] Children data in Gun:', data);
-                    // Check if data exists and has properties other than '_'
-                    const hasChildren = data && typeof data === 'object' && 
-                                     Object.keys(data).filter(k => k !== '_').length > 0;
-                    
-                    resolved = true;
-                    clearTimeout(timeoutId);
-                    resolve(hasChildren);
-                });
-                
-                // Add a timeout
-                timeoutId = setTimeout(() => {
-                    if (!resolved) {
-                        console.log('[App] Timeout checking for children, assuming none exist');
-                        resolved = true;
-                        resolve(false);
-                    }
-                }, 5000);
-            });
+            const childrenCheck = await Promise.race([
+                new Promise<boolean>(resolve => {
+                    this.gunRef.get('children').once((data) => {
+                        console.log('[App] Children data in Gun:', data);
+                        // Check if data exists and has properties other than '_'
+                        const hasChildren = data && typeof data === 'object' && 
+                                         Object.keys(data).filter(k => k !== '_').length > 0;
+                        resolve(hasChildren);
+                    });
+                }),
+                // Add a 3-second timeout
+                new Promise<boolean>(resolve => setTimeout(() => {
+                    console.log('[App] Timeout checking for children, assuming none exist');
+                    resolve(false);
+                }, 3000))
+            ]);
             
             console.log('[App] Children check result:', { childrenCheck, localChildrenCount: this.rootNode.children.size });
             

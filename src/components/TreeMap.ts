@@ -4,7 +4,12 @@ import { calculateFontSize, name } from '../utils/fontUtils';
 import { TreeNode } from '../models/TreeNode';
 import { gun } from '../models/Gun';
 
+// TODO:
+// Extract various functions into helpers (in particular gun.js related stuff)
 // when we navigate into a type, the backbutton no longer works
+// we can no longer navigate to a type
+// when adding children we no longer automatically zoom-in (commons has working functionality for this)
+
 
 // Create a type for the treemap return value
 type TreemapInstance = {
@@ -487,7 +492,6 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 const users: Array<{id: string, name: string}> = [];
                 let foundUsers = false;
                 let userCount = 0;
-                let completedQuery = false;
                 
                 // Get users from Gun
                 const gunQuery = gun.get('users').map().on((userData, userId) => {
