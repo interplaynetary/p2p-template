@@ -40,7 +40,7 @@ export function calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentV
 }
 
 // Helper function to get the full name path
-export const name = (d) => {
+export function name(d) {
     const names = [];
     let current = d;
     while (current) {

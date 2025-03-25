@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
-import { calculateFontSize } from '../utils/fontUtils';
+import { calculateFontSize, name } from '../utils/fontUtils';
 import { TreeNode } from '../models/TreeNode';
 import { gun } from '../models/Gun';
 
@@ -35,17 +35,6 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             return { id: uniqueId, href: `#${uniqueId}` };
         };
     })();
-
-    // Get full path name by traversing up parents
-    const name = (d: d3.HierarchyRectangularNode<TreeNode>) => {
-        const names = [];
-        let current: d3.HierarchyRectangularNode<TreeNode> | null = d;
-        while (current) {
-            names.push(current.data.name);
-            current = current.parent;
-        }
-        return names.reverse().join(" / ");
-    };
 
     // Create scales
     const x = d3.scaleLinear().rangeRound([0, width]);

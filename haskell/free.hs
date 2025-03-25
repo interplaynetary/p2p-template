@@ -7,21 +7,21 @@ import Data.Function (on, (&))
 import Control.Arrow ((***), (&&&), first, second)
 
 -- Improved type definitions with newtypes for better type safety
-newtype RecognitionPoints = RecognitionPoints Int deriving (Eq, Ord, Show)
+newtype Points = Points Int deriving (Eq, Ord, Show)
 
--- Unwrap RecognitionPoints to get the Int value
-getPoints :: RecognitionPoints -> Int
-getPoints (RecognitionPoints p) = p
+-- Unwrap Points to get the Int value
+getPoints :: Points -> Int
+getPoints (Points p) = p
 
--- Create RecognitionPoints
-points :: Int -> RecognitionPoints
-points = RecognitionPoints
+-- Create Points
+points :: Int -> Points
+points = Points
 
 -- Tree structure for hierarchical recognition model
 data Node = Node {
     nodeId :: String,
     nodeName :: String,
-    nodePoints :: RecognitionPoints,
+    nodePoints :: Points,
     nodeParent :: Maybe Node,
     nodeChildren :: Map.Map String Node,
     nodeTypes :: Set.Set String,  -- Types are referenced by their ID
@@ -32,7 +32,7 @@ data Node = Node {
 type TypeIndex = Map.Map String (Set.Set Node)
 
 -- Create a new tree node with validation for manual fulfillment
-createNode :: String -> String -> RecognitionPoints -> Maybe Node -> [String] -> Maybe Float -> Node
+createNode :: String -> String -> Points -> Maybe Node -> [String] -> Maybe Float -> Node
 createNode id name points parent types manualFulfillment = 
     Node {
         nodeId = id,
@@ -122,7 +122,7 @@ removeNodeFromType node typeId typeIndex =
     Map.adjust (Set.delete node) typeId typeIndex
 
 -- Add a child to a tree node
-addChild :: TypeIndex -> Node -> String -> String -> RecognitionPoints -> [String] -> Maybe Float -> Either String (Node, TypeIndex)
+addChild :: TypeIndex -> Node -> String -> String -> Points -> [String] -> Maybe Float -> Either String (Node, TypeIndex)
 addChild typeIndex parent childId childName childPoints childTypes childManualFulfillment
     | isJust (nodeParent parent) && isContribution typeIndex parent =
         Left $ "Node " ++ nodeName parent ++ " is an instance of a contributor/contribution and cannot have children."
@@ -321,9 +321,7 @@ exampleTree = (finalRoot, finalTypeIndex)
         
     (finalRoot, finalTypeIndex) = case addChild typeIndex1 rootWithChild1 "need2" "Need 2" (points 30) ["bob"] Nothing of
         Right result -> result
-        Left err -> error err  -- For demonstration
-
--- Main function to demonstrate tree-based calculations
+        Left err -> error err  -- For demonstration-- Main function to demonstrate tree-based calculations
 main :: IO ()
 main = do
     putStrLn "Tree-Based Recognition and Fulfillment:"
@@ -334,3 +332,4 @@ main = do
     putStrLn $ "Need 1 Fulfillment: " ++ show (fulfilled typeIndex need1)
     putStrLn $ "Need 2 Fulfillment: " ++ show (fulfilled typeIndex need2)
     putStrLn $ "Root Total Fulfillment: " ++ show (fulfilled typeIndex tree)
+
