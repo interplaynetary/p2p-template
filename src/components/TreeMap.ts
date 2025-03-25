@@ -21,11 +21,11 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
     // State variables for growth animation
     let growthInterval: number | null = null;
     let growthTimeout: number | null = null;
-    const GROWTH_RATE = (d: TreeNode) => d.data.points * 0.05;
+    const GROWTH_RATE = (d: d3.HierarchyRectangularNode<TreeNode>) => d.data.points * 0.05;
     const GROWTH_TICK = 50;
     const GROWTH_DELAY = 500;
     let isGrowing = false;
-    const SHRINK_RATE = (d: TreeNode) => d.data.points * -0.05; // Negative growth rate for shrinking
+    const SHRINK_RATE = (d: d3.HierarchyRectangularNode<TreeNode>) => d.data.points * -0.05; // Negative growth rate for shrinking
 
     // Helper functions
     const uid = (function() {
@@ -36,16 +36,25 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         };
     })();
 
-    const name = (d: TreeNode) => d.data.ancestors.reverse().map(d => d.name).join(" / ");
+    // Get full path name by traversing up parents
+    const name = (d: d3.HierarchyRectangularNode<TreeNode>) => {
+        const names = [];
+        let current: d3.HierarchyRectangularNode<TreeNode> | null = d;
+        while (current) {
+            names.push(current.data.name);
+            current = current.parent;
+        }
+        return names.reverse().join(" / ");
+    };
 
     // Create scales
     const x = d3.scaleLinear().rangeRound([0, width]);
     const y = d3.scaleLinear().rangeRound([0, height]);
 
     // Create hierarchy
-    let hierarchy = d3.hierarchy(data, d => d.childrenArray)
-        .sum(d => d.data.points)
-        .each(d => { d.value || 0; });
+    let hierarchy = d3.hierarchy<TreeNode>(data, d => Array.from(d.children.values()))
+        .sum(d => d.points)
+        .each(d => { (d as any).value = d.data.points || 0; });
 
     // Create treemap layout
     let root = d3.treemap().tile(tile)(hierarchy);
@@ -64,7 +73,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
     let group = svg.append("g")
         .call(render, root);
 
-    function tile(node, x0, y0, x1, y1) {
+    function tile(node: d3.HierarchyRectangularNode<TreeNode>, x0: number, y0: number, x1: number, y1: number) {
         if (!node.children) return;
         
         // Calculate available space
@@ -73,39 +82,32 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         
         // Ensure values match points
         node.children.forEach(child => {
-            child.value = child.data.points || 0;
+            (child as any).value = child.data.points || 0;
         });
         
         // Create a simpler hierarchy object that matches d3's expectations
         const tempRoot = {
             children: node.children.map(child => ({
                 data: child.data,
-                value: child.value
+                value: child.data.points || 0
             }))
         };
         
         // Create hierarchy and apply squarify directly
         const tempHierarchy = d3.hierarchy(tempRoot)
-            .sum(d => d.value)
+            .sum(d => (d as any).value);
             
         // Apply squarify directly with the available space
-        d3.treemapSquarify(tempHierarchy, 0, 0, availableWidth, availableHeight);
-        
-        // Debug total values
-        // console.log('Total hierarchy value:', tempHierarchy.value);
-        // console.log('Available space:', [availableWidth, availableHeight]);
+        d3.treemapSquarify(tempHierarchy as d3.HierarchyRectangularNode<any>, 0, 0, availableWidth, availableHeight);
         
         // Transfer positions back to our nodes
         node.children.forEach((child, i) => {
             if (tempHierarchy.children && tempHierarchy.children[i]) {
-                const tempNode = tempHierarchy.children[i];
+                const tempNode = tempHierarchy.children[i] as d3.HierarchyRectangularNode<any>;
                 child.x0 = x0 + tempNode.x0;
                 child.x1 = x0 + tempNode.x1;
                 child.y0 = y0 + tempNode.y0;
                 child.y1 = y0 + tempNode.y1;
-                
-                // Debug
-                // console.log(`${child.data.name}: value=${child.value}, width=${child.x1 - child.x0}, height=${child.y1 - child.y0}`);
             }
         });
     }
@@ -170,15 +172,15 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             });
     }
   
-    function render(group, root) {
+    function render(group: d3.Selection<SVGGElement, unknown, null, undefined>, root: d3.HierarchyRectangularNode<TreeNode>) {
       // First, create groups only for nodes with value or root
       const nodeData = (root.children || []).concat(root);
 
         const node = group
-            .selectAll("g")
+            .selectAll<SVGGElement, d3.HierarchyRectangularNode<TreeNode>>("g")
             .data(nodeData)
             .join("g")
-            .filter(d => d === root || d.value > 0);
+            .filter(d => d === root || d.data.points > 0);
 
         node.append("title")
             .text(d => `${name(d)}\n`);
@@ -187,12 +189,12 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
 
         node.append("rect")
             .attr("id", d => {
-                d.leafUid = uid("leaf");
+                (d as any).leafUid = uid("leaf");
                 
                 // Also add the node's actual ID to make it findable for drag-drop
-                if (d === root) return d.leafUid.id;
-                if (d.data && d.data.id) return `leaf-${d.data.id}`;
-                return d.leafUid.id;
+                if (d === root) return (d as any).leafUid.id;
+                if (d.data.id) return `leaf-${d.data.id}`;
+                return (d as any).leafUid.id;
             })
             .attr("fill", d => {
                 if (d === root) return "#fff";
@@ -200,20 +202,23 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             })
             .attr("stroke", d => {
                 // Only add special outline for nodes with non-contributor children - now in blue
-                return (d.data.hasDirectContributorChild) ? "#2196f3" : "#fff";
+                return (d.data.hasDirectContributionChild) ? "#2196f3" : "#fff";
             })
             .attr("stroke-width", d => {
                 // Only make stroke wider for nodes with non-contributor children
-                return (d.data.hasDirectContributorChild) ? "3" : "2";
+                return (d.data.hasDirectContributionChild) ? "3" : "2";
             })
 
         node.append("clipPath")
-            .attr("id", d => (d.clipUid = uid("clip")).id)
+            .attr("id", d => {
+                (d as any).clipUid = uid("clip");
+                return (d as any).clipUid.id;
+            })
             .append("use")
-            .attr("xlink:href", d => d.leafUid.href);
+            .attr("xlink:href", d => (d as any).leafUid.href);
 
         node.append("text")
-            .attr("clip-path", d => d.clipUid)
+            .attr("clip-path", d => (d as any).clipUid)
             .attr("font-weight", d => d === root ? "bold" : null)
             .style("user-select", "none")
             .style("-webkit-user-select", "none")
@@ -273,8 +278,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         });
 
     // Add tag pills for each type
-    typeContainer.each(function(d) {
-        if (!d.data || d === root) return; // Skip for root node
+    typeContainer.each(function(d: d3.HierarchyRectangularNode<TreeNode>) {
+        if (!d || d === root) return; // Skip for root node
         
         const container = d3.select(this);
         
@@ -285,8 +290,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         // Skip all additions if rect is too small
         if (rectWidth < 60 || rectHeight < 60) return;
         
-        // Get type array safely
-        const typesArray = d.data._typesMap ? Array.from(d.data._typesMap.values()) : [];
+        // Get type array safely using public getter
+        const typesArray = d.data.typesMap ? Array.from(d.data.typesMap.values()) : [];
         
         // Create a tag wrapper to hold all pills in a flex layout
         const tagWrapper = container.append("foreignObject")
@@ -322,7 +327,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             .text("+");
         
         // Add existing type pills
-        typesArray.forEach(type => {
+        typesArray.forEach((type: TreeNode) => {
             const tagPill = tagWrapper.append("div")
                 .attr("class", "tag-pill")
                 .attr("data-type-id", type.id)
@@ -490,7 +495,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     .text("Loading...");
                 
                 // Collect users for batched display
-                const users = [];
+                const users: Array<{id: string, name: string}> = [];
                 let foundUsers = false;
                 let userCount = 0;
                 let completedQuery = false;
@@ -507,7 +512,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     }
                     
                     // Check if this user is already a type on the node
-                    const isAlreadyType = d.data._typesMap && d.data._typesMap.has(userId);
+                    const isAlreadyType = d.data.typesMap && d.data.typesMap.has(userId);
                     if (isAlreadyType) return;
                     
                     // Add to users collection if not already there
@@ -689,7 +694,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         .on("contextmenu", (event) => {
             event.preventDefault(); // This prevents the context menu from showing up
         })
-        .on("mousedown touchstart", (event, d) => {
+        .on("mousedown touchstart", (event, d: d3.HierarchyRectangularNode<TreeNode>) => {
             event.preventDefault();
             
             // Always set touch state for navigation purposes
@@ -740,6 +745,14 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                 // Calculate growth/shrink amount
                                 const rate = isShrinking ? SHRINK_RATE(d) : GROWTH_RATE(d);
                                 const newPoints = Math.max(0, d.data.points + rate); // Prevent negative points
+                                if (isNaN(newPoints)) {
+                                    console.error('Growth calculation resulted in NaN:', {
+                                        currentPoints: d.data.points,
+                                        rate: rate,
+                                        isShrinking: isShrinking
+                                    });
+                                    return;
+                                }
                                 d.data.points = newPoints;
                                 
                                 // Apply treemap
@@ -838,7 +851,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
 
                                 // console.log("\nFinal values:");
                                 // console.log("Node points:", d.data.points);
-                                // console.log("Node value:", d.value);
+                                // console.log("Node value:", d.data.value);
                                 // console.log("Hierarchy value:", hierarchy.value);
                             }, GROWTH_TICK);
                         }
@@ -906,7 +919,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             }
         }, { passive: false });
 
-        if (root.data.children.size === 0 && root !== data) {  // Check if view is empty and not root
+        // Check if view is empty (no children or all children have 0 points)
+        if ((!root.children || root.children.length === 0) && root !== data) {
             group.append("text")
                 .attr("class", "helper-text")
                 .attr("text-anchor", "middle")

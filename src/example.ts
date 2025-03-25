@@ -17,7 +17,7 @@ export async function initializeExampleData(root: TreeNode) {
   */
 
   // Check if the major categories already exist
-  const existingChildren = root.childrenArray.map(child => child.name);
+  const existingChildren = Array.from(root.children.values()).map(child => child.name);
   console.log(`Root has ${existingChildren.length} existing children: ${existingChildren.join(', ')}`);
   
   // Only create Space & Environment if it doesn't exist
@@ -27,7 +27,7 @@ export async function initializeExampleData(root: TreeNode) {
     space = await root.addChild("Space & Environment", 25);
   } else {
     console.log("Space & Environment already exists, using existing node");
-    space = root.childrenArray.find(child => child.name === "Space & Environment");
+    space = Array.from(root.children.values()).find(child => child.name === "Space & Environment");
   }
   
   // Only proceed with creating children if we have a valid space node

@@ -1,6 +1,6 @@
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import Data.Maybe (fromMaybe, isJust, maybeToList, mapMaybe)
+import Data.Maybe (fromMaybe, isJust, maybeToList, mapMaybe, listToMaybe)
 import Control.Monad (foldM)
 import Data.Foldable (foldl', foldr')
 import Data.Function (on, (&))
@@ -18,41 +18,41 @@ points :: Int -> RecognitionPoints
 points = RecognitionPoints
 
 -- Tree structure for hierarchical recognition model
-data RecognitionTree = RecognitionTree {
+data Node = Node {
     nodeId :: String,
     nodeName :: String,
     nodePoints :: RecognitionPoints,
-    nodeParent :: Maybe RecognitionTree,
-    nodeChildren :: Map.Map String RecognitionTree,
+    nodeParent :: Maybe Node,
+    nodeChildren :: Map.Map String Node,
     nodeTypes :: Set.Set String,  -- Types are referenced by their ID
     nodeManualFulfillment :: Maybe Float
 } deriving (Show, Eq, Ord)
 
 -- Type alias for TypeIndex to track instances of each type
-type TypeIndex = Map.Map String (Set.Set RecognitionTree)
+type TypeIndex = Map.Map String (Set.Set Node)
 
--- Create a new tree node
-createNode :: String -> String -> RecognitionPoints -> Maybe RecognitionTree -> [String] -> Maybe Float -> RecognitionTree
+-- Create a new tree node with validation for manual fulfillment
+createNode :: String -> String -> RecognitionPoints -> Maybe Node -> [String] -> Maybe Float -> Node
 createNode id name points parent types manualFulfillment = 
-    RecognitionTree {
+    Node {
         nodeId = id,
         nodeName = name,
         nodePoints = points,
         nodeParent = parent,
         nodeChildren = Map.empty,
         nodeTypes = Set.fromList types,
-        nodeManualFulfillment = manualFulfillment
+        nodeManualFulfillment = validateManualFulfillment manualFulfillment
     }
-
--- Get the root of a tree
-getRoot :: RecognitionTree -> RecognitionTree
-getRoot = until (isNothing . nodeParent) (fromJust . nodeParent)
   where
-    isNothing = null . maybeToList
-    fromJust = fromMaybe (error "Unexpected: Parent is Nothing after isNothing check")
+    -- Ensure manual fulfillment is between 0.0 and 1.0
+    validateManualFulfillment Nothing = Nothing
+    validateManualFulfillment (Just val)
+        | val < 0.0 = Just 0.0
+        | val > 1.0 = Just 1.0
+        | otherwise = Just val
 
 -- Check if a node is a contributor (root node)
-isContributor :: RecognitionTree -> Bool
+isContributor :: Node -> Bool
 isContributor = isNothing . nodeParent
   where
     isNothing = null . maybeToList
@@ -60,14 +60,14 @@ isContributor = isNothing . nodeParent
 -- === Standardized Tree Operations ===
 
 -- Apply a function to each node in the tree
-mapTree :: (RecognitionTree -> RecognitionTree) -> RecognitionTree -> RecognitionTree
+mapTree :: (Node -> Node) -> Node -> Node
 mapTree f node = 
     let updatedNode = f node
         updatedChildren = Map.map (mapTree f) (nodeChildren updatedNode)
     in updatedNode { nodeChildren = updatedChildren }
 
 -- Fold a tree from the bottom up
-foldTree :: (RecognitionTree -> b -> b) -> b -> RecognitionTree -> b
+foldTree :: (Node -> b -> b) -> b -> Node -> b
 foldTree f initial node =
     -- Start with the accumulated value
     let accumulator = initial
@@ -77,56 +77,70 @@ foldTree f initial node =
     in f node childrenFold
 
 -- Filter children of a node
-filterNodeChildren :: (RecognitionTree -> Bool) -> RecognitionTree -> [RecognitionTree]
+filterNodeChildren :: (Node -> Bool) -> Node -> [Node]
 filterNodeChildren pred = filter pred . Map.elems . nodeChildren
 
 -- Test if any child satisfies a predicate
-anyNodeChild :: (RecognitionTree -> Bool) -> RecognitionTree -> Bool
+anyNodeChild :: (Node -> Bool) -> Node -> Bool
 anyNodeChild pred = any pred . Map.elems . nodeChildren
 
 -- Sum a value over the children of a node
-sumOverChildren :: (RecognitionTree -> Float) -> RecognitionTree -> Float
+sumOverChildren :: (Node -> Float) -> Node -> Float
 sumOverChildren f = sum . map f . Map.elems . nodeChildren
 
 -- === End of Standardized Tree Operations ===
 
 -- Safely get instances of a type from TypeIndex
-lookupTypeInstances :: TypeIndex -> String -> Set.Set RecognitionTree
-lookupTypeInstances typeIndex typeId = Map.findWithDefault Set.empty typeId typeIndex
+getInstances :: TypeIndex -> String -> Set.Set Node
+getInstances typeIndex typeId = Map.findWithDefault Set.empty typeId typeIndex
+
+
+-- Safely get a type node from a type ID, returns Maybe to handle empty sets
+getTypeNode :: TypeIndex -> String -> Maybe Node
+getTypeNode typeIndex typeId = 
+    let instances = getInstances typeIndex typeId
+    in listToMaybe (Set.toList instances)
 
 -- Check if a node is a contribution (has contributor types and a parent)
-isContribution :: TypeIndex -> RecognitionTree -> Bool
+isContribution :: TypeIndex -> Node -> Bool
 isContribution typeIndex tree = not (Set.null $ nodeTypes tree)
                              && hasContributorType
                              && isJust (nodeParent tree)
   where
-    hasContributorType = any (hasContributor . lookupTypeInstances typeIndex) 
+    hasContributorType = any (hasContributor . getInstances typeIndex) 
                         (Set.toList $ nodeTypes tree)
     hasContributor = any isContributor . Set.toList
 
 -- Add a node to the type index
-addNodeToTypeIndex :: RecognitionTree -> String -> TypeIndex -> TypeIndex
+addNodeToTypeIndex :: Node -> String -> TypeIndex -> TypeIndex
 addNodeToTypeIndex node typeId typeIndex = 
     Map.alter (Just . Set.insert node . fromMaybe Set.empty) typeId typeIndex
 
 -- Remove a node from a specific type in the index
-removeNodeFromType :: RecognitionTree -> String -> TypeIndex -> TypeIndex
+removeNodeFromType :: Node -> String -> TypeIndex -> TypeIndex
 removeNodeFromType node typeId typeIndex = 
     Map.adjust (Set.delete node) typeId typeIndex
 
 -- Add a child to a tree node
-addChild :: TypeIndex -> RecognitionTree -> String -> String -> RecognitionPoints -> [String] -> Maybe Float -> (RecognitionTree, TypeIndex)
+addChild :: TypeIndex -> Node -> String -> String -> RecognitionPoints -> [String] -> Maybe Float -> Either String (Node, TypeIndex)
 addChild typeIndex parent childId childName childPoints childTypes childManualFulfillment
     | isJust (nodeParent parent) && isContribution typeIndex parent =
-        error $ "Node " ++ nodeName parent ++ " is an instance of a contributor/contribution and cannot have children."
-    | otherwise = (updatedParent, updatedTypeIndex)
+        Left $ "Node " ++ nodeName parent ++ " is an instance of a contributor/contribution and cannot have children."
+    | otherwise = Right (updatedParent, updatedTypeIndex)
   where
-    child = createNode childId childName childPoints (Just parent) childTypes childManualFulfillment
+    -- Validate manual fulfillment before creating the child
+    validatedManualFulfillment = case childManualFulfillment of
+        Just val | val < 0.0 -> Just 0.0
+                | val > 1.0 -> Just 1.0
+                | otherwise -> Just val
+        Nothing -> Nothing
+        
+    child = createNode childId childName childPoints (Just parent) childTypes validatedManualFulfillment
     updatedParent = parent { nodeChildren = Map.insert childId child (nodeChildren parent) }
     updatedTypeIndex = foldr' (\typeId idx -> addNodeToTypeIndex child typeId idx) typeIndex childTypes
 
 -- Remove a child from a tree node
-removeChild :: TypeIndex -> RecognitionTree -> String -> (RecognitionTree, TypeIndex)
+removeChild :: TypeIndex -> Node -> String -> (Node, TypeIndex)
 removeChild typeIndex parent childId = case Map.lookup childId (nodeChildren parent) of
     Nothing -> (parent, typeIndex)
     Just child -> 
@@ -135,7 +149,7 @@ removeChild typeIndex parent childId = case Map.lookup childId (nodeChildren par
         in (updatedParent, updatedTypeIndex)
 
 -- Add a type to a node
-addType :: TypeIndex -> RecognitionTree -> String -> (RecognitionTree, TypeIndex)
+addType :: TypeIndex -> Node -> String -> (Node, TypeIndex)
 addType typeIndex node typeId
     | Set.member typeId (nodeTypes node) = (node, typeIndex)
     | otherwise = 
@@ -144,7 +158,7 @@ addType typeIndex node typeId
         in (updatedNode, updatedTypeIndex)
 
 -- Remove a type from a node
-removeType :: TypeIndex -> RecognitionTree -> String -> (RecognitionTree, TypeIndex)
+removeType :: TypeIndex -> Node -> String -> (Node, TypeIndex)
 removeType typeIndex node typeId
     | not (Set.member typeId (nodeTypes node)) = (node, typeIndex)
     | otherwise = 
@@ -153,11 +167,11 @@ removeType typeIndex node typeId
         in (updatedNode, updatedTypeIndex)
 
 -- Get a node's total child points
-totalChildPoints :: RecognitionTree -> Int
+totalChildPoints :: Node -> Int
 totalChildPoints = sum . map (getPoints . nodePoints) . Map.elems . nodeChildren
 
 -- Calculate a node's weight (proportional importance in the tree)
-weight :: RecognitionTree -> Float
+weight :: Node -> Float
 weight node = case nodeParent node of
     Nothing -> 1.0  -- Root node has weight 1.0
     Just parent -> 
@@ -168,7 +182,7 @@ weight node = case nodeParent node of
            else (fromIntegral nodePointsVal / fromIntegral parentTotalPoints) * weight parent
 
 -- Calculate a node's share of its parent's total points
-shareOfParent :: RecognitionTree -> Float
+shareOfParent :: Node -> Float
 shareOfParent node = case nodeParent node of
     Nothing -> 1.0  -- Root node has 100% share
     Just parent ->
@@ -179,17 +193,17 @@ shareOfParent node = case nodeParent node of
            else fromIntegral nodePointsVal / fromIntegral parentTotalPoints
 
 -- Check if a node has direct contribution children
-hasDirectContributionChild :: TypeIndex -> RecognitionTree -> Bool
+hasDirectContributionChild :: TypeIndex -> Node -> Bool
 hasDirectContributionChild typeIndex = 
     anyNodeChild (isContribution typeIndex)
 
 -- Check if a node has non-contribution children
-hasNonContributionChild :: TypeIndex -> RecognitionTree -> Bool
+hasNonContributionChild :: TypeIndex -> Node -> Bool
 hasNonContributionChild typeIndex = 
     anyNodeChild (not . isContribution typeIndex)
 
 -- Calculate the proportion of total child points from contribution children
-contributionChildrenWeight :: TypeIndex -> RecognitionTree -> Float
+contributionChildrenWeight :: TypeIndex -> Node -> Float
 contributionChildrenWeight typeIndex node = ratio contributionPoints totalPoints
   where
     contributionPoints = sum $ map (getPoints . nodePoints) $ 
@@ -199,23 +213,23 @@ contributionChildrenWeight typeIndex node = ratio contributionPoints totalPoints
     ratio a b = fromIntegral a / fromIntegral b
 
 -- Sum fulfillment from children matching a predicate
-childrenFulfillment :: TypeIndex -> (RecognitionTree -> Bool) -> RecognitionTree -> Float
+childrenFulfillment :: TypeIndex -> (Node -> Bool) -> Node -> Float
 childrenFulfillment typeIndex pred node =
     sum $ map (\child -> fulfilled typeIndex child * shareOfParent child) $
           filterNodeChildren pred node
 
 -- Calculate the fulfillment from contribution children
-contributionChildrenFulfillment :: TypeIndex -> RecognitionTree -> Float
+contributionChildrenFulfillment :: TypeIndex -> Node -> Float
 contributionChildrenFulfillment typeIndex = 
     childrenFulfillment typeIndex (isContribution typeIndex)
 
 -- Calculate the fulfillment from non-contribution children
-nonContributionChildrenFulfillment :: TypeIndex -> RecognitionTree -> Float
+nonContributionChildrenFulfillment :: TypeIndex -> Node -> Float
 nonContributionChildrenFulfillment typeIndex =
     childrenFulfillment typeIndex (not . isContribution typeIndex)
 
 -- Calculate the fulfillment of a node (core recursive function)
-fulfilled :: TypeIndex -> RecognitionTree -> Float
+fulfilled :: TypeIndex -> Node -> Float
 fulfilled typeIndex node
     -- Leaf nodes
     | Map.null (nodeChildren node) = 
@@ -223,7 +237,7 @@ fulfilled typeIndex node
     
     -- Nodes with manual fulfillment and contributor children
     | isJust (nodeManualFulfillment node) && hasDirectContributionChild typeIndex node = 
-        let manualFulfillment = fromMaybe 0.0 (nodeManualFulfillment node)
+        let manualFulfillment = min 1.0 $ max 0.0 $ fromMaybe 0.0 (nodeManualFulfillment node)
         in if not (hasNonContributionChild typeIndex node)
            then manualFulfillment
            else 
@@ -236,19 +250,11 @@ fulfilled typeIndex node
         sumOverChildren (\child -> fulfilled typeIndex child * shareOfParent child) node
 
 -- Calculate the desire (unfulfilled need) of a node
-desire :: TypeIndex -> RecognitionTree -> Float
+desire :: TypeIndex -> Node -> Float
 desire typeIndex = (1.0 -) . fulfilled typeIndex
 
--- Calculate the fulfillment weight (fulfilled * weight)
-fulfillmentWeight :: TypeIndex -> RecognitionTree -> Float
-fulfillmentWeight typeIndex node = fulfilled typeIndex node * weight node
-
--- Get all instances of a given type
-getInstances :: TypeIndex -> String -> Set.Set RecognitionTree
-getInstances = lookupTypeInstances
-
 -- Calculate a node's share of general fulfillment from another type
-shareOfGeneralFulfillment :: TypeIndex -> RecognitionTree -> RecognitionTree -> Float
+shareOfGeneralFulfillment :: TypeIndex -> Node -> Node -> Float
 shareOfGeneralFulfillment typeIndex node typeNode =
     getInstances typeIndex (nodeId typeNode)
     & Set.filter (\instance_ -> node == instance_ || any ((==) node) (ancestors instance_))
@@ -263,29 +269,27 @@ shareOfGeneralFulfillment typeIndex node typeNode =
         in if contributorTypesCount > 0
            then fWeight / fromIntegral contributorTypesCount
            else fWeight
-    hasContributor idx = any isContributor . Set.toList . lookupTypeInstances idx
+    hasContributor idx = any isContributor . Set.toList . getInstances idx
     ancestors n = case nodeParent n of
-                    Nothing -> []
+            Nothing -> []
                     Just p -> p : ancestors p
 
 -- Calculate mutual fulfillment between two nodes
-mutualFulfillment :: TypeIndex -> RecognitionTree -> RecognitionTree -> Float
+mutualFulfillment :: TypeIndex -> Node -> Node -> Float
 mutualFulfillment typeIndex node1 node2 =
     min (shareOfGeneralFulfillment typeIndex node1 node2)
         (shareOfGeneralFulfillment typeIndex node2 node1)
 
 -- Calculate mutual fulfillment distribution
-mutualFulfillmentDistribution :: TypeIndex -> RecognitionTree -> Map.Map RecognitionTree Float
+mutualFulfillmentDistribution :: TypeIndex -> Node -> Map.Map Node Float
 mutualFulfillmentDistribution typeIndex node =
-    let validTypeIds = filter (not . Set.null . lookupTypeInstances typeIndex) 
+    let validTypeIds = filter (not . Set.null . getInstances typeIndex) 
                              (Map.keys typeIndex)
         
-        getTypeNode = head . Set.toList . lookupTypeInstances typeIndex
-        
-        getMutualFulfillment typeId = 
-            let typeNode = getTypeNode typeId
-                mf = mutualFulfillment typeIndex node typeNode
-            in if mf > 0 then Just (typeNode, mf) else Nothing
+        getMutualFulfillment typeId = do
+            typeNode <- getTypeNode typeIndex typeId
+            let mf = mutualFulfillment typeIndex node typeNode
+            if mf > 0 then Just (typeNode, mf) else Nothing
             
         typesWithValues = mapMaybe getMutualFulfillment validTypeIds
         
@@ -295,7 +299,7 @@ mutualFulfillmentDistribution typeIndex node =
     in Map.fromList $ map normalize typesWithValues
 
 -- Create an example tree structure for demonstration
-exampleTree :: (RecognitionTree, TypeIndex)
+exampleTree :: (Node, TypeIndex)
 exampleTree = (finalRoot, finalTypeIndex)
   where
     -- Create root node
@@ -310,9 +314,14 @@ exampleTree = (finalRoot, finalTypeIndex)
     typeIndexWithAlice = addNodeToTypeIndex alice "alice" initialTypeIndex
     typeIndexWithBoth = addNodeToTypeIndex bob "bob" typeIndexWithAlice
     
-    -- Add children to root with different recognitions
-    (rootWithChild1, typeIndex1) = addChild typeIndexWithBoth root "need1" "Need 1" (points 50) ["alice"] Nothing
-    (finalRoot, finalTypeIndex) = addChild typeIndex1 rootWithChild1 "need2" "Need 2" (points 30) ["bob"] Nothing
+    -- Add children to root with different recognitions - using the safer Either version
+    (rootWithChild1, typeIndex1) = case addChild typeIndexWithBoth root "need1" "Need 1" (points 50) ["alice"] Nothing of
+        Right result -> result
+        Left err -> error err  -- For demonstration, but in real code would handle this better
+        
+    (finalRoot, finalTypeIndex) = case addChild typeIndex1 rootWithChild1 "need2" "Need 2" (points 30) ["bob"] Nothing of
+        Right result -> result
+        Left err -> error err  -- For demonstration
 
 -- Main function to demonstrate tree-based calculations
 main :: IO ()

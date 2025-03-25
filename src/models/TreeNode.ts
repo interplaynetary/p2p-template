@@ -142,8 +142,9 @@ export class TreeNode {
     get isContribution(): boolean {
       // A node is a contribution if it has any types that are contributors
       if (this._typesMap.size === 0) return false;
-      return Array.from(this._typesMap.values()).some(type => type.isContributor);
-      // And if it has a parent!
+      const hasContributorType = Array.from(this._typesMap.values()).some(type => type.isContributor);
+      // Need to also check parent exists
+      return hasContributorType && this._parent !== null;
     }
   
     async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0,): Promise<TreeNode> {
@@ -503,48 +504,7 @@ export class TreeNode {
       );
     }
     
-        // D3 Compatibility Methods
-      get value() {
-          return this.points;
-      }
-  
-      get childrenArray() {
-          const result = Array.from(this.children.values());
-          return result;
-      }
-  
-      get data() {
-          return this;
-      }
-  
-      get hasChildren() {
-          return this.children.size > 0;
-      }
-      
-      get descendants() {
-          const result: TreeNode[] = [];
-          const stack: TreeNode[] = [this];
-          while (stack.length) {
-              const node = stack.pop();
-              if (!node) continue;
-              result.push(node);
-              stack.push(...node.childrenArray);
-          }
-          return result;
-      }
-  
-      get ancestors() {
-          const result: TreeNode[] = [];
-          let current: TreeNode = this;
-          while (current) {
-              result.push(current);
-              if (!current.parent) break;
-              current = current.parent;
-          }
-          return result;
-      }
-
-  // GUN Methods
+    // GUN Methods
 
     // Save this node to Gun
     saveToGun() {
@@ -872,6 +832,11 @@ export class TreeNode {
           resolve(null);
         }, 3000))
       ]);
+    }
+
+    // Getter for types map to allow access from TreeMap
+    get typesMap(): Map<string, TreeNode> {
+        return this._typesMap;
     }
 }
   
