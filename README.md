@@ -226,3 +226,4 @@ This is Hegel's resolution of the master-slave dialectic realized in practice: m
 ## Learn more 📚
 - [Proof and Strategy for a Truly Free Association of Free Individuals](EXTENDED-README.md)
 - [Playnet.lol](https://playnet.lol)
+- [Glossary](GLOSSARY.md)
