@@ -166,7 +166,7 @@ Total Recognition = True-Recognition + False-Recognition
             ∴ ↓Real-Relations with Real-Contributors
                ∴ ↓Access to Real-Social-Material-Coordination
                   ∴ ↓Real-Social-Material-Basis for Self-Actualization
-                    ∴ social-material-truth is realized through Free Association
+                     ∴ Social-Material-Truth is processually realized in Free-Association by processual social-material negation of False-Recognition
 
 *Note: True/False recognition is not binary, nor expressed as a proposition (propositional logic). The question is what % of your recognition feels true/false to you? How true is this? To what degree?*
 
@@ -434,6 +434,8 @@ However it should be noted that socialization of land and means of production in
 Moreover, the question of how to distribute the means of production and land, if they are to be socialized, is a complex one. So is the question of how to distribute the surplus-production of the means of production and land, if they are to be socialized. And more fundamentaly, what will decide of each of these - the governance of each State - is a complex question.
 
 Rather than reforming existing states, dual-power should be established in each country, and should be established on the basis of the widest democracy.
+
+It should be noted that socialization in free-association will likely take place out of natural necessity on the part of individuals and not necessarily via the use of state-power.
 
 ---
 

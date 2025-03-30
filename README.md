@@ -23,8 +23,7 @@ You can interact with an interface implementing this logic at [interplaynetary.g
 4. Your Share of Anyone's **Surplus-Distribution** equals *your mutual recognition with them, divided by the sum of all mutual recognition values between them and everyone they recognize.*
     - For example: If we have 10% of mutual-recognition, and you are my only mutual-relationship, you would have 100% of my **total-mutual-recognition** (100% of my **surplus-distribution**). If I have two mutual-relationships each with 10% mutual-recognition, each would have 50% of my **total-mutual-recognition** (50% of my **surplus-distribution**).
 
-<details>
-  <summary><b><i>Mathematically defined:</i></b></summary>
+**Mathematically defined:**
 
 ```
 One's Recognition = one's acknowledgment of contributions towards one's own self-actualization
@@ -35,7 +34,6 @@ Mutual-Recognition(You, Them) = MR(You, Them) = minimum(Their-share-of-Your-tota
 
 Your share of anyone's surplus = MR(You, Them) / Σ MR(Them, Each-of-Those-They-Recognize)
 ```
-</details>
 
 ## Why does any of that matter?
 
@@ -87,7 +85,6 @@ When you contribute surplus to Free Association:
 3. 🔄 **Effects return to you in unexpected ways** - As others you've supported gain capacity, they can contribute to your self-actualization in ways you couldn't predict.
 
 4. ⚖️ **The network self-corrects toward social-material-truth** - Mathematical properties ensure that false recognition naturally diminishes while true recognition strengthens:
-
 ```
 For any participant:
 Total Recognition = 100%
@@ -98,7 +95,7 @@ Total Recognition = True-Recognition + False-Recognition
             ∴ ↓Real-Relations with Real-Contributors
                ∴ ↓Access to Real-Social-Material-Coordination
                   ∴ ↓Real-Social-Material-Basis for Self-Actualization
-
+                     ∴ Social-Material-Truth is processually realized in Free-Association by processual social-material negation of False-Recognition
 ```
 
 This mathematical property ensures that inflating recognition or maintaining false-recognition only decreases your connection to real-contributors.
@@ -146,13 +143,27 @@ This means that in free association, you're never more than six distributions aw
 ```
 At each degree n:
 - Available Surplus = Σ(Contributors' Surplus)
+
 - Your share of anyone's surplus = MR(You, Them) / Σ MR(Them, Each-of-Those-They-Recognize)
+
 - Transitive Share(You, Them) = Direct Share(You, Them) + 
                              Direct Share(You, Node) * ... * Direct Share(Node, Them)
       for all Nodes connecting You to Them at n degrees
 
-- Total Transitive Access = Σ Transitive Share(You, Each) for All
-```
+- Total Potential Transitive Access = Σ Transitive Share(You, Each) for All
+
+- Total Actual Transitive Access = 
+   Σ[ EffectiveTransitiveShare(You, Each) * Surplus(Each) ] for all Each in Network
+      Where:
+      Surplus(Node) = max(0, Available(Node) - Needed(Node))
+      
+      SurplusRatio(Node) = Surplus(Node) / Available(Node)
+      
+      EffectiveTransitiveShare(A, B) = 
+         DirectShare(A, B) + 
+         Σ[ DirectShare(A, C) * SurplusRatio(C) * EffectiveTransitiveShare(C, B) ]
+         for all immediate connections C of A where C ≠ B
+   ```
 
 This exponential growth means that as free association spreads:
 * Your potential access to surplus grows exponentially
@@ -199,7 +210,7 @@ A basic interface for free association is almost complete but we are seeking sup
 
 **Provide Housing/Space:** If you have surplus housing or workspace that could support Free Association contributors
 
-**Spread Awareness:** Share the mathematical proof and potential of Free Association with others who might contribute surplus
+**Spread Awareness:** Share the mathematical proof and potential of Free Association with others
 
 ---
 
@@ -247,6 +258,7 @@ Total Recognition = True-Recognition + False-Recognition
             ∴ ↓Real-Relations with Real-Contributors
                ∴ ↓Access to Real-Social-Material-Coordination
                   ∴ ↓Real-Social-Material-Basis for Self-Actualization
+                     ∴ Social-Material-Truth is processually realized in Free-Association by processual social-material negation of False-Recognition
 ```
 
 This mathematical property ensures that inflating recognition or maintaining false-recognition only decreases your connection to real-contributors. You cannot accumulate power through ownership.
@@ -256,7 +268,7 @@ In Free Association, we are free! You don't own me, and I don't own you! We owe 
 This is Hegel's resolution of the master-slave dialectic realized in practice: mutual recognition without ownership or domination. Your contributions don't buy you permanent shares — they participate in an evolving network of mutual-recognition that continuously adjusts to reflect real social-material contributions.
 
 ## Learn more 📚
-- [Proof and Strategy for a Truly Free Association of Free Individuals](EXTENDED-README.md) Which goes into more details such as the *form* of surplus
+- [Proof and Strategy for a Truly Free Association of Free Individuals](EXTENDED-README.md) Which goes into more detail, addressing interesting questions such as the *form* of surplus (which is *not* private-property)
 - [Playnet.lol](https://playnet.lol)
 - [Glossary](GLOSSARY.md)
 

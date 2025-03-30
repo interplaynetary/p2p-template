@@ -180,14 +180,13 @@ addTag (tagIndex, contribIndex) node tagId
         in (updatedNode, (updatedTagIndex, contribIndex))
 
 -- Add a contributor to a node
-addContributor :: Indexes -> Node -> String -> Either String (Node, Indexes)
+addContributor :: Indexes -> Node -> String -> (Node, Indexes)
 addContributor (tagIndex, contribIndex) node contribId
-    | Set.member contribId (nodeContributors node) = Right (node, (tagIndex, contribIndex))
-    | not (isContributor node) = Left $ "Cannot add contributor to non-root node: " ++ nodeName node
+    | Set.member contribId (nodeContributors node) = (node, (tagIndex, contribIndex))
     | otherwise = 
         let updatedNode = node { nodeContributors = Set.insert contribId (nodeContributors node) }
             updatedContribIndex = addNodeToContributorIndex node contribId contribIndex
-        in Right (updatedNode, (tagIndex, updatedContribIndex))
+        in (updatedNode, (tagIndex, updatedContribIndex))
 
 -- Remove a tag from a node
 removeTag :: Indexes -> Node -> String -> (Node, Indexes)
