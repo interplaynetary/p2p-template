@@ -1,5 +1,5 @@
 import { gun, user } from './models/Gun';
-import { TreeNode } from './models/TreeNode';
+import { TreeNode } from './models/newTreeNode';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
 import { initializeExampleData } from './example';
@@ -7,7 +7,6 @@ import $ from 'jquery';
 
 // TODO:
 // We currently arent using handleResize, but we should probably use it?
-// Why is 
 
 export class App {
     name: string = ''
@@ -44,7 +43,7 @@ export class App {
             throw new Error('User public key is missing or invalid');
         }
         
-        this.gunRef = gun.get('users').get(this.rootId);
+        this.gunRef = gun.get('nodes').get(this.rootId);
         console.log('[App] User information:', { name: this.name, rootId: this.rootId });
 
         (window as any).app = this;
@@ -61,7 +60,7 @@ export class App {
 
         try {
             // Try to load existing root node first - using user public key as the node ID
-            console.log('[App] Attempting to load existing root node from path:', ['users', this.rootId]);
+            console.log('[App] Attempting to load existing root node from path:', ['nodes', this.rootId]);
             this.rootNode = await Promise.race([
                 TreeNode.fromId(this.rootId),
                 // Add a 5-second timeout
@@ -74,33 +73,42 @@ export class App {
             // If root node doesn't exist, create it
             if (!this.rootNode) {
                 console.log('[App] Root node not found, creating new root node with name:', this.name);
-                this.rootNode = new TreeNode(this.name, this.rootId, null);
+                this.rootNode = TreeNode.create(this.name, {
+                    id: this.rootId,
+                    parent: null
+                });
                 console.log('[App] New root node created with ID:', this.rootNode.id);
                 
-                // Explicitly save the user data using direct Gun approach
-                console.log('[App] Explicitly saving user data to Gun for root node');
-                this.gunRef.put({ 
-                    name: this.name,
-                    points: 0,
-                    manualFulfillment: null,
-                    lastSeen: Date.now()
-                });
-
-                // Add a reference to the nodes collection
-                gun.get('nodes').set(this.gunRef);
-                
-                console.log('[App] Root node linked to user');
+                // Ensure the name is persisted by explicitly setting it
+                this.rootNode.saveToGun();
             } else {
                 console.log('[App] Existing root node loaded successfully:', {
                     id: this.rootNode.id,
                     name: this.rootNode.name,
                     childrenCount: this.rootNode.children.size
                 });
+                
+                // If the root node name is empty/Unnamed but we have a user name, update it
+                if ((this.rootNode.name === '' || this.rootNode.name === 'Unnamed') && this.name) {
+                    console.log('[App] Updating root node name to match user name:', this.name);
+                    this.rootNode.name = this.name;
+                }
             }
 
-            // Regular ping to update lastSeen status
+            // Create a reference to this node in the users path
+            console.log('[App] Creating user reference in users path:', this.rootId);
+            gun.get('users').get(this.rootId).put({
+                name: this.name,
+                nodeId: this.rootId,  // Reference to the actual node
+                lastSeen: Date.now()
+            });
+
+            // Regular ping to update lastSeen status in both paths
             this.saveInterval = setInterval(() => {
-                this.gunRef.get('lastSeen').put(Date.now());
+                const timestamp = Date.now();
+                this.gunRef.get('lastSeen').put(timestamp);
+                gun.get('users').get(this.rootId).get('lastSeen').put(timestamp);
+                gun.get('users').get(this.rootId).get('name').put(this.name); // Keep name updated
             }, 60000); // Update every minute
 
             console.log('[App] Root node setup complete, initializing UI');

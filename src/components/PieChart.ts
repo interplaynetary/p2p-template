@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
-import { TreeNode } from '../models/TreeNode';
+import { TreeNode } from '../models/newTreeNode';
 
 export function createPieChart(data: TreeNode) {
     // Get the container dimensions
@@ -19,8 +19,22 @@ export function createPieChart(data: TreeNode) {
     const mutualFulfillmentDistribution = data.mutualFulfillmentDistribution;
     console.log('mutualFulfillmentDistribution for pie:', mutualFulfillmentDistribution);
 
+    // Create an array of [nodeId, value] pairs for the pie chart
+    const pieData: [string, number][] = Array.from(mutualFulfillmentDistribution.entries());
+    
+    // Create a map of node IDs to TreeNode objects for later reference
+    const nodeMap = new Map<string, TreeNode>();
+    
+    // Load node objects for each ID
+    pieData.forEach(async ([nodeId]) => {
+        const node = await TreeNode.fromId(nodeId);
+        if (node) {
+            nodeMap.set(nodeId, node);
+        }
+    });
+
     // Create pie layout
-    const pie = d3.pie<[TreeNode, number]>()
+    const pie = d3.pie<[string, number]>()
         .value(d => d[1])  // Use the mutualFulfillmentDistribution value
         .sort(null);  // Maintain original order
 
@@ -37,29 +51,47 @@ export function createPieChart(data: TreeNode) {
         .style("font", "12px sans-serif");
         
     // Create pie segments from mutualFulfillmentDistribution
-    const arcs = pie(Array.from(mutualFulfillmentDistribution.entries()));
+    const arcs = pie(pieData);
 
     // Add segments using the same color scheme as the treemap
     svg.selectAll("path")
         .data(arcs)
         .join("path")
-        .attr("fill", d => getColorForName(d.data[0].name))  // Use same color function
+        .attr("fill", d => {
+            // Try to get the node object from the map, or use a default color
+            const node = nodeMap.get(d.data[0]);
+            return node ? getColorForName(node.name) : getColorForName(d.data[0]);
+        })
         .attr("d", d => arc(d as any))  // Type assertion to fix type error
         .append("title") 
-        .text(d => `${d.data[0].name}: ${(d.data[1] * 100).toFixed(1)}%`);
+        .text(d => {
+            const node = nodeMap.get(d.data[0]);
+            const name = node ? node.name : d.data[0];
+            return `${name}: ${(d.data[1] * 100).toFixed(1)}%`;
+        });
 
-    // Add labels
+    // Add labels with node names
     svg.selectAll("text")
         .data(arcs)
         .join("text")
         .attr("transform", d => {
-            const [x, y] = arc.centroid(d as any);  // Type assertion to fix type error
-            return `translate(${x},${y})`;
+            const [x, y] = arc.centroid(d as any);
+            return `translate(${x}, ${y})`;
         })
         .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .style("font-size", `${ringThickness * 0.3}px`)  // Scale text to 30% of ring thickness
-        .text(d => `${d.data[0].name}`);
+        .attr("fill", "white")
+        .style("font-size", "10px")
+        .style("pointer-events", "none")
+        .style("text-shadow", "0px 0px 2px rgba(0,0,0,0.8)")
+        .text(d => {
+            const node = nodeMap.get(d.data[0]);
+            if (node && node.name.length < 10) {
+                return node.name;
+            }
+            // Don't show text for long names or if node isn't loaded
+            return "";
+        });
 
     // Add center text
     const centerGroup = svg.append("g")

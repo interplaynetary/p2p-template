@@ -1,18 +1,9 @@
-
-# Discourse Structure
-
-Agent         →       Other
--------               -------
-Truth         ↓       Production
-
-This structure resembles the analyst's discourse but operates at a social rather than clinical level. Mutual recognition ($a$) occupies the agent position, addressing the barred subject ($S$) to produce a network of contributions ($S_2$) that ultimately serves self-actualization ($S_1$) rather than capital accumulation.
-
-## The Four Discourses and Free Association
+# The Four Discourses and Free Association
 
 First, let's situate free association in relation to Lacan's four discourses to understand how it represents a structural transformation:
 
 ### Discourse of the Master (Capitalism):
-$\frac{S_1}{S}$⟶$\frac{S_2}{a}$
+$\frac{S_1}{S}$⟶ $\frac{S_2}{a}$
 
 Where:
 - $S_1$ (master signifier) = Capital/ownership
@@ -21,7 +12,7 @@ Where:
 - $a$ (surplus enjoyment) = Surplus value extracted
 
 ### Discourse of Free Association (Proposed):
-$\frac{a}{S}$⟶$\frac{S_2}{S_1}$
+$\frac{a}{S}$⟶ $\frac{S_2}{S_1}$
 
 Where:
 - $a$ (surplus enjoyment/object-cause of desire) = Mutual recognition
@@ -30,6 +21,8 @@ Where:
 - $S_1$ (master signifier) = Self-actualization
 
 This structure resembles the analyst's discourse but operates at a social rather than clinical level. Mutual recognition ($a$) occupies the agent position, addressing the barred subject ($S$) to produce a network of contributions ($S_2$) that ultimately serves self-actualization ($S_1$) rather than capital accumulation.
+
+Typical revolutionary discourse either operates as a hysteric's discourse — $ addressing S₁, demanding a new master—or as a university discourse — S₂ addressing a, expert knowledge addressing the proletariat as surplus. Both fail to transform the fundamental structure of desire. Free association transforms this structure by placing mutual recognition in the position from which the subject is addressed!
 
 ## Core Mathemes of Free Association
 
@@ -104,12 +97,14 @@ This matheme captures how "desire desires desire" in free association, creating 
 
 For a network of mutual recognition with multiple subjects, we can represent the complete set of relations as a matrix:
 
-$M = \begin{pmatrix}
-MR(1↔1) & MR(1↔2) & ... & MR(1↔n) \\
-MR(2↔1) & MR(2↔2) & ... & MR(2↔n) \\
-... & ... & ... & ... \\
-MR(n↔1) & MR(n↔2) & ... & MR(n↔n)
-\end{pmatrix}$
+$$
+M = \begin{pmatrix} 
+MR(1\leftrightarrow 1) & MR(1\leftrightarrow 2) & \cdots & MR(1\leftrightarrow n) \\
+MR(2\leftrightarrow 1) & MR(2\leftrightarrow 2) & \cdots & MR(2\leftrightarrow n) \\
+\vdots & \vdots & \ddots & \vdots \\
+MR(n\leftrightarrow 1) & MR(n\leftrightarrow 2) & \cdots & MR(n\leftrightarrow n)
+\end{pmatrix}
+$$
 
 Where each $MR(i↔j)$ represents the mutual recognition between subjects $i$ and $j$.
 

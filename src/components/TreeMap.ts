@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
-import { TreeNode } from '../models/TreeNode';
+import { TreeNode } from '../models/newTreeNode';
 import { gun } from '../models/Gun';
 
 // TODO:
@@ -497,6 +497,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 const gunQuery = gun.get('users').map().on((userData, userId) => {
                     if (!userData || !userId || userId === d.data.app.rootId) return;
                     
+                    // Get user name from the users path
                     const userName = userData.name || 'Unknown';
                     
                     // Filter by name if search text exists
@@ -511,7 +512,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     // Add to users collection if not already there
                     if (!users.some(u => u.id === userId)) {
                         users.push({
-                            id: userId,
+                            id: userId,  // This is the node ID we'll use to add as a type
                             name: userName
                         });
                         userCount++;

@@ -1,19 +1,19 @@
-import { TreeNode } from './models/TreeNode.ts';
+import { TreeNode } from './models/newTreeNode';
 
 // Export the initialization function
 export async function initializeExampleData(root: TreeNode) {
   console.log("Checking for existing data before initialization...");
   
   /*
-  // Initialize data structure
-  const environmentalist = new TreeNode('environmentalist');
-  const clownsWithoutBorders = new TreeNode('clowns4all', null, [environmentalist]);
-  const researcher = new TreeNode('researcher', null, [environmentalist]);
-  const educator = new TreeNode('educator', null, [environmentalist]);
+  // Initialize data structure - using new TreeNode implementation
+  const environmentalist = TreeNode.create('environmentalist');
+  const clownsWithoutBorders = TreeNode.create('clowns4all', { typeIds: [environmentalist.id] });
+  const researcher = TreeNode.create('researcher', { typeIds: [environmentalist.id] });
+  const educator = TreeNode.create('educator', { typeIds: [environmentalist.id] });
 
   // Our main nodes with multiple types
-  const whalewatch = new TreeNode('whalewatch', null, [researcher]);  // is a contributor
-  const alice = new TreeNode('alice', null, [researcher]);  // is a contributor
+  const whalewatch = TreeNode.create('whalewatch', { typeIds: [researcher.id] });  // is a contributor
+  const alice = TreeNode.create('alice', { typeIds: [researcher.id] });  // is a contributor
   */
 
   // Check if the major categories already exist
@@ -69,9 +69,9 @@ export async function initializeExampleData(root: TreeNode) {
     const development = await freeAssociation.addChild("Development", 10)
     const communications = await freeAssociation.addChild("Communications", 10)
 
-    // Now using IDs instead of objects
-    communications.addType(money);
-    communications.addType(development);
+    // Now using IDs instead of objects for addType
+    communications.addType(money.id);
+    communications.addType(development.id);
 
     /*
     // Underground Networks contributions
