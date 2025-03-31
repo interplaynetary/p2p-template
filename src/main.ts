@@ -1,4 +1,3 @@
-import { initializeExampleData } from './example';
 import { App } from './App';
 import * as GunX from './models/Gun';
 import './style.css';

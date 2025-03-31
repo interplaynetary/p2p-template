@@ -3,6 +3,8 @@ import { App } from '../App';
 import { TreeNode } from '../models/TreeNode';
 import { getColorForName } from '../utils/colorUtils';
 
+// Could maybe be repurposed as a generic Cards component (for dragging and dropping nodes)
+
 interface UserCardData {
   id: string;
   name: string;

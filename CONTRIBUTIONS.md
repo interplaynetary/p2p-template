@@ -78,7 +78,7 @@ Let's build tools for a more collaborative future together!
 
 # Project Structure and Tree-Based Calculations
 
-![Tree Structure](./resources/tree.png)
+![Tree Structure](./resources//images/tree.png)
 
 ## Tree Data Structure Overview
 

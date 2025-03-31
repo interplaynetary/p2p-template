@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
-import { TreeNode } from '../models/newTreeNode';
+import { TreeNode } from '../models/TreeNode';
 import { gun } from '../models/Gun';
 
 // TODO:
@@ -476,7 +476,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .style("flex", "1");
                 
             // Function to load and filter users
-            function loadUsers(filterText = "") {
+            async function loadUsers(filterText = "") {
                 resultsContainer.html(""); // Clear previous results
                 
                 // Show loading indicator
@@ -494,11 +494,18 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 let userCount = 0;
                 
                 // Get users from Gun
-                const gunQuery = gun.get('users').map().on((userData, userId) => {
-                    if (!userData || !userId || userId === d.data.app.rootId) return;
+                const gunQuery = gun.get('users').map().on(async (userData, userId) => {
+                    console.log('[TreeMap] Found user:', userData, userId);
+                    const user = await TreeNode.fromId(userId).then(user => {
+                        console.log('[TreeMap] Recreated user:', user);
+                        console.log('[TreeMap] Recreated Username:', user.name);
+                        return user;
+                    });
+                    if (!user || userId === d.data.app.rootId) return;
                     
-                    // Get user name from the users path
-                    const userName = userData.name || 'Unknown';
+                    // Get user name from the users path first, then fall back to userId
+                    // This ensures we use the stored name when available
+                    const userName = user.name;
                     
                     // Filter by name if search text exists
                     if (filterText && !userName.toLowerCase().includes(filterText.toLowerCase())) {

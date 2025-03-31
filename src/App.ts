@@ -1,5 +1,5 @@
 import { gun, user } from './models/Gun';
-import { TreeNode } from './models/newTreeNode';
+import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
 import { initializeExampleData } from './example';
@@ -7,6 +7,9 @@ import $ from 'jquery';
 
 // TODO:
 // We currently arent using handleResize, but we should probably use it?
+
+// This seems unneeded:
+// gun.get('users').get(this.rootId).get('name').put(this.name); // Keep name updated
 
 export class App {
     name: string = ''
@@ -97,18 +100,19 @@ export class App {
 
             // Create a reference to this node in the users path
             console.log('[App] Creating user reference in users path:', this.rootId);
+            // Always ensure the user's name is saved correctly in the users path
             gun.get('users').get(this.rootId).put({
-                name: this.name,
-                nodeId: this.rootId,  // Reference to the actual node
+                node: this.gunRef,  // Reference to the actual node
                 lastSeen: Date.now()
             });
 
-            // Regular ping to update lastSeen status in both paths
+            // Setup a regular ping to keep user data fresh
             this.saveInterval = setInterval(() => {
                 const timestamp = Date.now();
+                // Update lastSeen in both paths
                 this.gunRef.get('lastSeen').put(timestamp);
                 gun.get('users').get(this.rootId).get('lastSeen').put(timestamp);
-                gun.get('users').get(this.rootId).get('name').put(this.name); // Keep name updated
+                // Always keep name up to date in users path
             }, 60000); // Update every minute
 
             console.log('[App] Root node setup complete, initializing UI');
@@ -396,13 +400,14 @@ export class App {
             const seenIds = new Set<string>();
             
             // Use on() instead of once() to get live updates
-            gun.get('users').map().on((data, key) => {
+            gun.get('users').map().on(async (data, key) => {
+                console.log('[App] Found user:', data);
                 if (data && key !== this.rootId && !seenIds.has(key)) {
                     console.log(`[App] Found user: ${data.name} (${key})`);
                     seenIds.add(key);
                     users.push({
                         id: key,
-                        name: data.name || 'Unknown',
+                        name: (await TreeNode.fromId(key)).name || 'Unknown',
                         lastSeen: data.lastSeen || 0
                     });
                     

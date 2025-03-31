@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
-import { TreeNode } from '../models/newTreeNode';
+import { TreeNode } from '../models/TreeNode';
 
 export function createPieChart(data: TreeNode) {
     // Get the container dimensions

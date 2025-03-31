@@ -12,8 +12,6 @@ The beauty of this free association is its organic evolution based on real contr
 
 ## Ok great story! lets stick with it! Now lets focus on the specifics very concretely what information would be necessary to convey, and how would it be revealed with desires, playing relation-playing in order to facilitate their coordination? For example space-time interaction? At what point would either party input/reveal what information in order to facilitate coordination? Especially among strangers
 
-
-
 Let me break down the coordination dance between Alice and Bob, focusing on space-time resources as an example:
 
 Initially, Alice (provider) reveals:

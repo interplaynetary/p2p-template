@@ -11,10 +11,7 @@ import { gun } from './Gun';
 // - All nodes we recognize
 // THAT IS IT.
 
-// TODO:
-// isContribution should only be true if the node has a parent!
-// isContributor should only be true if it the root of a user!
-// can we remove the D3 compatibility methods (since value, and data are so simple)
+// couldnt we pass children into the TreeNode constructor? As well as the addChild constructor?
 
 export class TreeNode {
     id: string;
@@ -27,7 +24,11 @@ export class TreeNode {
     
     // Store types in a Map with ID as key to prevent duplicates
     private _typesMap: Map<string, TreeNode> = new Map();
-    typeIndex: Map<TreeNode, Set<TreeNode>>;
+    
+    // NEW: Use ID-based typeIndex instead of TreeNode-based
+    // Previously: typeIndex: Map<TreeNode, Set<TreeNode>>;
+    typeIndex: Map<string, Set<string>>;
+    
     app: App;
     
     // Gun subscription references
@@ -37,6 +38,10 @@ export class TreeNode {
     
     // Static reference cache to avoid duplicating Gun references
     private static gunRefCache: Map<string, any> = new Map();
+    // Static node cache to avoid duplicating TreeNode instances
+    private static nodeCache: Map<string, TreeNode> = new Map();
+    // Track nodes being loaded to prevent circular dependencies
+    private static loadingNodes: Set<string> = new Set<string>();
     
     // Helper to get a Gun reference and cache it
     static getGunRef(id: string): any {
@@ -47,53 +52,78 @@ export class TreeNode {
         return this.gunRefCache.get(id);
     }
     
-    constructor(name: string, id?: string, parent: TreeNode | null = null, types: TreeNode[] = [], manualFulfillment: number = 0, points: number = 0) {
+    constructor(
+      name: string,
+      options: {
+        id?: string,
+        parent?: TreeNode | null,
+        typeIds?: string[],
+        manualFulfillment?: number,
+        points?: number
+      } = {}
+    ) {
+      const {
+        id,
+        parent = null,
+        typeIds = [],
+        manualFulfillment = 1,
+        points = 1
+      } = options;
+
+      // Generate ID first
+      const nodeId = id || Math.random().toString(36).substring(2, 15);
+      
+      // If node already exists in cache, we shouldn't be creating a new one
+      // This should be handled by the factory method
+      if (TreeNode.nodeCache.has(nodeId) && id) {
+        console.error(`[TreeNode] Attempted to create duplicate node with ID ${nodeId}`);
+      }
+      
       this._name = name;
-      this.id = id || Math.random().toString(36).substring(2, 15);
+      this.id = nodeId;
       this._parent = parent;
       this._manualFulfillment = manualFulfillment || null;
       this._points = points;
       this.app = (window as any).app;
       this.gunRef = TreeNode.getGunRef(this.id);
       
-      // Map of type -> Set of instances (shared at root level)
-      this.typeIndex = parent ? parent.root.typeIndex : new Map();
-  
-      // Initialize _typesMap with passed types, indexed by ID
-      if (types.length > 0) {
-        // Create a map of type ID to type
-        types.forEach(type => {
-          if (type && type.id) {
-            this._typesMap.set(type.id, type);
-            // Don't need to call addType here since we're just initializing
-          }
-        });
-        
-        // Now add each type to Gun
-        Array.from(this._typesMap.values()).forEach(type => {
-          this.addType(type);
-        });
-      }
+      // Add to node cache
+      TreeNode.nodeCache.set(this.id, this);
+      
+      // Initialize typeIndex (ID-based)
+      this.typeIndex = parent ? parent.root.typeIndex : new Map<string, Set<string>>();
       
       // If this is a new node with manual fulfillment, update in Gun
-      if (!id && this._manualFulfillment !== null) {
+      if (!options.id && this._manualFulfillment !== null) {
         console.log(`[TreeNode] Setting initial manual fulfillment for ${this.name} to ${this._manualFulfillment}`);
         this.gunRef.get('manualFulfillment').put(this._manualFulfillment);
       }
       
       // If this is a new node with points, update in Gun
-      if (!id && this._points > 0) {
+      if (!options.id && this._points > 0) {
         console.log(`[TreeNode] Setting initial points for ${this.name} to ${this._points}`);
         this.gunRef.get('points').put(this._points);
       }
       
       // If this is a new node, persist it to Gun
-      if (!id) {
+      if (!options.id) {
         this.saveToGun();
       }
       
       // Set up subscriptions
       this.setupSubscriptions();
+      
+      // Add type IDs after setup - this is safe because we're handling new types from subscriptions too
+      if (typeIds.length > 0) {
+        typeIds.forEach(typeId => {
+          this.addType(typeId);
+        });
+      }
+      
+      // Periodically clean up the cache (once every ~100 node creations)
+      if (Math.random() < 0.01) {
+        TreeNode.cleanupCache();
+      }
     }
 
     get name(): string {
@@ -119,78 +149,132 @@ export class TreeNode {
     }
 
     set parent(parent: TreeNode | null) {
-      this._parent = parent
+      const oldRoot = this.root;
+      const oldParent = this._parent;
+      
+      // First remove this node from previous parent's children map
+      if (oldParent && oldParent.children.has(this.id)) {
+        oldParent.children.delete(this.id);
+      }
+      
+      this._parent = parent;
+      
+      // Then add to new parent's children map if applicable
       if (parent) {
-        // Use Gun's direct reference operation
-        const parentRef = gun.get('nodes').get(parent.id);
-        this.gunRef.get('parent').put(parentRef);
+        // Store the parent ID directly in Gun
+        this.gunRef.get('parent').put(parent.id);
+        
+        // Update in-memory reference
+        parent.children.set(this.id, this);
+        
+        // If the root has changed, update type indices
+        const newRoot = this.root;
+        if (oldRoot !== newRoot) {
+          this.updateTypeIndicesForTree(oldRoot, newRoot);
+        }
       } else {
-        // If parent is null, remove the reference
+        // If parent is null, remove the reference in Gun
         this.gunRef.get('parent').put(null);
       }
     }   
+
+    // Helper method to update type indices when a node changes parents
+    private updateTypeIndicesForTree(oldRoot: TreeNode, newRoot: TreeNode): void {
+      // First, collect all the type relationships for this subtree
+      const typeRelationships: Array<{nodeId: string, typeId: string}> = [];
+      
+      // Helper to collect types for a node and its descendants
+      const collectTypes = (node: TreeNode) => {
+        // Collect this node's types
+        node._typesMap.forEach((_, typeId) => {
+          typeRelationships.push({ nodeId: node.id, typeId });
+          
+          // Remove from old root's index
+          if (oldRoot.typeIndex.has(typeId)) {
+            oldRoot.typeIndex.get(typeId)?.delete(node.id);
+          }
+        });
+        
+        // Process all children recursively
+        node.children.forEach(child => collectTypes(child));
+      };
+      
+      // Start collection with this node
+      collectTypes(this);
+      
+      // Now add all collected relationships to the new root's index
+      typeRelationships.forEach(({ nodeId, typeId }) => {
+        if (!newRoot.typeIndex.has(typeId)) {
+          newRoot.typeIndex.set(typeId, new Set<string>());
+        }
+        newRoot.typeIndex.get(typeId)?.add(nodeId);
+      });
+    }
+
     // Helper method to get all types in the system
-    get rootTypes(): TreeNode[] {
+    get rootTypes(): string[] {
       return Array.from(this.root.typeIndex.keys());
     }
 
-    get isContributor() : boolean {
-      return !this._parent
-      // will be changed with Gun logic!
+    get isContributor(): boolean {
+      // isContributor should only be true if it is the root of a user
+      return !this._parent;
     }
     
     get isContribution(): boolean {
-      // A node is a contribution if it has any types that are contributors
-      if (this._typesMap.size === 0) return false;
-      const hasContributorType = Array.from(this._typesMap.values()).some(type => type.isContributor);
-      // Need to also check parent exists
-      return hasContributorType && this._parent !== null;
+      // isContribution should only be true if the node has a parent and has a type that's a contributor
+      if (!this._parent || this._typesMap.size === 0) return false;
+      
+      // Check if any of the types are contributors (root nodes) by checking their isContributor property
+      // This avoids circular references by relying on the simple parent check in isContributor
+      return Array.from(this._typesMap.values()).some(type => type.isContributor);
     }
   
-    async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0,): Promise<TreeNode> {
+    async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0, id: string = Math.random().toString(36).substring(2, 15)): Promise<TreeNode> {
       if (this._parent && this.isContribution) {
         throw new Error(
           `Node ${this.name} is an instance of a contributor/contribution and cannot have children.`
         );
       }
   
-      // Create child data
+      // Create child data WITHOUT the types array
       const childData = {
+        id: id,
         name: name,
         points: points,
         manualFulfillment: manualFulfillment || null
+        // Remove types from here
       };
       
       console.log(`[TreeNode] Creating child node "${name}"`);
       
-      // Step 1: Create node directly in Gun's 'nodes' collection
-      // Let Gun generate the soul (ID) automatically
-      const childNodeRef = gun.get('nodes').set(childData);
+      // Create node directly in Gun's 'nodes' collection with specified ID
+      gun.get('nodes').get(id).put(childData);
       
-      // Step 2: Wait for Gun to generate the soul
-      const childId = await new Promise<string>((resolve) => {
-        childNodeRef.once((data, key) => {
-          // Extract soul from metadata or use key
-          const soul = data?._?.['#'] || key;
-          console.log(`[TreeNode] Gun generated soul for child: ${soul}`);
-          resolve(soul);
+      // Then add types correctly, one by one
+      if (typeIds.length > 0) {
+        typeIds.forEach(typeId => {
+          gun.get('nodes').get(id).get('types').get(typeId).put(true);
         });
+      }
+      
+      // Add reference to parent's children collection
+      console.log(`[TreeNode] Adding child ${id} to parent ${this.id}`);
+      
+      // Store the child ID directly in the children collection
+      this.gunRef.get('children').get(id).put(true);
+      
+      // Create the TreeNode instance using the factory method
+      const child = TreeNode.create(name, {
+        id,
+        parent: this,
+        typeIds,
+        manualFulfillment,
+        points
       });
       
-      // Step 3: Add reference to parent's children collection
-      console.log(`[TreeNode] Adding child ${childId} to parent ${this.id}`);
-        this.gunRef.get('children').set(childNodeRef);
-      
-      // Step 4: Create the TreeNode instance
-      const child = new TreeNode(name, childId, this, [], manualFulfillment, points);
-      
-      // Step 5: Add to local children map
-      this.children.set(childId, child);
-      
-      // Step 7: Add types by ID
-      for (const typeId of typeIds) {
-        child.addType(typeId);
-      }
+      // Add to local children map
+      this.children.set(id, child);
       
       this.app.updateNeeded = true;
       this.app.pieUpdateNeeded = true;      
@@ -200,9 +284,12 @@ export class TreeNode {
     removeChild(childId: string): TreeNode {
       const child = this.children.get(childId);
       if (child) {        
-        // Remove from type index
-        this.root.typeIndex.forEach(instances => {
-          instances.delete(child);
+        // Remove from type index - updated for ID-based approach
+        child._typesMap.forEach((_, typeId) => {
+          const root = this.root;
+          if (root.typeIndex.has(typeId)) {
+            root.typeIndex.get(typeId)?.delete(childId);
+          }
         });
         
         // Remove from children
@@ -210,17 +297,25 @@ export class TreeNode {
         
         // Remove from Gun by removing the reference
         console.log(`[TreeNode] Removing child ${childId} from node ${this.id}`);
-        
-        // Get reference to child node
-        const childRef = gun.get('nodes').get(childId);
-        
-        // Use Gun's native unset operation
+                
+        // Simply remove the child ID entry from the children collection
         this.gunRef.get('children').get(childId).put(null);
         
         if (child.nodeSubscription && child.nodeSubscription.gunNodeRef) {
           child.unsubscribe();
         }
+        
+        // Remove from cache only if this node has no other references
+        // This is a simple approach - for a more accurate one, we'd need reference counting
+        if (!Array.from(TreeNode.nodeCache.values()).some(node => 
+          node.children.has(childId) || 
+          (node.parent && node.parent.id === childId)
+        )) {
+          console.log(`[TreeNode] Removing ${childId} from cache`);
+          TreeNode.nodeCache.delete(childId);
+        }
       }
+      
       this.app.updateNeeded = true;
       this.app.pieUpdateNeeded = true;
       return this;
@@ -230,11 +325,21 @@ export class TreeNode {
     get types(): Set<TreeNode> {
       return new Set(this._typesMap.values());
     }
+
+    // Getter for types map to allow access from TreeMap
+    get typesMap(): Map<string, TreeNode> {
+        return this._typesMap;
+    }
     
     // Add this node as an instance of the given type
-    addType(typeOrId: TreeNode | string): TreeNode {
+    addType(typeId: string): TreeNode {
+      // Skip invalid type IDs
+      if (!typeId || typeId === '#' || typeof typeId !== 'string') {
+        console.warn(`[TreeNode] Ignoring invalid type ID: ${typeId}`);
+        return this;
+      }
+      
       const root = this.root;
-      const typeId = typeof typeOrId === 'string' ? typeOrId : typeOrId.id;
       
       // If the type is already in our map, nothing to do
       if (this._typesMap.has(typeId)) {
@@ -242,67 +347,56 @@ export class TreeNode {
         return this;
       }
       
-      // First get or load the type node
-      const getTypeNode = async (): Promise<TreeNode | null> => {
-        if (typeof typeOrId === 'string') {
-          return TreeNode.fromId(typeOrId);
-        }
-        return typeOrId;
-      };
-      
-      // Use Gun's native reference system
       console.log(`[TreeNode] Adding type ${typeId} to node ${this.name}`);
       
-      // Get reference to type node
-      const typeNodeRef = gun.get('nodes').get(typeId);
+      // Store the typeId directly in the types collection in Gun
+      this.gunRef.get('types').get(typeId).put(true);
       
-      // Add to types collection using Gun's put operation instead of set - this ensures persistence
-      this.gunRef.get('types').get(typeId).put(typeNodeRef);
-      
-      // Asynchronously update the type index when we have the type node
-      getTypeNode().then(typeNode => {
+      // Update the ID-based type index
+      this.addToTypeIndex(typeId);
+
+      // Load the type node to store in memory
+      TreeNode.fromId(typeId)
+        .then(typeNode => {
         if (typeNode) {
-          // Add to local types map if not already present
+            // Add to local types map
           this._typesMap.set(typeId, typeNode);
-          
-          // Update type index
-          if (!root.typeIndex.has(typeNode)) {
-            root.typeIndex.set(typeNode, new Set());
-          }
-          root.typeIndex.get(typeNode)?.add(this);
+            // Ensure UI updates happen
+            this.app.updateNeeded = true;
+            this.app.pieUpdateNeeded = true;
         } else {
           console.error(`[TreeNode] Failed to get type node for ${typeId}`);
         }
-      }).catch(err => {
-        console.error(`[TreeNode] Error adding type ${typeId} to node ${this.name}:`, err);
+        })
+        .catch(err => {
+          console.error(`[TreeNode] Error loading type ${typeId}:`, err);
       });
-      
-      this.app.updateNeeded = true;
-      this.app.pieUpdateNeeded = true;
       
       return this;
     }
   
-    removeType(typeOrId: TreeNode | string): TreeNode {
+    removeType(typeId: string): TreeNode {
       const root = this.root;
-      const typeId = typeof typeOrId === 'string' ? typeOrId : typeOrId.id;
       
-      // Remove from Gun using native Gun operations
+      // Remove from Gun
       console.log(`[TreeNode] Removing type ${typeId} from node ${this.name}`);
       
-      // Use Gun's direct approach to remove the type reference
+      // Remove the type ID entry from the types collection in Gun
       this.gunRef.get('types').get(typeId).put(null);
       
-      // If we have a TreeNode object, update the type index right away
-      if (typeof typeOrId !== 'string') {
-        const typeNode = typeOrId;
-        if (root.typeIndex.has(typeNode)) {
-          root.typeIndex.get(typeNode)?.delete(this);
-        }
+      // Update the ID-based type index
+      if (root.typeIndex.has(typeId)) {
+        root.typeIndex.get(typeId)?.delete(this.id);
       }
       
       // Remove from local types map
       this._typesMap.delete(typeId);
+      
+      // Remove from cache if no longer referenced
+      if (!this.hasTypeReferences(typeId)) {
+        console.log(`[TreeNode] Removing type ${typeId} from cache as it's no longer referenced`);
+        TreeNode.nodeCache.delete(typeId);
+      }
       
       this.app.updateNeeded = true;
       this.app.pieUpdateNeeded = true;
@@ -456,14 +550,45 @@ export class TreeNode {
     }
 
     // Helper method to get all instances of a given type
-    getInstances(type: TreeNode): Set<TreeNode> {
-      return this.root.typeIndex.get(type) || new Set();
+    getInstances(typeId: string): Set<TreeNode> {
+      // Get the instance IDs from the type index
+      const instanceIds = this.root.typeIndex.get(typeId) || new Set<string>();
+      
+      // Convert IDs to TreeNode objects
+      const instances = new Set<TreeNode>();
+      instanceIds.forEach(id => {
+        // Try to get from node cache first for efficiency
+        const cachedNode = TreeNode.nodeCache.get(id);
+        if (cachedNode) {
+          instances.add(cachedNode);
+        } else {
+          // If not in cache, look up from children maps
+          const node = this.root.children.get(id) || this.children.get(id);
+          if (node) {
+            instances.add(node);
+          }
+        }
+      });
+      
+      return instances;
     }
 
-    shareOfGeneralFulfillment(node: TreeNode): number {
-      const instances = this.getInstances(node);
+    shareOfGeneralFulfillment(typeId: string): number {
+      const instances = this.getInstances(typeId);
+      if (instances.size === 0) return 0;
+      
       return Array.from(instances).reduce((sum, instance) => {
-        const contributorTypesCount = Array.from(instance._typesMap.values()).filter(type => type.isContributor).length;
+        // Count contributor types for this instance
+        const contributorTypes = Array.from(instance._typesMap.values())
+          .filter(type => type.isContributor);
+
+        const contributorTypesCount = contributorTypes.length;
+
+        if(contributorTypesCount > 0) {
+          console.log(`[TreeNode] Contributor types for ${instance.name}:`, contributorTypes);
+        } else {
+            console.log(`[TreeNode] Contributor types for ${instance.name}:`, contributorTypesCount)
+        }
 
         const fulfillmentWeight = instance.fulfilled * instance.weight;
 
@@ -476,21 +601,42 @@ export class TreeNode {
       }, 0);
     }
 
-    mutualFulfillment(node: TreeNode): number {
-      const recognitionFromHere = this.shareOfGeneralFulfillment(node);
-      const recognitionFromThere = node.shareOfGeneralFulfillment(this);
+    mutualFulfillment(typeId: string): number {
+      const recognitionFromHere = this.shareOfGeneralFulfillment(typeId);
+      
+      // First try to get the type node directly from cache
+      let typeNode = TreeNode.nodeCache.get(typeId);
+      
+      // If not found, find it through the type index
+      if (!typeNode) {
+        // Look through all roots to find the type
+        for (const node of TreeNode.nodeCache.values()) {
+          if (node.isContributor && node.typeIndex.has(typeId)) {
+            // The type exists in this root's index, find it among this root's children
+            typeNode = Array.from(node.children.values())
+              .find(child => child.id === typeId);
+            if (typeNode) break;
+          }
+        }
+      }
+      
+      if (!typeNode) {
+        return 0;
+      }
+      
+      const recognitionFromThere = typeNode.shareOfGeneralFulfillment(this.id);
       return Math.min(recognitionFromHere, recognitionFromThere);
     }
 
-    get mutualFulfillmentDistribution(): Map<TreeNode, number> {
-      const types = Array.from(this.root.typeIndex.keys()).filter(
-        type => this.getInstances(type).size > 0
+    get mutualFulfillmentDistribution(): Map<string, number> {
+      const types = this.rootTypes.filter(
+        typeId => this.getInstances(typeId).size > 0
       );
 
       const rawDistribution = types
-        .map(type => ({
-          type,
-          value: this.mutualFulfillment(type),
+        .map(typeId => ({
+          typeId,
+          value: this.mutualFulfillment(typeId),
         }))
         .filter(entry => entry.value > 0);
 
@@ -498,7 +644,7 @@ export class TreeNode {
 
       return new Map(
         rawDistribution.map(entry => [
-          entry.type,
+          entry.typeId,
           total > 0 ? entry.value / total : 0,
         ])
       );
@@ -527,9 +673,8 @@ export class TreeNode {
       if (this._parent) {
         console.log(`[TreeNode] Saving parent reference: ${this._parent.id}`);
         
-        // Get reference to parent node and link directly
-        const parentRef = gun.get('nodes').get(this._parent.id);
-        this.gunRef.get('parent').put(parentRef);
+        // Store the parent ID directly
+        this.gunRef.get('parent').put(this._parent.id);
       }
       
       // Save children references using Gun's set operation
@@ -539,9 +684,8 @@ export class TreeNode {
         Array.from(this.children.values()).forEach(child => {
           console.log(`[TreeNode] Saving child reference: ${child.id}`);
           
-          // Get reference to child node and add to children collection
-          const childRef = gun.get('nodes').get(child.id);
-          this.gunRef.get('children').set(childRef);
+          // Store the child ID directly in the children collection
+          this.gunRef.get('children').get(child.id).put(true);
         });
       }
       
@@ -552,9 +696,8 @@ export class TreeNode {
         Array.from(this._typesMap.entries()).forEach(([typeId, type]) => {
           console.log(`[TreeNode] Saving type reference: ${typeId}`);
           
-          // Get reference to type node and add to types collection with its ID as key
-          const typeRef = gun.get('nodes').get(typeId);
-          this.gunRef.get('types').get(typeId).put(typeRef);
+          // Store the type ID directly
+          this.gunRef.get('types').get(typeId).put(true);
         });
       }
       
@@ -570,20 +713,57 @@ export class TreeNode {
       if (this.nodeSubscription.gunNodeRef) {
         this.nodeSubscription.gunNodeRef.on((data) => {
           if (data) {
-            console.log(`[TreeNode] Received data update for node ${this.id}:`, data);
+            let dataChanged = false;
             
-            // Handle name updates properly - only update if name is defined
-            if (data.name !== undefined && this._name === '') {
+            // Handle name updates properly - update regardless of current name
+            if (data.name !== undefined && data.name !== this._name) {
               console.log(`[TreeNode] Updating name from "${this._name}" to "${data.name}"`);
               this._name = data.name;
+              dataChanged = true;
             }
             
-            if (typeof data.points === 'number') {
+            if (typeof data.points === 'number' && this._points !== data.points) {
+              console.log(`[TreeNode] Updating points from ${this._points} to ${data.points}`);
               this._points = data.points;
+              dataChanged = true;
             }
             
-            if (data.manualFulfillment !== undefined) {
+            if (data.manualFulfillment !== undefined && this._manualFulfillment !== data.manualFulfillment) {
+              console.log(`[TreeNode] Updating manual fulfillment from ${this._manualFulfillment} to ${data.manualFulfillment}`);
               this._manualFulfillment = data.manualFulfillment;
+              dataChanged = true;
+            }
+            
+            // Handle parent ID changes
+            if (data.parent !== undefined) {
+              // If parent is a string ID and different from current parent
+              if (typeof data.parent === 'string' && (!this._parent || this._parent.id !== data.parent)) {
+                console.log(`[TreeNode] Parent ID changed to ${data.parent}, loading parent node`);
+                TreeNode.fromId(data.parent)
+                  .then(parentNode => {
+                    if (parentNode) {
+                      // Use the setter to ensure proper bidirectional relationship
+                      this.parent = parentNode;
+                      this.app.updateNeeded = true;
+                      this.app.pieUpdateNeeded = true;
+                    }
+                  })
+                  .catch(err => {
+                    console.error(`[TreeNode] Error loading parent ${data.parent}:`, err);
+                  });
+              }
+              // If parent is null, clear parent
+              else if (data.parent === null && this._parent !== null) {
+                console.log(`[TreeNode] Parent removed for node ${this.id}`);
+                this.parent = null;
+                dataChanged = true;
+              }
+            }
+            
+            // Update UI if any data changed
+            if (dataChanged) {
+              this.app.updateNeeded = true;
+              this.app.pieUpdateNeeded = true;
             }
           }
         });
@@ -596,28 +776,55 @@ export class TreeNode {
         this.childrenSubscription.gunNodeRef.map().on((data, key) => {
           if (key === '_') return;
           
-          // When handling references in Gun, we need to extract the soul (ID)
-          // from the reference's metadata
-          const childId = data && data._?.['#'] || key;
+          const childId = key;
           
-          console.log(`[TreeNode] Detected child with key ${key} and ID ${childId} for node ${this.id}`);
+          // If the value is null/undefined or false, it means the child has been removed
+          if (!data) {
+            if (this.children.has(childId)) {
+              const child = this.children.get(childId);
+              if (child) {
+                // Clean up subscription
+                child.unsubscribe();
+                
+                // Remove from type index - update for ID-based approach
+                // For each type this child has, remove its ID from the type's instances
+                child._typesMap.forEach((_, typeId) => {
+                  const root = this.root;
+                  if (root.typeIndex.has(typeId)) {
+                    root.typeIndex.get(typeId)?.delete(childId);
+                  }
+                });
+              }
+              // Remove from local children map
+              this.children.delete(childId);
+              console.log(`[TreeNode] Child ${childId} has been removed`);
+            }
+            return;
+          }
           
           // Skip if we already have this child
           if (this.children.has(childId)) {
-            console.log(`[TreeNode] Child ${childId} already loaded, skipping`);
             return;
           }
           
           // New child detected, load it
           console.log(`[TreeNode] Loading new child with ID ${childId}`);
-          TreeNode.fromId(childId).then(child => {
+          TreeNode.fromId(childId)
+            .then(child => {
             if (child) {
-              console.log(`[TreeNode] Child ${childId} (${child.name}) loaded successfully for ${this.id}`);
-              child._parent = this;
+                console.log(`[TreeNode] Child ${childId} loaded successfully for ${this.id}`);
+              child.parent = this;
               this.children.set(childId, child);
+                
+                // Ensure UI updates happen
+                this.app.updateNeeded = true;
+                this.app.pieUpdateNeeded = true;
             } else {
-              console.warn(`[TreeNode] Failed to load child with ID ${childId}`);
+                console.error(`[TreeNode] Failed to load child ${childId}`);
             }
+            })
+            .catch(err => {
+              console.error(`[TreeNode] Error loading child ${childId}:`, err);
           });
         });
       }
@@ -629,41 +836,57 @@ export class TreeNode {
         this.typesSubscription.gunNodeRef.map().on((data, key) => {
           if (key === '_') return;
           
-          // Extract the typeId - might be in the reference or as the key
-          let typeId = key;
-          if (data && data._ && data._['#']) {
-            typeId = data._['#'];
-          }
+          const typeId = key;
           
-          console.log(`[TreeNode] Detected type with key ${key} and ID ${typeId} for node ${this.id}`);
-          
-          // Check if we already have this type
-          if (this._typesMap.has(typeId)) {
-            console.log(`[TreeNode] Type ${typeId} already loaded, skipping`);
+          // If the value is null/undefined or false, it means the type has been removed
+          if (!data) {
+            if (this._typesMap.has(typeId)) {
+              // Remove from type index
+              const root = this.root;
+              if (root.typeIndex.has(typeId)) {
+                root.typeIndex.get(typeId)?.delete(this.id);
+              }
+              
+              // Remove from local types map
+              this._typesMap.delete(typeId);
+              console.log(`[TreeNode] Type ${typeId} has been removed`);
+              
+              // Remove from cache if no longer referenced
+              if (!this.hasTypeReferences(typeId)) {
+                console.log(`[TreeNode] Removing type ${typeId} from cache as it's no longer referenced`);
+                TreeNode.nodeCache.delete(typeId);
+              }
+              
+              this.app.updateNeeded = true;
+              this.app.pieUpdateNeeded = true;
+            }
             return;
           }
           
+          // Check if we already have this type
+          if (this._typesMap.has(typeId)) {
+            return;
+          }
+          
+          // Update type index through helper method for consistency
+          this.addToTypeIndex(typeId);
+          
           // New type detected, load it
           console.log(`[TreeNode] Loading new type with ID ${typeId}`);
-          TreeNode.fromId(typeId).then(type => {
+          TreeNode.fromId(typeId)
+            .then(type => {
             if (type) {
               console.log(`[TreeNode] Type ${typeId} (${type.name}) loaded successfully for ${this.id}`);
               this._typesMap.set(typeId, type);
-              
-              // Update type index
-              const root = this.root;
-              if (!root.typeIndex.has(type)) {
-                root.typeIndex.set(type, new Set());
-              }
-              root.typeIndex.get(type)?.add(this);
               
               // Update UI to reflect changes
               this.app.updateNeeded = true;
               this.app.pieUpdateNeeded = true;
             } else {
-              console.warn(`[TreeNode] Failed to load type with ID ${typeId}`);
+                console.error(`[TreeNode] Failed to load type ${typeId}`);
             }
-          }).catch(err => {
+            })
+            .catch(err => {
             console.error(`[TreeNode] Error loading type ${typeId}:`, err);
           });
         });
@@ -683,161 +906,191 @@ export class TreeNode {
       if (this.typesSubscription && this.typesSubscription.gunNodeRef) {
         this.typesSubscription.gunNodeRef.off();
       }
-    }
-    
-    // Static method to create a TreeNode from Gun ID
-    static async fromId(id: string): Promise<TreeNode | null> {
-      return Promise.race([
-        new Promise<TreeNode | null>((resolve) => {
-          console.log(`[TreeNode] Attempting to load node with ID: ${id}`);
-          
-          // First try to load from the users path
-          const userRef = readFromGunPath(['users', id]);
-          userRef.gunNodeRef.once((userData, userKey) => {
-            console.log('INTERESTING INFO', userData, userKey)
-            if (userData && Object.keys(userData).some(k => k !== '_')) {
-              console.log(`[TreeNode.fromId] Found node in users path: ${id}`);
-              
-              // Create the node
-              const node = new TreeNode(
-                userData.name || 'Unnamed',
-                id,
-                null,
-                []
-              );
-              
-              // Set initial properties
-              if (typeof userData.points === 'number') {
-                node._points = userData.points;
-              }
-              if (userData.manualFulfillment !== undefined) {
-                node._manualFulfillment = userData.manualFulfillment;
-              }
-              
-              resolve(node);
-              return;
-            }
-            
-            // If not found in users, try in nodes
-            console.log(`[TreeNode.fromId] Node not found in users path, trying nodes: ${id}`);
-            const nodeRef = readFromGunPath(['nodes', id]);
-            nodeRef.gunNodeRef.once((data, key) => {
-              if (!data) {
-                console.log(`[TreeNode] Node ${id} not found in Gun (data is falsy)`);
-                resolve(null);
-                return;
-              }
-              
-              // Verify it has actual properties beyond Gun metadata
-              const hasValidData = Object.keys(data).some(k => k !== '_');
-              if (!hasValidData) {
-                console.log(`[TreeNode] Node ${id} exists but has no data properties`);
-                resolve(null);
-                return;
-              }
-              
-              console.log(`[TreeNode.fromId] Raw data from Gun for node ${id}:`, data);
-              
-              // Clean up data handling - check for name explicitly 
-              const name = data.name;
-              console.log(`[TreeNode.fromId] Node name from Gun: "${name}" (${typeof name})`);
-              
-              if (name === undefined) {
-                console.warn(`[TreeNode.fromId] Name is undefined for node ${id}, will use 'Unnamed'`);
-              }
-              
-              const node = new TreeNode(
-                name || 'Unnamed',
-                id,
-                null, // Parent will be set by caller
-                [] // Types will be loaded via subscription
-              );
-              
-              console.log(`[TreeNode.fromId] Created node with name: "${node.name}" (ID: ${node.id})`);
-              
-              // Set initial properties
-              if (typeof data.points === 'number') {
-                node._points = data.points;
-              }
-              if (data.manualFulfillment !== undefined) {
-                node._manualFulfillment = data.manualFulfillment;
-              }
-              
-              // Load types immediately to populate typeIndex
-              const typesRef = readFromGunPath(['nodes', id, 'types']);
-              typesRef.gunNodeRef.once((typesData) => {
-                if (typesData && typeof typesData === 'object') {
-                  // Filter out Gun metadata
-                  const typeIds = Object.keys(typesData).filter(k => k !== '_');
-                  
-                  if (typeIds.length > 0) {
-                    console.log(`[TreeNode] Node ${id} has types: ${typeIds.join(', ')}`);
-                    
-                    // Handle each type key separately to get the referenced ID
-                    Promise.all(typeIds.map(typeKey => {
-                      return new Promise<string | null>((resolve) => {
-                        typesRef.gunNodeRef.get(typeKey).once((typeRefData) => {
-                          let typeId = typeKey;
-                          if (typeRefData && typeRefData._ && typeRefData._['#']) {
-                            typeId = typeRefData._['#'];
-                          }
-                          resolve(typeId);
-                        });
-                      });
-                    }))
-                    .then(extractedTypeIds => {
-                      // Filter out nulls and duplicates
-                      const validTypeIds = [...new Set(extractedTypeIds.filter(id => id !== null) as string[])];
-                      
-                      // Load each type node
-                      return Promise.all(validTypeIds.map(typeId => TreeNode.fromId(typeId)));
-                    })
-                    .then(loadedTypes => {
-                      // Filter out nulls
-                      const validTypes = loadedTypes.filter(t => t !== null) as TreeNode[];
-                      
-                      // For each valid type, add this node as an instance
-                      validTypes.forEach(type => {
-                        if (type) {
-                          console.log(`[TreeNode] Adding type ${type.id} (${type.name}) to node ${node.name}`);
-                          // Store in _typesMap by ID to prevent duplicates
-                          node._typesMap.set(type.id, type);
-                          
-                          // Update typeIndex at root level
-                          const root = node.root;
-                          if (!root.typeIndex.has(type)) {
-                            root.typeIndex.set(type, new Set());
-                          }
-                          root.typeIndex.get(type)?.add(node);
-                        }
-                      });
-                      
-                      // Update UI 
-                      node.app.updateNeeded = true;
-                      node.app.pieUpdateNeeded = true;
-                    })
-                    .catch(err => {
-                      console.error(`[TreeNode] Error loading types for node ${id}:`, err);
-                    });
-                  }
-                }
-              });
-              
-              resolve(node);
-            });
-          });
-        }),
-        // Add a timeout to prevent hanging
-        new Promise<null>(resolve => setTimeout(() => {
-          console.log(`[TreeNode] Timeout loading node ${id}, assuming it doesn't exist`);
-          resolve(null);
-        }, 3000))
-      ]);
+      
+      // Clean up children subscriptions too
+      this.children.forEach(child => {
+        child.unsubscribe();
+      });
     }
 
-    // Getter for types map to allow access from TreeMap
-    get typesMap(): Map<string, TreeNode> {
-        return this._typesMap;
+    static async fromId(id: string): Promise<TreeNode | null> {
+      // Skip invalid IDs
+      if (!id || id === '#' || typeof id !== 'string') {
+        console.warn(`[TreeNode] Invalid node ID: ${id}`);
+        return null;
+      }
+      
+      // Check cache first
+      if (TreeNode.nodeCache.has(id)) {
+        return TreeNode.nodeCache.get(id)!;
+      }
+      
+      return new Promise<TreeNode | null>((resolve, reject) => {
+        try {
+          // If this node is already being loaded in this call chain, resolve null to break cycles
+          if (TreeNode.loadingNodes.has(id)) {
+            console.warn(`[TreeNode] Circular dependency detected while loading ${id}`);
+                resolve(null);
+                return;
+              }
+              
+          // Mark this node as being loaded
+          TreeNode.loadingNodes.add(id);
+          
+          gun.get('nodes').get(id).once((data) => {
+            if (!data || Object.keys(data).filter(k => k !== '_').length === 0) {
+              TreeNode.loadingNodes.delete(id);
+                resolve(null);
+                return;
+              }
+              
+            // Extract type IDs - should be object with keys as type IDs in new paradigm
+            const typeIds: string[] = [];
+            if (data.types && typeof data.types === 'object') {
+              Object.keys(data.types).forEach(key => {
+                if (key !== '_') {
+                  typeIds.push(key);
+                }
+              });
+            }
+            
+            // Create the node with factory method
+            const node = TreeNode.create(
+              data.name || 'Unnamed', 
+              {
+                id,
+                typeIds,
+                manualFulfillment: data.manualFulfillment || 0,
+                points: data.points || 0
+              }
+            );
+            
+            // If we have a parent ID, trigger loading but don't wait for it
+            const parentId = typeof data.parent === 'string' ? data.parent : null;
+            if (parentId) {
+              TreeNode.fromId(parentId)
+                .then(parent => {
+                  if (parent) {
+                    node.parent = parent;
+                  }
+                })
+                .catch(err => {
+                  console.error(`[TreeNode] Error loading parent ${parentId}:`, err);
+                });
+            }
+            
+            // Done loading this node
+            TreeNode.loadingNodes.delete(id);
+            
+            // Resolve immediately with the node
+            resolve(node);
+          });
+        } catch (err) {
+          TreeNode.loadingNodes.delete(id);
+          console.error(`[TreeNode] Error loading node ${id}:`, err);
+          reject(err);
+        }
+      });
+    }
+
+    // Add to type index
+    addToTypeIndex(typeId: string): void {
+      // Get the current root to ensure we're using the most up-to-date reference
+      const root = this.root;
+      if (!root.typeIndex.has(typeId)) {
+        root.typeIndex.set(typeId, new Set<string>());
+      }
+      root.typeIndex.get(typeId)?.add(this.id);
+    }
+
+    // Public factory method to create or get TreeNode instances
+    static create(
+      name: string,
+      options: {
+        id?: string,
+        parent?: TreeNode | null,
+        typeIds?: string[],
+        manualFulfillment?: number,
+        points?: number
+      } = {}
+    ): TreeNode {
+      const nodeId = options.id || Math.random().toString(36).substring(2, 15);
+      
+      // If this node already exists in the cache, update parent if needed and return
+      if (TreeNode.nodeCache.has(nodeId)) {
+        const cachedNode = TreeNode.nodeCache.get(nodeId)!;
+        
+        // If a parent is specified and different from current, update it
+        if (options.parent !== undefined && cachedNode.parent !== options.parent) {
+          cachedNode.parent = options.parent;
+        }
+        
+        return cachedNode;
+      }
+      
+      // Create a new instance
+      return new TreeNode(name, options);
+    }
+
+    // Helper to check if a type has references in the system
+    private hasTypeReferences(typeId: string): boolean {
+      // First check if any node has this as a type in their _typesMap
+      const hasDirectReference = Array.from(TreeNode.nodeCache.values()).some(node => 
+        node._typesMap.has(typeId)
+      );
+      
+      if (hasDirectReference) return true;
+      
+      // Then check if this type ID exists in any root's typeIndex with non-empty instances
+      return Array.from(TreeNode.nodeCache.values())
+        .filter(node => node.isContributor) // Only check root nodes
+        .some(root => {
+          const instances = root.typeIndex.get(typeId);
+          return instances && instances.size > 0;
+        });
+    }
+
+    // Static method to clean up the cache by removing orphaned nodes
+    private static cleanupCache(): void {
+      // Get all node IDs that are referenced as children or types
+      const referencedIds = new Set<string>();
+      
+      // Helper to collect all referenced node IDs
+      const collectReferencedIds = () => {
+        TreeNode.nodeCache.forEach(node => {
+          // Add children references
+          node.children.forEach((_, childId) => {
+            referencedIds.add(childId);
+          });
+          
+          // Add type references
+          node._typesMap.forEach((_, typeId) => {
+            referencedIds.add(typeId);
+          });
+          
+          // Add parent reference if exists
+          if (node.parent) {
+            referencedIds.add(node.parent.id);
+          }
+        });
+      };
+      
+      // Collect all referenced IDs
+      collectReferencedIds();
+      
+      // Remove nodes that aren't referenced and aren't root nodes
+      const orphanedIds: string[] = [];
+      TreeNode.nodeCache.forEach((node, id) => {
+        if (!referencedIds.has(id) && node.parent !== null) {
+          orphanedIds.push(id);
+        }
+      });
+      
+      // Remove the orphaned nodes from the cache
+      orphanedIds.forEach(id => {
+        console.log(`[TreeNode] Cleaning up orphaned node ${id} from cache`);
+        TreeNode.nodeCache.delete(id);
+      });
     }
 }
   
