@@ -112,7 +112,6 @@ export class App {
                 // Update lastSeen in both paths
                 this.gunRef.get('lastSeen').put(timestamp);
                 gun.get('users').get(this.rootId).get('lastSeen').put(timestamp);
-                // Always keep name up to date in users path
             }, 60000); // Update every minute
 
             console.log('[App] Root node setup complete, initializing UI');
@@ -193,8 +192,14 @@ export class App {
                 }
                 if (this._pieUpdateNeeded) {
                     console.log('[App] Pie chart update needed, refreshing');
-                    this.updatePieChart();
-                    this._pieUpdateNeeded = false;
+                    // Use an async IIFE to handle the async updatePieChart
+                    (async () => {
+                        await this.updatePieChart();
+                        this._pieUpdateNeeded = false;
+                    })().catch(err => {
+                        console.error('[App] Error updating pie chart:', err);
+                        this._pieUpdateNeeded = false; // Reset the flag even on error
+                    });
                 }
             }, 1000);
             console.log('[App] Update interval set up');
@@ -277,7 +282,7 @@ export class App {
                 }
             }
             if (this.pieUpdateNeeded) {
-                this.updatePieChart();
+                await this.updatePieChart();
                 this.pieUpdateNeeded = false;
             }
             
@@ -306,7 +311,7 @@ export class App {
         }
     }
 
-    updatePieChart() {
+    async updatePieChart() {
         console.log('updatePieChart started');
         const pieContainer = document.getElementById('pie-container');
         if (!pieContainer || !this.rootNode) {
@@ -320,13 +325,19 @@ export class App {
 
         pieContainer.innerHTML = '';
         
-        const newPieChart = createPieChart(this.rootNode);
-        if (!newPieChart) {
-            console.error('Failed to create pie chart');
-            return;
-        }
+        try {
+            const newPieChart = await createPieChart(this.rootNode);
+            if (!newPieChart) {
+                console.error('Failed to create pie chart');
+                return;
+            }
 
-        pieContainer.appendChild(newPieChart);
+            pieContainer.appendChild(newPieChart);
+        } catch (error) {
+            console.error('Error creating pie chart:', error);
+            // Add a simple message to the container
+            pieContainer.innerHTML = '<div style="text-align:center;padding:20px;">Error loading pie chart</div>';
+        }
     }
 
     // Add a method to connect to another user's tree

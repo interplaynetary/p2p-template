@@ -1,4 +1,4 @@
-import { TreeNode } from './models/TreeNode';
+import { TreeNode } from './models/mid/TreeNode';
 
 // Export the initialization function
 export async function initializeExampleData(root: TreeNode) {
@@ -68,11 +68,11 @@ export async function initializeExampleData(root: TreeNode) {
 
     const development = await freeAssociation.addChild("Development", 10)
     const communications = await freeAssociation.addChild("Communications", 10)
-
+/*
     // Now using IDs instead of objects for addType
     communications.addType(money.id);
     communications.addType(development.id);
-
+*/
     /*
     // Underground Networks contributions
     const secretStairs = await infrastructure.addChild("Secret stairways", 10, [alice.id]);

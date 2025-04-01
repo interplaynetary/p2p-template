@@ -16,22 +16,30 @@ export function createPieChart(data: TreeNode) {
 
     // Get mutualFulfillmentDistribution from root node
     console.log('Creating pie chart for data:', data);
+    
+    // Use the synchronous method to get the distribution
     const mutualFulfillmentDistribution = data.mutualFulfillmentDistribution;
     console.log('mutualFulfillmentDistribution for pie:', mutualFulfillmentDistribution);
 
     // Create an array of [nodeId, value] pairs for the pie chart
     const pieData: [string, number][] = Array.from(mutualFulfillmentDistribution.entries());
     
+    // If there's no data, create a placeholder pie chart
+    if (pieData.length === 0) {
+        console.log('No mutual fulfillment data found, creating placeholder');
+        return createPlaceholderPieChart(width, height, radius);
+    }
+    
     // Create a map of node IDs to TreeNode objects for later reference
     const nodeMap = new Map<string, TreeNode>();
     
-    // Load node objects for each ID
-    pieData.forEach(async ([nodeId]) => {
-        const node = await TreeNode.fromId(nodeId);
+    // Get node objects for each ID directly from nodeCache
+    for (const [nodeId] of pieData) {
+        const node = TreeNode.getNodeById(nodeId);
         if (node) {
             nodeMap.set(nodeId, node);
         }
-    });
+    }
 
     // Create pie layout
     const pie = d3.pie<[string, number]>()
@@ -126,5 +134,56 @@ export function createPieChart(data: TreeNode) {
         .attr("font-weight", "bold")
         .text("Fulfillment");
 
+    return svg.node();
+}
+
+// Helper function to create placeholder pie chart when no data is available
+function createPlaceholderPieChart(width: number, height: number, radius: number) {
+    // Create SVG
+    const svg = d3.create("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [-width/2, -height/2, width, height])
+        .style("font", "12px sans-serif");
+    
+    // Add gray empty circle
+    svg.append("circle")
+        .attr("r", radius * 0.8)
+        .attr("fill", "#f0f0f0")
+        .attr("stroke", "#e0e0e0")
+        .attr("stroke-width", 2);
+    
+    // Add donut hole
+    svg.append("circle")
+        .attr("r", radius * 0.4)
+        .attr("fill", "white");
+    
+    // Add center text
+    const centerGroup = svg.append("g")
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "middle");
+
+    // Calculate text size based on inner radius
+    const fontSize = radius * 0.12;
+    
+    centerGroup.append("text")
+        .attr("dy", -fontSize/1.6)
+        .attr("font-size", fontSize)
+        .attr("font-weight", "bold")
+        .text("Mutual");
+
+    centerGroup.append("text")
+        .attr("dy", fontSize/1.6)
+        .attr("font-size", fontSize)
+        .attr("font-weight", "bold")
+        .text("Fulfillment");
+    
+    // Add message about no data
+    svg.append("text")
+        .attr("y", radius * 0.6)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("fill", "#999")
+    
     return svg.node();
 }

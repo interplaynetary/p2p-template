@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
 import { TreeNode } from '../models/TreeNode';
+import { usersMap, getUserName } from '../utils/names';
 import { gun } from '../models/Gun';
 
 // TODO:
@@ -10,6 +11,9 @@ import { gun } from '../models/Gun';
 // we can no longer navigate to a type
 // when adding children we no longer automatically zoom-in (commons has working functionality for this)
 
+
+// lets clean up the App.ts especially everything related to adding peers
+// lets extract the utility functions
 
 // Create a type for the treemap return value
 type TreemapInstance = {
@@ -285,7 +289,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         if (rectWidth < 60 || rectHeight < 60) return;
         
         // Get type array safely using public getter
-        const typesArray = d.data.typesMap ? Array.from(d.data.typesMap.values()) : [];
+        const typesArray = d.data.types ? Array.from(d.data.types) : [];
         
         // Create a tag wrapper to hold all pills in a flex layout
         const tagWrapper = container.append("foreignObject")
@@ -321,14 +325,14 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             .text("+");
         
         // Add existing type pills
-        typesArray.forEach((type: TreeNode) => {
+        typesArray.forEach((type: string) => {
             const tagPill = tagWrapper.append("div")
                 .attr("class", "tag-pill")
-                .attr("data-type-id", type.id)
+                .attr("data-type-id", type)
                 .style("display", "flex")
                 .style("align-items", "center")
                 .style("border-radius", "10px")
-                .style("background", getColorForName(type.name))
+                .style("background", getColorForName(getUserName(type)))
                 .style("padding", "2px 8px")
                 .style("margin", "2px")
                 .style("height", "20px")
@@ -342,8 +346,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .style("text-shadow", "0 1px 1px rgba(0,0,0,0.3)")
                 .text(() => {
                     // Truncate text if too long
-                    const name = type.name;
-                    return name.length > 10 ? name.substring(0, 8) + "..." : name;
+                    const userName = getUserName(type);
+                    return userName.length > 10 ? userName.substring(0, 8) + "..." : userName;
                 });
                 
             // X button
@@ -358,7 +362,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .text("×")
                 .on("click", (event) => {
                     event.stopPropagation();
-                    console.log('Removing type:', type.name, 'from node:', d.data.name);
+                    console.log('Removing type:', getUserName(type), 'from node:', d.data.name);
                     
                     // Remove the type from the node
                     d.data.removeType(type);
@@ -376,11 +380,15 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 // Don't handle if clicking on X button
                 if (event.target.classList.contains("remove-tag")) return;
                 
-                console.log('Tag clicked, navigating to type:', type.name);
+                console.log('Tag clicked, navigating to type:', getUserName(type));
                 event.stopPropagation();
                 
+                // Get the type node from the hierarchy
+                const typeNode = hierarchy.descendants().find(d => d.data.id === type);
+                if (!typeNode) return;
+                
                 // Update current view
-                currentView = type;
+                currentView = typeNode;
                 
                 // Clear existing content and recreate group
                 group.selectAll("*").remove();
@@ -398,7 +406,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             });
             
             // Add tooltip
-            tagPill.attr("title", `${type.name}: Click to view tree, click × to remove`);
+            tagPill.attr("title", `${getUserName(type)}: Click to view tree, click × to remove`);
         });
         
         // Create search dropdown for add tag button
@@ -493,35 +501,55 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 let foundUsers = false;
                 let userCount = 0;
                 
-                // Get users from Gun
-                const gunQuery = gun.get('users').map().on(async (userData, userId) => {
-                    console.log('[TreeMap] Found user:', userData, userId);
-                    const user = await TreeNode.fromId(userId).then(user => {
-                        console.log('[TreeMap] Recreated user:', user);
-                        console.log('[TreeMap] Recreated Username:', user.name);
-                        return user;
-                    });
-                    if (!user || userId === d.data.app.rootId) return;
+                // First check already cached users
+                for (const [userId, userName] of usersMap.entries()) {
+                    // Skip if it's the root node or already a type
+                    if (userId === d.data.app.rootId || (d.data.types && d.data.types.has(userId))) {
+                        continue;
+                    }
                     
-                    // Get user name from the users path first, then fall back to userId
-                    // This ensures we use the stored name when available
-                    const userName = user.name;
-                    
-                    // Filter by name if search text exists
+                    // Apply filter if needed
                     if (filterText && !userName.toLowerCase().includes(filterText.toLowerCase())) {
+                        continue;
+                    }
+                    
+                    // Add to the display list
+                    users.push({ id: userId, name: userName });
+                    userCount++;
+                    foundUsers = true;
+                }
+                
+                // Then get any additional users from Gun that aren't already cached
+                const gunQuery = gun.get('users').map().on((userData, userId) => {
+                    // Skip if already processed from cache
+                    if (usersMap.has(userId) || !userData || !userId || userId === d.data.app.rootId) {
                         return;
                     }
                     
                     // Check if this user is already a type on the node
-                    const isAlreadyType = d.data.typesMap && d.data.typesMap.has(userId);
-                    if (isAlreadyType) return;
+                    if (d.data.types && d.data.types.has(userId)) {
+                        return;
+                    }
+                    
+                    // Get user name using our global getUserName function
+                    // This will add the user to usersMap for future use
+                    const userName = getUserName(userId);
+                    
+                    // If we got a fallback ID, trigger a longer lookup
+                    if (userName === userId) {
+                        // This will eventually update usersMap when the gun.once callback fires
+                        return;
+                    }
+                    
+                    // Apply filter if needed
+                    if (filterText && !userName.toLowerCase().includes(filterText.toLowerCase())) {
+                        return;
+                    }
                     
                     // Add to users collection if not already there
                     if (!users.some(u => u.id === userId)) {
-                        users.push({
-                            id: userId,  // This is the node ID we'll use to add as a type
-                            name: userName
-                        });
+                        const userInfo = { id: userId, name: userName };
+                        users.push(userInfo);
                         userCount++;
                         foundUsers = true;
                         
@@ -529,6 +557,11 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                         updateUsersList();
                     }
                 });
+                
+                // If we already have users from cache, update immediately
+                if (users.length > 0) {
+                    updateUsersList();
+                }
                 
                 // Add subscription to cleanup list
                 gunSubscriptions.push(gunQuery);

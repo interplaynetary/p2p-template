@@ -1,30 +1,29 @@
-import { App } from '../App';
-import { readFromGunPath } from './FuncGun';
-import { gun } from './Gun';
+import { App } from '../../App';
+import { readFromGunPath } from '../FuncGun';
+import { gun } from '../Gun';
 
 // Are our nodes saving to the gun-space or the user-space
 // Late: From public to user-spaces (so that overwriting is not possible)
 
-// Create a tree for all those we recognize and subscribe to their changes so that we can calculate mutual-recognition
-
-// So we know we need to mantain in our own cache, the trees of:
-// - All nodes we recognize
-// THAT IS IT.
+// Create a tree for all those we recognize and subscribe to their changes so that we can calculate mutual-recognition.
 
 // couldnt we pass children into the TreeNode constructor? As well as the addChild constructor?
-// Now we need to change our isContributor logic to be more Gun Based
+
+// Let's rethink our approach:
+// In doing our calculations we don't actually need any of the type nodes. We only need to look like where do the ID's appear in our tree and do the calculations based on that locally. Store those calculations, persist them into GAN and then subscribe to where we appear in the recognition of others and use that for our mutual recognition calculation. 
+
 
 export class TreeNode {
     id: string;
-    name: string = '';
+    private _name: string = '';
     private _points: number = 0;
     private gunRef: any;
     private _parent: TreeNode | null;
     children: Map<string, TreeNode> = new Map();
     private _manualFulfillment: number | null = null;
-    private _sharesOfOthersRecognition: {[key: string]: number} = {};
-    // Convert typesMap to a Set of strings instead of Map<string, TreeNode>
-    private _types: Set<string> = new Set();
+    
+    // Store types in a Map with ID as key to prevent duplicates
+    private _typesMap: Map<string, TreeNode> = new Map();
     
     // NEW: Use ID-based typeIndex instead of TreeNode-based
     // Previously: typeIndex: Map<TreeNode, Set<TreeNode>>;
@@ -36,8 +35,6 @@ export class TreeNode {
     private nodeSubscription: any;
     private childrenSubscription: any;
     private typesSubscription: any;
-    // Add subscription for shares of general fulfillment from other nodes
-    private recognitionSubscriptions: Map<string, any> = new Map();
     
     // Static reference cache to avoid duplicating Gun references
     private static gunRefCache: Map<string, any> = new Map();
@@ -46,10 +43,9 @@ export class TreeNode {
     // Track nodes being loaded to prevent circular dependencies
     private static loadingNodes: Set<string> = new Set<string>();
     
-    // Helper method to access node cache from outside the class
-    static getNodeById(id: string): TreeNode | undefined {
-        return this.nodeCache.get(id);
-    }
+    // Add this property to the TreeNode class
+    private _recognitionValues: Map<string, number> = new Map();
+    private recognitionSubscription: any;
     
     // Helper to get a Gun reference and cache it
     static getGunRef(id: string): any {
@@ -87,7 +83,7 @@ export class TreeNode {
         console.error(`[TreeNode] Attempted to create duplicate node with ID ${nodeId}`);
       }
       
-      this.name = name;
+      this._name = name;
       this.id = nodeId;
       this._parent = parent;
       this._manualFulfillment = manualFulfillment || null;
@@ -132,6 +128,20 @@ export class TreeNode {
       if (Math.random() < 0.01) {
         TreeNode.cleanupCache();
       }
+    }
+
+    get name(): string {
+      return this._name;
+    }
+    
+    set name(name: string) {
+      console.log(`[TreeNode] Setting name for node ${this.id} to ${name}`);
+      this._name = name;
+      
+      // Update in Gun using direct approach
+      this.gunRef.get('name').put(name);
+      
+      this.app.updateNeeded = true;
     }
 
     get root(): TreeNode {
@@ -180,7 +190,7 @@ export class TreeNode {
       // Helper to collect types for a node and its descendants
       const collectTypes = (node: TreeNode) => {
         // Collect this node's types
-        node._types.forEach(typeId => {
+        node._typesMap.forEach((_, typeId) => {
           typeRelationships.push({ nodeId: node.id, typeId });
           
           // Remove from old root's index
@@ -217,12 +227,11 @@ export class TreeNode {
     
     get isContribution(): boolean {
       // isContribution should only be true if the node has a parent and has a type that's a contributor
-      if (!this._parent || this._types.size === 0) return false;
+      if (!this._parent || this._typesMap.size === 0) return false;
       
-      // Check if any of the types are contributors (root nodes)
-      // Need to look up each type ID in the cache to check
-      /* return Array.from(this._types).some(typeId => typeId.isContributor); For now we count all types as contributors */
-      return Array.from(this._types).length > 0;
+      // Check if any of the types are contributors (root nodes) by checking their isContributor property
+      // This avoids circular references by relying on the simple parent check in isContributor
+      return Array.from(this._typesMap.values()).some(type => type.isContributor);
     }
   
     async addChild(name: string, points: number = 0, typeIds: string[] = [], manualFulfillment: number = 0, id: string = Math.random().toString(36).substring(2, 15)): Promise<TreeNode> {
@@ -280,7 +289,7 @@ export class TreeNode {
       const child = this.children.get(childId);
       if (child) {        
         // Remove from type index - updated for ID-based approach
-        child._types.forEach(typeId => {
+        child._typesMap.forEach((_, typeId) => {
           const root = this.root;
           if (root.typeIndex.has(typeId)) {
             root.typeIndex.get(typeId)?.delete(childId);
@@ -316,9 +325,14 @@ export class TreeNode {
       return this;
     }
 
-    // Getter to return a Set of type IDs
-    get types(): Set<string> {
-      return new Set(this._types);
+    // Getter to return a Set of types for backward compatibility
+    get types(): Set<TreeNode> {
+      return new Set(this._typesMap.values());
+    }
+
+    // Getter for types map to allow access from TreeMap
+    get typesMap(): Map<string, TreeNode> {
+        return this._typesMap;
     }
     
     // Add this node as an instance of the given type
@@ -331,8 +345,8 @@ export class TreeNode {
       
       const root = this.root;
       
-      // If the type is already in our set, nothing to do
-      if (this._types.has(typeId)) {
+      // If the type is already in our map, nothing to do
+      if (this._typesMap.has(typeId)) {
         console.log(`[TreeNode] Type ${typeId} already exists for node ${this.name}`);
         return this;
       }
@@ -345,12 +359,49 @@ export class TreeNode {
       // Update the ID-based type index
       this.addToTypeIndex(typeId);
 
-      // Add to local types set
-      this._types.add(typeId);
-      
+      // Load the type node to store in memory
+      TreeNode.fromId(typeId)
+        .then(typeNode => {
+        if (typeNode) {
+            // Add to local types map
+          this._typesMap.set(typeId, typeNode);
             // Ensure UI updates happen
             this.app.updateNeeded = true;
             this.app.pieUpdateNeeded = true;
+        } else {
+          console.error(`[TreeNode] Failed to get type node for ${typeId}`);
+        }
+        })
+        .catch(err => {
+          console.error(`[TreeNode] Error loading type ${typeId}:`, err);
+      });
+      
+      // If we're a root node and the type is a contributor, subscribe to their recognition
+      if (this.isContributor) {
+        TreeNode.fromId(typeId)
+          .then(typeNode => {
+            if (typeNode && typeNode.isContributor) {
+              // Subscribe to their recognition of us
+              const peerGunRef = TreeNode.getGunRef(typeId);
+              peerGunRef.get('recognitionValues').get(this.id).on((value) => {
+                if (value === undefined) return;
+                
+                const numericValue = typeof value === 'number' ? value : 0;
+                console.log(`[TreeNode] New peer ${typeId} recognition of us: ${numericValue}`);
+                
+                // Update our local recognition value
+                if (!this._recognitionValues) {
+                  this._recognitionValues = new Map<string, number>();
+                }
+                
+                this._recognitionValues.set(typeId, numericValue);
+                
+                // Update UI
+                this.app.pieUpdateNeeded = true;
+              });
+            }
+          });
+      }
       
       return this;
     }
@@ -369,8 +420,14 @@ export class TreeNode {
         root.typeIndex.get(typeId)?.delete(this.id);
       }
       
-      // Remove from local types set
-      this._types.delete(typeId);
+      // Remove from local types map
+      this._typesMap.delete(typeId);
+      
+      // Remove from cache if no longer referenced
+      if (!this.hasTypeReferences(typeId)) {
+        console.log(`[TreeNode] Removing type ${typeId} from cache as it's no longer referenced`);
+        TreeNode.nodeCache.delete(typeId);
+      }
       
       this.app.updateNeeded = true;
       this.app.pieUpdateNeeded = true;
@@ -524,142 +581,110 @@ export class TreeNode {
     }
 
     // Helper method to get all instances of a given type
-    getInstances(typeId: string): Set<string> {
-      return this.root.typeIndex.get(typeId) || new Set();
+    getInstances(typeId: string): Set<TreeNode> {
+      // Get the instance IDs from the type index
+      const instanceIds = this.root.typeIndex.get(typeId) || new Set<string>();
+      
+      // Convert IDs to TreeNode objects
+      const instances = new Set<TreeNode>();
+      instanceIds.forEach(id => {
+        // Try to get from node cache first for efficiency
+        const cachedNode = TreeNode.nodeCache.get(id);
+        if (cachedNode) {
+          instances.add(cachedNode);
+        } else {
+          // If not in cache, look up from children maps
+          const node = this.root.children.get(id) || this.children.get(id);
+          if (node) {
+            instances.add(node);
+          }
+        }
+      });
+      
+      return instances;
     }
 
     shareOfGeneralFulfillment(typeId: string): number {
       const instances = this.getInstances(typeId);
-      const share = Array.from(instances).reduce((sum, instance) => {
-        const node = TreeNode.nodeCache.get(instance);
-        if(!node) return sum;
-        const contributorTypesCount = Array.from(node.types).length;
-        /*.filter(type => type.isContributor).length; For now we count all types as contributors*/
+      if (instances.size === 0) return 0;
+      
+      const fulfillmentValue = Array.from(instances).reduce((sum, instance) => {
+        // Count contributor types for this instance
+        const contributorTypes = Array.from(instance._typesMap.values())
+          .filter(type => type.isContributor);
 
-        const fulfillmentWeight = node.fulfilled * node.weight;
+        const contributorTypesCount = contributorTypes.length;
+
+        if(contributorTypesCount > 0) {
+          console.log(`[TreeNode] Contributor types for ${instance.name}:`, contributorTypes);
+        } else {
+          console.log(`[TreeNode] Contributor types for ${instance.name}:`, contributorTypesCount)
+        }
+
+        const fulfillmentWeight = instance.fulfilled * instance.weight;
 
         const weightShare =
           contributorTypesCount > 0
             ? fulfillmentWeight / contributorTypesCount
             : fulfillmentWeight;
 
-        return sum + weightShare;	
+        return sum + weightShare;
       }, 0);
-      console.log(`[TreeNode] Share of general fulfillment for ${this.id} to ${typeId}: ${share}`);
-      return share;
+      
+      // Store the calculated value in Gun indexed by typeId
+      // Store it under the root node to make it easy to find
+      console.log(`[TreeNode] Storing recognition value for ${typeId}: ${fulfillmentValue}`);
+      this.root.gunRef.get('recognitionValues').get(typeId).put(fulfillmentValue);
+      
+      return fulfillmentValue;
     }
 
-    // calculate all shares for all types and put to gun (ensuring it adds up to 1)
-    calculateSharesOfGeneralFulfillment(): {[key: string]: number} {
-        const shares: {[key: string]: number} = {};
-        for (const typeId of this.typeIndex.keys()) { // we can further filter to only those with instances
-            const share = this.shareOfGeneralFulfillment(typeId);
-            shares[typeId] = share;
-        }
-      
-      this.gunRef.get('sharesOfGeneralFulfillment').put(shares);
-      
-      // After updating our shares, check if we need to subscribe to any new nodes
-      this.updateRecognitionSubscriptions();
-      
-      return shares;
-    }
-
-    get sharesOfOthersRecognition(): {[key: string]: number} {
-      return this._sharesOfOthersRecognition;
-    }
-
-    // sofar this is synchronous, now lets see if we can keep track of who is recognizing us!
-    // and subscribe to their sharesOfGeneralFulfillment!
-    // keeping a local map of who recognizes us and our share in them!
-    // this would make our own mutualFulfillment synchronous!
-
-    // Find nodes that should recognize us and subscribe to their sharesOfGeneralFulfillment
-    private updateRecognitionSubscriptions(): void {
-      // Get all nodes that have us as a type
-      const potentialRecognizers = Array.from(TreeNode.nodeCache.values())
-        .filter(node => node._types.has(this.id));
-      
-      // Subscribe to each node's sharesOfGeneralFulfillment that isn't already subscribed
-      potentialRecognizers.forEach(node => {
-        if (!this._sharesOfOthersRecognition[node.id]) {
-          console.log(`[TreeNode] Setting up recognition subscription for ${this.id} from ${node.id}`);
-          this.subscribeToNodeRecognition(node.id);
-        }
-      });
-      
-      // Clean up subscriptions for nodes that no longer have us as a type
-      const recognizersToRemove = Array.from(this.recognitionSubscriptions.keys())
-        .filter(nodeId => {
-          const node = TreeNode.nodeCache.get(nodeId);
-          return !node || !node._types.has(this.id);
-        });
-      
-      recognizersToRemove.forEach(nodeId => {
-        this.unsubscribeFromNodeRecognition(nodeId);
-      });
-    }
-
-    // Subscribe to a specific node's sharesOfGeneralFulfillment
-    private subscribeToNodeRecognition(nodeId: string): void {
-      const subscription = readFromGunPath(['nodes', nodeId, 'sharesOfGeneralFulfillment'], true);
-      
-      if (subscription.gunNodeRef) {
-        subscription.gunNodeRef.on((data: any) => {
-          if (!data) return;
-          
-          // Process the sharesOfGeneralFulfillment data
-          // Gun stores object data, so we need to extract our share if it exists
-          if (data[this.id] !== undefined && typeof data[this.id] === 'number') {
-            console.log(`[TreeNode] Received recognition from ${nodeId} to ${this.id}: ${data[this.id]}`);
-            this._sharesOfOthersRecognition[nodeId] = data[this.id];
-            
-            // Update UI to reflect new recognition data
-            this.app.updateNeeded = true;
-            this.app.pieUpdateNeeded = true;
-          }
-        });
-        
-        // Store the subscription for later cleanup
-        this.recognitionSubscriptions.set(nodeId, subscription);
-      }
-    }
-
-    // Unsubscribe from a node's sharesOfGeneralFulfillment
-    private unsubscribeFromNodeRecognition(nodeId: string): void {
-      const subscription = this.recognitionSubscriptions.get(nodeId);
-      if (subscription && subscription.gunNodeRef) {
-        console.log(`[TreeNode] Removing recognition subscription for ${this.id} from ${nodeId}`);
-        subscription.gunNodeRef.off();
-        this.recognitionSubscriptions.delete(nodeId);
-        delete this._sharesOfOthersRecognition[nodeId];
-      }
-    }
-
-    // Updated to use synchronous local data
     mutualFulfillment(typeId: string): number {
-        const recognitionFromHere = this.shareOfGeneralFulfillment(typeId);
-        const recognitionFromThere = this._sharesOfOthersRecognition[typeId];
-        return Math.min(recognitionFromHere, recognitionFromThere);
+      // Get our recognition of them - stored in our gun node
+      const recognitionFromHere = this.shareOfGeneralFulfillment(typeId);
+      
+      // Get their recognition of us - stored in their gun node
+      let recognitionFromThere = 0;
+      
+      // Try to get from our cached recognition values first
+      const ourId = this.root.id;
+      const typeNode = TreeNode.nodeCache.get(typeId);
+      
+      if (typeNode && typeNode.isContributor) {
+        // Check if we have the recognition value in memory
+        const theirRoot = typeNode.root;
+        if (theirRoot && theirRoot._recognitionValues && theirRoot._recognitionValues.has(ourId)) {
+          recognitionFromThere = theirRoot._recognitionValues.get(ourId) || 0;
+          console.log(`[TreeNode] Using cached recognition value from ${typeId} to us: ${recognitionFromThere}`);
+        } else {
+          console.log(`[TreeNode] No cached recognition value found from ${typeId} to us`);
+        }
+      } else {
+        console.log(`[TreeNode] Type node ${typeId} not found or not a contributor`);
+      }
+      
+      const result = Math.min(recognitionFromHere, recognitionFromThere);
+      console.log(`[TreeNode] Mutual fulfillment between ${this.root.id} and ${typeId}: ${result}`);
+      return result;
     }
-  
-    get mutualFulfillmentDistribution(): Map<string, number> {
-        const types = Array.from(this.root.typeIndex.keys()).filter(
-            type => this.getInstances(type).size > 0
-            );
 
-        const rawDistribution = types
-            .map(type => ({
-            type,
-            value: this.mutualFulfillment(type),
-            }))
-            .filter(entry => entry.value > 0);
+    get mutualFulfillmentDistribution(): Map<string, number> {
+      const types = this.rootTypes.filter(
+        typeId => this.getInstances(typeId).size > 0
+      );
+
+      const rawDistribution = types
+        .map(typeId => ({
+          typeId,
+          value: this.mutualFulfillment(typeId),
+        }))
+        .filter(entry => entry.value > 0);
 
       const total = rawDistribution.reduce((sum, entry) => sum + entry.value, 0);
 
       return new Map(
         rawDistribution.map(entry => [
-            entry.type,
+          entry.typeId,
           total > 0 ? entry.value / total : 0,
         ])
       );
@@ -672,7 +697,7 @@ export class TreeNode {
       console.log(`[TreeNode] Saving node ${this.name} (ID: ${this.id}) to Gun`);
       
       const data = {
-        name: this.name,
+        name: this._name,
         points: this._points,
         manualFulfillment: this._manualFulfillment,
       };
@@ -705,23 +730,16 @@ export class TreeNode {
       }
       
       // Save type references using Gun's put operation directly with ID keys
-      if (this._types.size > 0) {
-        console.log(`[TreeNode] Saving ${this._types.size} type references`);
+      if (this._typesMap.size > 0) {
+        console.log(`[TreeNode] Saving ${this._typesMap.size} type references`);
         
-        Array.from(this._types).forEach(typeId => {
+        Array.from(this._typesMap.entries()).forEach(([typeId, type]) => {
           console.log(`[TreeNode] Saving type reference: ${typeId}`);
           
           // Store the type ID directly
           this.gunRef.get('types').get(typeId).put(true);
         });
       }
-
-      // save sharesOfOthersRecognition as a proper object for Gun
-      const recognitionObject: {[key: string]: number} = {};
-      Object.entries(this._sharesOfOthersRecognition).forEach(([key, value]) => {
-        recognitionObject[key] = value;
-      });
-      this.gunRef.get('sharesOfOthersRecognition').put(recognitionObject);
       
       console.log(`[TreeNode] Save to Gun complete for node ${this.id}`);
     }
@@ -738,9 +756,9 @@ export class TreeNode {
             let dataChanged = false;
             
             // Handle name updates properly - update regardless of current name
-            if (data.name !== undefined && data.name !== this.name) {
-              console.log(`[TreeNode] Updating name from "${this.name}" to "${data.name}"`);
-              this.name = data.name;
+            if (data.name !== undefined && data.name !== this._name) {
+              console.log(`[TreeNode] Updating name from "${this._name}" to "${data.name}"`);
+              this._name = data.name;
               dataChanged = true;
             }
             
@@ -810,7 +828,7 @@ export class TreeNode {
                 
                 // Remove from type index - update for ID-based approach
                 // For each type this child has, remove its ID from the type's instances
-                child._types.forEach(typeId => {
+                child._typesMap.forEach((_, typeId) => {
                   const root = this.root;
                   if (root.typeIndex.has(typeId)) {
                     root.typeIndex.get(typeId)?.delete(childId);
@@ -862,16 +880,22 @@ export class TreeNode {
           
           // If the value is null/undefined or false, it means the type has been removed
           if (!data) {
-            if (this._types.has(typeId)) {
+            if (this._typesMap.has(typeId)) {
               // Remove from type index
               const root = this.root;
               if (root.typeIndex.has(typeId)) {
                 root.typeIndex.get(typeId)?.delete(this.id);
               }
               
-              // Remove from local types set
-              this._types.delete(typeId);
+              // Remove from local types map
+              this._typesMap.delete(typeId);
               console.log(`[TreeNode] Type ${typeId} has been removed`);
+              
+              // Remove from cache if no longer referenced
+              if (!this.hasTypeReferences(typeId)) {
+                console.log(`[TreeNode] Removing type ${typeId} from cache as it's no longer referenced`);
+                TreeNode.nodeCache.delete(typeId);
+              }
               
               this.app.updateNeeded = true;
               this.app.pieUpdateNeeded = true;
@@ -880,48 +904,105 @@ export class TreeNode {
           }
           
           // Check if we already have this type
-          if (this._types.has(typeId)) {
+          if (this._typesMap.has(typeId)) {
             return;
           }
           
           // Update type index through helper method for consistency
           this.addToTypeIndex(typeId);
           
-          // Add to local types set
-          this._types.add(typeId);
-          console.log(`[TreeNode] Type ${typeId} added successfully for ${this.id}`);
+          // New type detected, load it
+          console.log(`[TreeNode] Loading new type with ID ${typeId}`);
+          TreeNode.fromId(typeId)
+            .then(type => {
+            if (type) {
+              console.log(`[TreeNode] Type ${typeId} (${type.name}) loaded successfully for ${this.id}`);
+              this._typesMap.set(typeId, type);
               
               // Update UI to reflect changes
               this.app.updateNeeded = true;
               this.app.pieUpdateNeeded = true;
+            } else {
+                console.error(`[TreeNode] Failed to load type ${typeId}`);
+            }
+            })
+            .catch(err => {
+            console.error(`[TreeNode] Error loading type ${typeId}:`, err);
+          });
         });
       }
       
-      // Subscribe to our own sharesOfOthersRecognition data to handle updates from other devices
-      const sharesSubscription = readFromGunPath(['nodes', this.id, 'sharesOfOthersRecognition'], true);
-      if (sharesSubscription.gunNodeRef) {
-        sharesSubscription.gunNodeRef.on((data) => {
-          if (data && typeof data === 'object') {
-            // Process the sharesOfOthersRecognition data
-            Object.keys(data).forEach(key => {
-              if (key !== '_' && typeof data[key] === 'number') {
-                this._sharesOfOthersRecognition[key] = data[key];
-              }
-            });
+      // Add subscription for recognition values if this is a root node
+      if (this.isContributor) {
+        // Initialize recognition values map
+        if (!this._recognitionValues) {
+          this._recognitionValues = new Map<string, number>();
+        }
+        
+        console.log(`[TreeNode] Setting up recognition values subscription for ${this.id}`);
+        this.recognitionSubscription = readFromGunPath(['nodes', this.id, 'recognitionValues'], true);
+        
+        if (this.recognitionSubscription && this.recognitionSubscription.gunNodeRef) {
+          this.recognitionSubscription.gunNodeRef.map().on((value, key) => {
+            if (key === '_') return;
             
-            // Update UI to reflect new recognition data
-            this.app.updateNeeded = true;
+            const typeId = key;
+            // Store the recognition value from others
+            const numericValue = typeof value === 'number' ? value : 0;
+            
+            console.log(`[TreeNode] Received recognition value from type ${typeId}: ${numericValue}`);
+            this._recognitionValues.set(typeId, numericValue);
+            
+            // Update UI
             this.app.pieUpdateNeeded = true;
-          }
-        });
+          });
+          
+          // Subscribe to recognition values for each type we care about
+          this.subscribeToPeerRecognition();
+        }
       }
-      
-      // Set up recognition subscriptions - find nodes that have us as a type
-      this.updateRecognitionSubscriptions();
       
       console.log(`[TreeNode] All subscriptions set up for node ${this.id}`);
     }
     
+    // Subscribe to recognition values from peers
+    subscribeToPeerRecognition(): void {
+      if (!this.isContributor) return;
+      
+      console.log(`[TreeNode] Setting up peer recognition subscriptions for ${this.id}`);
+      
+      // Get all contributors we care about
+      const peerIds = this.rootTypes.filter(typeId => {
+        const node = TreeNode.nodeCache.get(typeId);
+        return node && node.isContributor;
+      });
+      
+      peerIds.forEach(peerId => {
+        console.log(`[TreeNode] Subscribing to recognition values from ${peerId}`);
+        
+        // Get gun reference for the peer's node
+        const peerGunRef = TreeNode.getGunRef(peerId);
+        
+        // Subscribe to their recognition of us
+        peerGunRef.get('recognitionValues').get(this.id).on((value) => {
+          if (value === undefined) return;
+          
+          const numericValue = typeof value === 'number' ? value : 0;
+          console.log(`[TreeNode] Peer ${peerId} recognition of us updated to ${numericValue}`);
+          
+          // Update our local recognition value
+          if (!this._recognitionValues) {
+            this._recognitionValues = new Map<string, number>();
+          }
+          
+          this._recognitionValues.set(peerId, numericValue);
+          
+          // Update UI
+          this.app.pieUpdateNeeded = true;
+        });
+      });
+    }
+
     // Clean up subscriptions
     unsubscribe() {
       if (this.nodeSubscription && this.nodeSubscription.gunNodeRef) {
@@ -933,14 +1014,9 @@ export class TreeNode {
       if (this.typesSubscription && this.typesSubscription.gunNodeRef) {
         this.typesSubscription.gunNodeRef.off();
       }
-      
-      // Clean up recognition subscriptions
-      this.recognitionSubscriptions.forEach((subscription, nodeId) => {
-        if (subscription && subscription.gunNodeRef) {
-          subscription.gunNodeRef.off();
-        }
-      });
-      this.recognitionSubscriptions.clear();
+      if (this.recognitionSubscription && this.recognitionSubscription.gunNodeRef) {
+        this.recognitionSubscription.gunNodeRef.off();
+      }
       
       // Clean up children subscriptions too
       this.children.forEach(child => {
@@ -1069,9 +1145,9 @@ export class TreeNode {
 
     // Helper to check if a type has references in the system
     private hasTypeReferences(typeId: string): boolean {
-      // First check if any node has this as a type in their _types
+      // First check if any node has this as a type in their _typesMap
       const hasDirectReference = Array.from(TreeNode.nodeCache.values()).some(node => 
-        node._types.has(typeId)
+        node._typesMap.has(typeId)
       );
       
       if (hasDirectReference) return true;
@@ -1099,7 +1175,7 @@ export class TreeNode {
           });
           
           // Add type references
-          node._types.forEach(typeId => {
+          node._typesMap.forEach((_, typeId) => {
             referencedIds.add(typeId);
           });
           
