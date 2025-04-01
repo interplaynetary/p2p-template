@@ -1,6 +1,6 @@
 import { App } from '../App';
 import { GunNode } from './GunNode';
-import { GunSubscription, SubscriptionCleanup } from './GunSubscription';
+import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './GunSubscription';
 
 // Define the core data structure of a TreeNode
 export interface TreeNodeData {
@@ -85,13 +85,15 @@ export class TreeNode extends GunNode<TreeNodeData> {
       parent: options.parent?.id
     };
     
-    // Create node in Gun
-    const nodesNode = new GunNode(['nodes']);
-    await nodesNode.get(id).put(data);
+    // Create node in Gun using a root GunNode
+    const rootNode = new GunNode(['nodes']);
+    await rootNode.get(id).put(data);
     
     // Add types
     if (options.typeIds && options.typeIds.length > 0) {
-      const typesNode = new GunNode(['nodes', id, 'types']);
+      // Get the types node using the path from our new node
+      const treeNode = TreeNode.getNode(id, app);
+      const typesNode = treeNode.get('types');
       for (const typeId of options.typeIds) {
         await typesNode.get(typeId).put({ value: true } as any);
       }
@@ -99,8 +101,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     // Add as child to parent
     if (options.parent) {
-      const parentChildrenNode = new GunNode(['nodes', options.parent.id, 'children']);
-      await parentChildrenNode.get(id).put({ value: true } as any);
+      // Get the children node using the parent's path
+      const childrenNode = options.parent.get('children');
+      await childrenNode.get(id).put({ value: true } as any);
     }
     
     // Get the node from registry
@@ -211,8 +214,8 @@ export class TreeNode extends GunNode<TreeNodeData> {
       this._childrenSubscription = null;
     }
     
-    // Set up new subscription
-    const childrenNode = new GunNode(['nodes', this._id, 'children']);
+    // Set up new subscription using path abstraction
+    const childrenNode = this.get('children');
     this._childrenSubscription = childrenNode.each((childData) => {
       const childId = childData._key;
       
@@ -256,8 +259,8 @@ export class TreeNode extends GunNode<TreeNodeData> {
       this._typesSubscription = null;
     }
     
-    // Set up new subscription
-    const typesNode = new GunNode(['nodes', this._id, 'types']);
+    // Set up new subscription using path abstraction
+    const typesNode = this.get('types');
     this._typesSubscription = typesNode.each((typeData) => {
       const typeId = typeData._key;
       
@@ -328,7 +331,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * @param nodeId Node ID to subscribe to
    */
   private subscribeToNodeRecognition(nodeId: string): void {
-    const sharesNode = new GunNode(['nodes', nodeId, 'sharesOfGeneralFulfillment']);
+    // Create a temporary node to access the shares path
+    const node = TreeNode.getNode(nodeId, this._app);
+    const sharesNode = node.get('sharesOfGeneralFulfillment');
     
     const cleanup = sharesNode.on((data) => {
       if (!data) return;
@@ -382,8 +387,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
    */
   set name(value: string) {
     if (value !== this._name) {
-      this._name = value;
+      // Update in Gun first - local update will happen through the subscription
       this.put({ name: value });
+      // Don't set this._name directly - let the subscription do it
     }
   }
   
@@ -399,20 +405,13 @@ export class TreeNode extends GunNode<TreeNodeData> {
    */
   set parent(value: TreeNode | null) {
     if (value !== this._parent) {
-      // Get old and new roots
+      // Get old and new roots before making any changes
       const oldRoot = this.root;
       
-      // Update Gun data with new parent reference
+      // Update Gun data with new parent reference - local update will happen through subscription
       this.put({ parent: value ? value.id : null });
       
-      // Update parent reference locally
-      this.updateParent(value ? value.id : null);
-      
-      // Update type indices if root changed
-      const newRoot = this.root;
-      if (oldRoot !== newRoot) {
-        this.updateTypeIndices(oldRoot, newRoot);
-      }
+      // Note: updateParent and updateTypeIndices will be triggered by the subscription
     }
   }
   
@@ -435,13 +434,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
    */
   set points(value: number) {
     if (value !== this._points) {
-      this._points = value;
+      // Update in Gun first - local update will happen through the subscription
       this.put({ points: value });
+      // Don't set this._points directly - let the subscription do it
       
-      // Only update pie chart if not in active interaction
-      if (!(this._app as any).isGrowingActive) {
-        this._app.pieUpdateNeeded = true;
-      }
+      // The pie chart update will be handled in the subscription handler
     }
   }
   
@@ -457,13 +454,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
    */
   set manualFulfillment(value: number | null) {
     if (value !== this._manualFulfillment) {
-      this._manualFulfillment = value;
+      // Update in Gun first - local update will happen through the subscription
       this.put({ manualFulfillment: value });
+      // Don't set this._manualFulfillment directly - let the subscription do it
       
-      // Only update pie chart if not in active interaction
-      if (!(this._app as any).isGrowingActive) {
-        this._app.pieUpdateNeeded = true;
-      }
+      // The pie chart update will be handled in the subscription handler
     }
   }
   
@@ -505,20 +500,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
       return this;
     }
     
-    // Add to Gun
-    const typesNode = new GunNode(['nodes', this._id, 'types']);
+    // Add to Gun using path abstraction
+    const typesNode = this.get('types');
     typesNode.get(typeId).put({ value: true } as any);
     
-    // Add locally (subscription will handle the rest)
-    this._types.add(typeId);
-    
-    // Update type index
-    this.root.addToTypeIndex(typeId, this._id);
-    
-    // Request UI updates
-    this._app.updateNeeded = true;
-    this._app.pieUpdateNeeded = true;
-    
+    // Let the subscription handle the local update
     return this;
   }
   
@@ -531,8 +517,8 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Skip if doesn't have type
     if (!this._types.has(typeId)) return this;
     
-    // Remove from Gun
-    const typesNode = new GunNode(['nodes', this._id, 'types']);
+    // Remove from Gun using path abstraction
+    const typesNode = this.get('types');
     typesNode.get(typeId).put(null);
     
     // Remove locally (subscription will handle the rest)
@@ -593,8 +579,8 @@ export class TreeNode extends GunNode<TreeNodeData> {
   public removeChild(childId: string): TreeNode {
     const child = this._children.get(childId);
     if (child) {
-      // Remove from Gun
-      const childrenNode = new GunNode(['nodes', this._id, 'children']);
+      // Remove from Gun using path abstraction
+      const childrenNode = this.get('children');
       childrenNode.get(childId).put(null);
       
       // Subscription will handle the rest
@@ -853,12 +839,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
       shares[typeId] = share;
     }
     
-    // Persist to Gun
-    const sharesNode = new GunNode(['nodes', this._id, 'sharesOfGeneralFulfillment']);
+    // Persist to Gun using path abstraction
+    const sharesNode = this.get('sharesOfGeneralFulfillment');
     sharesNode.put(shares);
     
-    // Update recognition subscriptions
-    this.updateRecognitionSubscriptions();
+    // Subscription will handle the recognition updates 
     
     return shares;
   }
@@ -935,5 +920,141 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Unsubscribe all nodes
     TreeNode._registry.forEach(node => node.unsubscribe());
     TreeNode._registry.clear();
+  }
+
+  /**
+   * Create a Svelte-compatible store for this node's data
+   * @returns A store that reactively updates with the node's data
+   */
+  public toStore() {
+    const store = super.toStore();
+    return store;
+  }
+
+  /**
+   * Create a store for a specific property of this node
+   * @param property The property to access
+   * @param initialValue Optional initial value
+   * @returns A store that updates with only that property
+   */
+  public createPropertyStore<K extends keyof TreeNodeData>(
+    property: K,
+    initialValue?: TreeNodeData[K]
+  ) {
+    // Use the initial value from the node if available
+    const initial = initialValue !== undefined ? initialValue : 
+                    (property in this ? this[property as string] : undefined);
+    
+    // Create a subscription for the property
+    const nodeSub = new GunSubscription<TreeNodeData>(this.getPath());
+    
+    // Map the subscription to only emit the property
+    const propSub = nodeSub.map(data => {
+      if (!data) return initial as any;
+      return data[property];
+    });
+    
+    return propSub.toStore();
+  }
+
+  /**
+   * Get a derived store for calculated properties
+   * @param name The name of the calculated property
+   * @returns A store that updates when the calculation changes
+   */
+  public getDerivedStore(name: 'fulfilled' | 'desire' | 'weight' | 'shareOfParent') {
+    // Create initial subscription to node data to drive updates
+    const nodeSub = new GunSubscription<TreeNodeData>(this.getPath());
+    
+    // Configure the store with proper initial value
+    const initialValue = this[name];
+    
+    return {
+      subscribe: (run: SubscriptionHandler<any>) => {
+        // Keep track of the last value to avoid duplicate emissions
+        let lastValue = initialValue;
+        run(lastValue);
+        
+        // Subscribe to node data changes
+        const cleanup = nodeSub.on(() => {
+          // When data changes, recalculate the derived value
+          const newValue = this[name];
+          
+          // Only notify if the value changed
+          if (newValue !== lastValue) {
+            lastValue = newValue;
+            run(newValue);
+          }
+        });
+        
+        return cleanup;
+      }
+    };
+  }
+
+  /**
+   * Get children as a stream
+   * @returns A subscription that emits the children collection
+   */
+  public childrenStream() {
+    const childrenNode = this.get('children');
+    const subscription = childrenNode.each((childData) => {
+      const childId = childData._key;
+      if (childId === '_') return;
+      
+      // Return the actual node if it exists in registry
+      return TreeNode._registry.get(childId);
+    });
+    return subscription;
+  }
+
+  /**
+   * Get types as a stream
+   * @returns A subscription that emits the types collection
+   */
+  public typesStream() {
+    const typesNode = this.get('types');
+    return typesNode.each((typeData) => {
+      return typeData._key;
+    });
+  }
+
+  /**
+   * Get a store of all children
+   * @returns A store that emits the children map
+   */
+  public childrenStore() {
+    // Track the current children map
+    const currentChildren = new Map(this._children);
+    
+    // Create a direct subscription to the children collection
+    const childrenNode = this.get('children');
+    
+    return {
+      subscribe: (run: SubscriptionHandler<Map<string, TreeNode>>) => {
+        // Immediately emit current value
+        run(new Map(currentChildren));
+        
+        // Set up the subscription directly
+        const cleanup = childrenNode.each((childData) => {
+          if (!childData) return;
+          
+          const childId = childData._key;
+          if (!childId || childId === '_') return;
+          
+          // Get the node from registry
+          const node = TreeNode._registry.get(childId);
+          if (node) {
+            // Update the map
+            currentChildren.set(childId, node);
+            
+            // Notify subscriber with a new map
+            run(new Map(currentChildren));
+          }
+        });
+        
+        return cleanup;
+      }
+    };
   }
 } 

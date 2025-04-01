@@ -7,12 +7,15 @@ import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './Gun
  */
 export class GunNode<T = any> {
   protected chain: any;
+  protected path: string[];
   
   /**
    * Create a new Gun node wrapper
    * @param path Array of path segments to the node
    */
   constructor(path: string[]) {
+    this.path = [...path]; // Store a copy of the path
+    
     // Navigate the Gun path to create the chain
     let ref = gun as any;
     for (const segment of path) {
@@ -31,9 +34,9 @@ export class GunNode<T = any> {
     key: string,
     NodeClass: new (path: string[]) => N = GunNode as any
   ): N {
-    // Get the current path and add the new key
-    const path = this.getPath();
-    return new NodeClass([...path, key]);
+    // Create a new path with the child key
+    const childPath = [...this.path, key];
+    return new NodeClass(childPath);
   }
 
   /**
@@ -55,7 +58,7 @@ export class GunNode<T = any> {
    * @returns A function to unsubscribe
    */
   public on(handler: SubscriptionHandler<T>): SubscriptionCleanup {
-    const subscription = new GunSubscription<T>(this.getPath());
+    const subscription = new GunSubscription<T>(this.path);
     return subscription.on(handler);
   }
 
@@ -64,7 +67,7 @@ export class GunNode<T = any> {
    * @returns Promise that resolves with the node value
    */
   public once(): Promise<T> {
-    const subscription = new GunSubscription<T>(this.getPath());
+    const subscription = new GunSubscription<T>(this.path);
     return subscription.once();
   }
 
@@ -73,7 +76,7 @@ export class GunNode<T = any> {
    * @returns A subscription that can be used as a stream
    */
   public stream(): GunSubscription<T> {
-    return new GunSubscription<T>(this.getPath());
+    return new GunSubscription<T>(this.path);
   }
 
   /**
@@ -82,9 +85,29 @@ export class GunNode<T = any> {
    * @returns A function to unsubscribe
    */
   public each(handler: SubscriptionHandler<any>): SubscriptionCleanup {
-    const subscription = new GunSubscription(this.getPath());
+    const subscription = new GunSubscription(this.path);
     const eachSub = subscription.each();
     return eachSub.on(handler);
+  }
+
+  /**
+   * Create a Svelte-compatible store from this node's data
+   * @param initialValue Optional initial value to use before data arrives
+   * @returns A store with subscribe method that emits updates
+   */
+  public toStore(initialValue?: T) {
+    const subscription = new GunSubscription<T>(this.path);
+    return subscription.toStore();
+  }
+  
+  /**
+   * Get an object representation of this node
+   * @param initialValue Optional initial value to use before data arrives
+   * @returns A subscription that emits the full object
+   */
+  public asObject(initialValue: Record<string, any> = {}): GunSubscription<Record<string, any>> {
+    const subscription = new GunSubscription(this.path);
+    return subscription.asObject(initialValue);
   }
 
   /**
@@ -92,33 +115,24 @@ export class GunNode<T = any> {
    * @returns Array of path segments
    */
   protected getPath(): string[] {
-    // This would need to be tracked during construction and get() calls
-    // For now, let's extract it from the Soul if available
-    const soul = this.getSoul();
-    if (soul) {
-      // For simple paths, the soul might be something like 'nodes/abc123'
-      return soul.split('/');
-    }
-    
-    // Fallback: cannot determine path
-    console.warn('Could not determine Gun path, using empty path');
-    return [];
+    return [...this.path]; // Return a copy
   }
 
   /**
    * Get the Soul (unique identifier) of this node if it has one
-   * @returns The Soul string or undefined
+   * @returns Promise that resolves with the Soul string or undefined
    */
-  public getSoul(): string | undefined {
-    return new Promise<string | undefined>((resolve) => {
-      this.chain.once((data: any) => {
-        if (data && data['_'] && data['_']['#']) {
-          resolve(data['_']['#']);
-        } else {
-          resolve(undefined);
-        }
-      });
-    }) as any; // This is a hack to avoid dealing with async
+  public async getSoul(): Promise<string | undefined> {
+    try {
+      const data = await this.once();
+      if (data && data['_'] && data['_']['#']) {
+        return data['_']['#'];
+      }
+      return undefined;
+    } catch (err) {
+      console.error('Error getting Soul:', err);
+      return undefined;
+    }
   }
 
   /**
@@ -132,5 +146,14 @@ export class GunNode<T = any> {
     } catch (err) {
       return false;
     }
+  }
+  
+  /**
+   * Return the Gun chain directly if needed
+   * Warning: Using this bypasses the abstraction
+   * @returns The raw Gun chain
+   */
+  public getChain(): any {
+    return this.chain;
   }
 } 

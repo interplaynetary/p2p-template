@@ -12,6 +12,7 @@ export type SubscriptionCleanup = () => void;
  * 2. Better error handling
  * 3. Consistent stream-based API
  * 4. Protection against receiving data after unsubscribe
+ * 5. Support for Svelte-compatible stores
  */
 export class GunSubscription<T = any> {
   private gunRef: any;
@@ -19,6 +20,9 @@ export class GunSubscription<T = any> {
   private handlers: Set<SubscriptionHandler<T>> = new Set();
   private reader: ReadableStreamDefaultReader<T> | null = null;
   private stream: ReadableStream<T> | null = null;
+  // Track last value for late subscribers
+  private lastValue: T | undefined = undefined;
+  private hasValue: boolean = false;
 
   /**
    * Create a subscription to a Gun node path
@@ -56,10 +60,19 @@ export class GunSubscription<T = any> {
     // Create a stream that will emit values from Gun
     this.stream = new ReadableStream<T>({
       start: (controller) => {
+        // Emit the last value immediately if we have one
+        if (this.hasValue && this.lastValue !== undefined) {
+          controller.enqueue(this.lastValue);
+        }
+        
         // Set up Gun subscription
         this.gunRef.on((data: T, key: string) => {
           if (!this.active) return; // Skip if we've been unsubscribed
           if (key === '_') return;  // Skip Gun metadata
+          
+          // Store the last value
+          this.lastValue = data;
+          this.hasValue = true;
 
           // Emit the value to all handlers
           this.handlers.forEach(handler => {
@@ -96,6 +109,15 @@ export class GunSubscription<T = any> {
 
     // Add the handler
     this.handlers.add(handler);
+    
+    // Immediately emit the last value if we have one
+    if (this.hasValue && this.lastValue !== undefined) {
+      try {
+        handler(this.lastValue);
+      } catch (err) {
+        console.error('Error in Gun subscription handler (immediate):', err);
+      }
+    }
 
     // Return a function to remove this specific handler
     return () => {
@@ -113,6 +135,12 @@ export class GunSubscription<T = any> {
    */
   public once(): Promise<T> {
     return new Promise<T>((resolve, reject) => {
+      // Immediately return last value if available
+      if (this.hasValue && this.lastValue !== undefined) {
+        resolve(this.lastValue);
+        return;
+      }
+      
       // Create a timeout to avoid hanging forever
       const timeout = setTimeout(() => {
         cleanup();
@@ -155,6 +183,19 @@ export class GunSubscription<T = any> {
   }
 
   /**
+   * Create a Svelte-compatible store from this subscription
+   * @returns An object with subscribe method compatible with Svelte stores
+   */
+  public toStore() {
+    return {
+      subscribe: (run: SubscriptionHandler<T>) => {
+        const cleanup = this.on(run);
+        return cleanup;
+      }
+    };
+  }
+
+  /**
    * Map values from a Gun node using the provided mapper function
    * @param mapFn Function to transform each item
    * @returns A new GunSubscription with mapped values
@@ -178,6 +219,8 @@ export class GunSubscription<T = any> {
 
               // Map the value and send to stream
               const mappedValue = mapFn(value);
+              mappedSub.lastValue = mappedValue;
+              mappedSub.hasValue = true;
               controller.enqueue(mappedValue);
 
               // Send to handlers
@@ -218,6 +261,9 @@ export class GunSubscription<T = any> {
     mapSub.gunRef = this.gunRef.map();
     mapSub.active = true;
     
+    // Track seen keys to help with cleanup
+    const seenKeys = new Set<string>();
+    
     // Create the stream with proper Gun map handling
     mapSub.stream = new ReadableStream({
       start: (controller) => {
@@ -225,11 +271,16 @@ export class GunSubscription<T = any> {
           if (!mapSub.active) return;
           if (key === '_') return; // Skip Gun metadata
           
-          // Skip null/undefined/false values (deleted items)
-          if (!data) return;
+          if (!data) {
+            // Item was removed, we need to handle this
+            seenKeys.delete(key);
+            // Could emit a removal event here if needed
+            return;
+          }
           
           // Add the key to the data for context
           const valueWithKey = { ...data, _key: key };
+          seenKeys.add(key);
           
           // Emit to handlers
           mapSub.handlers.forEach(handler => {
@@ -250,5 +301,62 @@ export class GunSubscription<T = any> {
     });
     
     return mapSub;
+  }
+  
+  /**
+   * Transform this subscription to a JSON-compatible object
+   * @param initialValue Optional initial value to use before data arrives
+   * @returns A subscription that emits the full object
+   */
+  public asObject(initialValue: Record<string, any> = {}): GunSubscription<Record<string, any>> {
+    const objSub = new GunSubscription<Record<string, any>>([]);
+    objSub.hasValue = true;
+    objSub.lastValue = initialValue;
+    
+    // Track the current state
+    let currentState = { ...initialValue };
+    
+    // Create the stream
+    objSub.stream = new ReadableStream<Record<string, any>>({
+      start: (controller) => {
+        // Start by emitting the initial value
+        controller.enqueue(currentState);
+        
+        // Set up subscription to each property
+        this.gunRef.map().on((data: any, key: string) => {
+          if (!objSub.active) return;
+          if (key === '_') return; // Skip Gun metadata
+          
+          // Update the state with this property
+          if (data === null || data === undefined) {
+            // Property was removed
+            delete currentState[key];
+          } else {
+            currentState[key] = data;
+          }
+          
+          // Clone to avoid reference issues
+          const newState = { ...currentState };
+          objSub.lastValue = newState;
+          
+          // Emit to handlers
+          objSub.handlers.forEach(handler => {
+            try {
+              handler(newState);
+            } catch (err) {
+              console.error('Error in object subscription handler:', err);
+            }
+          });
+          
+          // Send to stream
+          controller.enqueue(newState);
+        });
+      },
+      cancel: () => {
+        objSub.unsubscribe();
+      }
+    });
+    
+    return objSub;
   }
 } 
