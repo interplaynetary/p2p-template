@@ -10,13 +10,6 @@ export class GunNode<T = any> {
   protected path: string[];
   
   /**
-   * Get the Gun reference for this node
-   */
-  protected get gunRef(): any {
-    return this.chain;
-  }
-  
-  /**
    * Create a new Gun node wrapper
    * @param path Array of path segments to the node
    */
@@ -87,50 +80,14 @@ export class GunNode<T = any> {
   }
 
   /**
-   * Subscribe to each item in a collection
-   * @param handler Callback to receive each item
-   * @returns Cleanup function
+   * Subscribe to all values in this node (for collections)
+   * @param handler Function to call with each item
+   * @returns A function to unsubscribe
    */
-  public each(handler: (data: T & { _key: string }) => void): SubscriptionCleanup {
-    // Create a new Gun map subscription
-    let ref = this.chain.map();
-    
-    // Track seen keys for cleanup
-    const seen = new Set<string>();
-    
-    // Create a cleanup function before setting up the subscription
-    let isActive = true;
-    const cleanup = () => {
-      isActive = false;
-      if (ref) {
-        ref.off();
-        ref = null as any;
-      }
-    };
-    
-    // Set up the subscription
-    ref.on((data: any, key: string) => {
-      // Skip if the subscription has been cleaned up
-      if (!isActive) return;
-      
-      // Skip Gun metadata
-      if (key === '_') return;
-      
-      if (data === null || data === undefined) {
-        // Item was removed from the collection
-        seen.delete(key);
-        // Call the handler with null to signal removal
-        handler({ _key: key, ...null as any });
-        return;
-      }
-      
-      // Add key to the data object for context
-      seen.add(key);
-      handler({ ...data, _key: key });
-    });
-    
-    // Return the cleanup function
-    return cleanup;
+  public each(handler: SubscriptionHandler<any>): SubscriptionCleanup {
+    const subscription = new GunSubscription(this.path);
+    const eachSub = subscription.each();
+    return eachSub.on(handler);
   }
 
   /**

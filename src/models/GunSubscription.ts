@@ -143,23 +143,17 @@ export class GunSubscription<T = any> {
       
       // Create a timeout to avoid hanging forever
       const timeout = setTimeout(() => {
-        if (cleanup) {
-          cleanup(); // Ensure we clean up if we timeout
-        }
-        // Resolve with null rather than rejecting to prevent breaking app flow
-        resolve(null as any);
-        console.warn('Gun once() timed out after 10 seconds');
+        if (cleanupFn) cleanupFn();
+        reject(new Error('Gun once() timed out after 10 seconds'));
       }, 10000);
 
-      // Declare cleanup variable first
-      let cleanup: SubscriptionCleanup | null = null;
+      // Declare cleanup variable first before using it
+      let cleanupFn: (() => void) | null = null;
       
       // Set up a one-time handler
-      cleanup = this.on((data) => {
+      cleanupFn = this.on((data) => {
         clearTimeout(timeout);
-        if (cleanup) {
-          cleanup(); // Only call if cleanup is defined
-        }
+        if (cleanupFn) cleanupFn(); // Call cleanup using the now-defined variable
         resolve(data);
       });
     });
@@ -265,6 +259,8 @@ export class GunSubscription<T = any> {
    * @returns A subscription to all values in the node
    */
   public each(): GunSubscription {
+    console.log(`[GunSubscription] Setting up each() subscription`);
+    
     // Create a new subscription that will use .map() internally
     const mapSub = new GunSubscription([]);
     mapSub.gunRef = this.gunRef.map();
@@ -276,14 +272,62 @@ export class GunSubscription<T = any> {
     // Create the stream with proper Gun map handling
     mapSub.stream = new ReadableStream({
       start: (controller) => {
+        console.log(`[GunSubscription] each() starting stream`);
+        
+        // Force immediate emit of existing data
+        this.gunRef.map().once((data: any, key: string) => {
+          if (key === '_') return; // Skip Gun metadata
+          
+          console.log(`[GunSubscription] each() initial data for key ${key}:`, data);
+          
+          if (!data) return; // Skip null/undefined data
+          
+          // Add the key to the data for context
+          const valueWithKey = { ...data, _key: key };
+          seenKeys.add(key);
+          
+          // Emit initial data
+          controller.enqueue(valueWithKey);
+          
+          // Store as last value for late subscribers
+          mapSub.lastValue = valueWithKey;
+          mapSub.hasValue = true;
+          
+          // Emit to handlers
+          mapSub.handlers.forEach(handler => {
+            try {
+              handler(valueWithKey);
+            } catch (err) {
+              console.error('[GunSubscription] Error in initial map handler:', err);
+            }
+          });
+        });
+        
+        // Set up ongoing subscription
         mapSub.gunRef.on((data: any, key: string) => {
           if (!mapSub.active) return;
           if (key === '_') return; // Skip Gun metadata
           
+          console.log(`[GunSubscription] each() update for key ${key}:`, data);
+          
           if (!data) {
             // Item was removed, we need to handle this
+            console.log(`[GunSubscription] each() key ${key} was removed`);
             seenKeys.delete(key);
-            // Could emit a removal event here if needed
+            
+            // Emit a removal event
+            const removalEvent = { _key: key, _removed: true };
+            controller.enqueue(removalEvent);
+            
+            // Notify handlers of removal
+            mapSub.handlers.forEach(handler => {
+              try {
+                handler(removalEvent);
+              } catch (err) {
+                console.error('[GunSubscription] Error in removal handler:', err);
+              }
+            });
+            
             return;
           }
           
@@ -291,12 +335,16 @@ export class GunSubscription<T = any> {
           const valueWithKey = { ...data, _key: key };
           seenKeys.add(key);
           
+          // Store as last value
+          mapSub.lastValue = valueWithKey;
+          mapSub.hasValue = true;
+          
           // Emit to handlers
           mapSub.handlers.forEach(handler => {
             try {
               handler(valueWithKey);
             } catch (err) {
-              console.error('Error in Gun map subscription handler:', err);
+              console.error('[GunSubscription] Error in map handler:', err);
             }
           });
           
@@ -305,6 +353,7 @@ export class GunSubscription<T = any> {
         });
       },
       cancel: () => {
+        console.log(`[GunSubscription] each() subscription cancelled`);
         mapSub.unsubscribe();
       }
     });

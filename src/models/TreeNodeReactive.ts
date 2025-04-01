@@ -1,6 +1,7 @@
 import { App } from '../App';
 import { GunNode } from './GunNode';
 import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './GunSubscription';
+import { gun } from './Gun';
 
 // Define the core data structure of a TreeNode
 export interface TreeNodeData {
@@ -24,13 +25,13 @@ export class TreeNode extends GunNode<TreeNodeData> {
   private _manualFulfillment: number | null = null;
   private _children: Map<string, TreeNode> = new Map();
   private _types: Set<string> = new Set();
+  private _sharesOfOthersRecognition: {[key: string]: number} = {};
   
   // Subscriptions for cleanup
   private _parentSubscription: SubscriptionCleanup | null = null;
   private _childrenSubscription: SubscriptionCleanup | null = null;
   private _typesSubscription: SubscriptionCleanup | null = null;
   private _recognitionSubscriptions: Map<string, SubscriptionCleanup> = new Map();
-  private _sharesOfOthersRecognition: {[key: string]: number} = {};
   
   // Reference to App
   private _app: App;
@@ -57,45 +58,51 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
   
   /**
-   * Create a new TreeNode and persist it to Gun
+   * Create a new node with the given name and options
    * @param name Node name
    * @param options Creation options
    * @param app App instance
-   * @returns New TreeNode instance
+   * @returns The new node
    */
   public static async create(
-    name: string, 
+    name: string,
     options: {
       parent?: TreeNode,
       points?: number,
       manualFulfillment?: number,
-      typeIds?: string[]
-    }, 
+      typeIds?: string[],
+      id?: string
+    } = {},
     app: App
   ): Promise<TreeNode> {
-    // Generate ID
-    const id = Math.random().toString(36).substring(2, 15);
+    // Generate an ID if not provided
+    const id = options.id || Math.random().toString(36).substring(2, 15);
     
-    // Create initial data
-    const data: TreeNodeData = {
-      id,
+    // Create node data
+    const nodeData: any = {
       name,
       points: options.points || 0,
-      manualFulfillment: options.manualFulfillment || null,
-      parent: options.parent?.id
+      manualFulfillment: options.manualFulfillment || null
     };
     
-    // Create node in Gun using a root GunNode
-    const rootNode = new GunNode(['nodes']);
-    await rootNode.get(id).put(data);
+    // Add parent reference if provided
+    if (options.parent) {
+      nodeData.parent = options.parent.id;
+    }
     
-    // Add types
+    // Create the node in Gun
+    const nodeRef = gun.get('nodes').get(id);
+    await new Promise<void>((resolve) => {
+      nodeRef.put(nodeData, () => resolve());
+    });
+    
+    // Add types if provided
     if (options.typeIds && options.typeIds.length > 0) {
-      // Get the types node using the path from our new node
-      const treeNode = TreeNode.getNode(id, app);
-      const typesNode = treeNode.get('types');
+      const typesRef = nodeRef.get('types');
       for (const typeId of options.typeIds) {
-        await typesNode.get(typeId).put({ value: true } as any);
+        await new Promise<void>((resolve) => {
+          typesRef.get(typeId).put({ value: true }, () => resolve());
+        });
       }
     }
     
@@ -128,8 +135,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Set up all reactive subscriptions to Gun data
    */
   private setupSubscriptions(): void {
+    console.log(`[TreeNode ${this._id}] Setting up subscriptions`);
+    
     // Subscribe to node data changes
     this.on((data) => {
+      console.log(`[TreeNode ${this._id}] Received data update:`, data);
       let updated = false;
       
       if (data.name !== this._name) {
@@ -162,6 +172,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
       
       // Request UI updates if needed
       if (updated) {
+        console.log(`[TreeNode ${this._id}] Properties updated, requesting UI update`);
         this._app.updateNeeded = true;
         this._app.pieUpdateNeeded = true;
       }
@@ -208,6 +219,8 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Subscribe to children collection
    */
   private subscribeToChildren(): void {
+    console.log(`[TreeNode ${this._id}] Setting up children subscription`);
+    
     // Clean up existing subscription
     if (this._childrenSubscription) {
       this._childrenSubscription();
@@ -217,44 +230,20 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Set up new subscription using path abstraction
     const childrenNode = this.get('children');
     
-    // First, try to get initial children data all at once
-    childrenNode.once().then(initialData => {
-      if (initialData && typeof initialData === 'object') {
-        // Process initial children data
-        Object.keys(initialData).forEach(childId => {
-          // Skip Gun metadata
-          if (childId === '_') return;
-          
-          // Skip if already added
-          if (this._children.has(childId)) return;
-          
-          // Load the child node if data exists
-          if (initialData[childId]) {
-            const childNode = TreeNode.getNode(childId, this._app);
-            this._children.set(childId, childNode);
-            
-            // Ensure parent reference is correct
-            childNode.parent = this;
-            
-            // Request UI updates
-            this._app.updateNeeded = true;
-            this._app.pieUpdateNeeded = true;
-          }
-        });
-      }
-    }).catch(err => {
-      console.warn(`Error loading initial children for node ${this._id}:`, err);
-    });
+    console.log(`[TreeNode ${this._id}] Starting children each() subscription`);
     
-    // Set up ongoing reactive subscription
+    // Create a more robust subscription
     this._childrenSubscription = childrenNode.each((childData) => {
       const childId = childData._key;
       
       // Skip Gun metadata
       if (childId === '_') return;
       
+      console.log(`[TreeNode ${this._id}] Child data received:`, childId, childData);
+      
       // If data is falsy, it means child was removed
-      if (!childData) {
+      if (!childData || childData.value === null) {
+        console.log(`[TreeNode ${this._id}] Removing child:`, childId);
         // Remove from local collection
         if (this._children.has(childId)) {
           this._children.delete(childId);
@@ -265,9 +254,13 @@ export class TreeNode extends GunNode<TreeNodeData> {
       }
       
       // Skip if we already have this child
-      if (this._children.has(childId)) return;
+      if (this._children.has(childId)) {
+        console.log(`[TreeNode ${this._id}] Child already in local collection:`, childId);
+        return;
+      }
       
       // Load the child node
+      console.log(`[TreeNode ${this._id}] Creating child node:`, childId);
       const childNode = TreeNode.getNode(childId, this._app);
       this._children.set(childId, childNode);
       
@@ -275,6 +268,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
       childNode.parent = this;
       
       // Request UI updates
+      console.log(`[TreeNode ${this._id}] Child added, requesting UI update`);
       this._app.updateNeeded = true;
       this._app.pieUpdateNeeded = true;
     });
@@ -570,29 +564,33 @@ export class TreeNode extends GunNode<TreeNodeData> {
   /**
    * Add a child node
    * @param name Child name
-   * @param options Child creation options
+   * @param points Points value
+   * @param typeIds Optional array of type IDs
+   * @param manualFulfillment Optional manual fulfillment value
+   * @param id Optional child ID (generated if not provided)
    * @returns Promise that resolves with the new child node
    */
   public async addChild(
     name: string,
-    options: {
-      points?: number,
-      typeIds?: string[],
-      manualFulfillment?: number,
-      id?: string
-    } = {}
+    points: number = 0,
+    typeIds: string[] = [],
+    manualFulfillment: number = null,
+    id?: string
   ): Promise<TreeNode> {
     // Check if this node can have children
     if (this._parent && this.isContribution) {
       throw new Error(`Node ${this._name} is a contribution and cannot have children`);
     }
     
+    console.log(`[TreeNode] Adding child "${name}" with points ${points} to ${this._name}`);
+    
     // Create the child node
     const child = await TreeNode.create(name, {
       parent: this,
-      points: options.points || 0,
-      manualFulfillment: options.manualFulfillment,
-      typeIds: options.typeIds
+      points: points,
+      manualFulfillment: manualFulfillment,
+      typeIds: typeIds,
+      id: id
     }, this._app);
     
     // Request UI updates
@@ -1087,36 +1085,5 @@ export class TreeNode extends GunNode<TreeNodeData> {
         return cleanup;
       }
     };
-  }
-
-  /**
-   * Get a single value from the node and resolve
-   * @returns Promise that resolves with the node value
-   */
-  public once(): Promise<TreeNodeData> {
-    // First try to use cached data if available
-    if (this._name) {
-      // If we already have basic data loaded, return it directly
-      const cachedData: TreeNodeData = {
-        id: this._id,
-        name: this._name,
-        points: this._points,
-        manualFulfillment: this._manualFulfillment,
-        parent: this._parent?.id
-      };
-      return Promise.resolve(cachedData);
-    }
-    
-    // Otherwise use superclass once() method with error handling
-    return super.once().catch(err => {
-      console.warn(`Error in TreeNode.once() for node ${this._id}:`, err);
-      // Return a minimal valid object even on error
-      return {
-        id: this._id,
-        name: '',
-        points: 0,
-        manualFulfillment: null
-      };
-    });
   }
 } 

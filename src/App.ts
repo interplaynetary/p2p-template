@@ -70,13 +70,20 @@ export class App {
             this.rootNode = await Promise.race([
                 new Promise<TreeNode>(resolve => {
                     // Subscribe to check if the node exists
-                    existingNode.once().then(data => {
-                        if (data && data.name) {
-                            resolve(existingNode);
-                        } else {
+                    existingNode.once()
+                        .then(data => {
+                            if (data && (data.name || data.id)) {
+                                console.log('[App] Found existing node data:', data);
+                                resolve(existingNode);
+                            } else {
+                                console.log('[App] Node exists but has insufficient data:', data);
+                                resolve(null as any);
+                            }
+                        })
+                        .catch(err => {
+                            console.log('[App] Error checking node data:', err);
                             resolve(null as any);
-                        }
-                    });
+                        });
                 }),
                 // Add a 5-second timeout
                 new Promise<null>(resolve => setTimeout(() => {
@@ -239,20 +246,15 @@ export class App {
         // Return a proxy that adapts our new TreeNode to the interface expected by components
         return new Proxy(node, {
             get: (target, prop, receiver) => {
-                // Special handling for properties that might be missing or different
-                if (prop === 'gunRef') {
-                    // Provide a gun reference directly as expected by old components
-                    return gun.get('nodes').get(target.id);
-                }
-                
+                // Special handling for specific properties that might have different names or behavior
                 if (prop === 'childrenArray') {
-                    // Convert Map to Array for components that expect an array
+                    // Convert children Map to array for old components
                     return Array.from(target.children.values());
                 }
                 
-                if (prop === 'hasChildren') {
-                    // Convert to boolean property
-                    return target.children.size > 0;
+                if (prop === 'gunRef') {
+                    // Provide a compatible gunRef for old components
+                    return target.getChain();
                 }
                 
                 if (prop === 'app') {
@@ -260,72 +262,54 @@ export class App {
                     return this;
                 }
                 
+                if (prop === 'hasChildren') {
+                    // Check if node has children
+                    return target.children.size > 0;
+                }
+                
                 if (prop === 'typeIndex') {
-                    // Legacy components might expect typeIndex
-                    return {};
+                    // Create a compatible type index
+                    const typeIndex: Record<string, boolean> = {};
+                    target.types.forEach(typeId => {
+                        typeIndex[typeId] = true;
+                    });
+                    return typeIndex;
                 }
                 
-                if (prop === 'nodeSubscription') {
-                    // Legacy components might expect nodeSubscription
-                    return () => {}; // No-op function for cleanup
+                // Get the property from the target
+                const value = Reflect.get(target, prop, receiver);
+                
+                // Automatically wrap returned TreeNode instances in compatibility wrapper
+                if (value instanceof TreeNode && prop !== 'parent') {
+                    return this.createCompatibleNode(value);
                 }
                 
-                if (prop === 'calculateSharesOfGeneralFulfillment') {
-                    // Backward compatibility for old methods
-                    return function() {
-                        if (typeof target[prop] === 'function') {
-                            return target[prop]();
+                // Handle functions that might expect different parameters
+                if (typeof value === 'function') {
+                    return (...args: any[]) => {
+                        // Call the method on the target
+                        const result = value.apply(target, args);
+                        
+                        // Wrap returned TreeNode in compatibility wrapper
+                        if (result instanceof TreeNode) {
+                            return this.createCompatibleNode(result);
                         }
-                        return {};
-                    };
-                }
-                
-                if (prop === 'addChild' && typeof target[prop] === 'function') {
-                    // Wrap addChild to handle different parameter structures
-                    return function(name: string, points: number | any) {
-                        // Handle both old style (name, points) and new style (name, options)
-                        if (typeof points === 'number') {
-                            return target.addChild(name, { points });
-                        } else if (typeof points === 'object') {
-                            return target.addChild(name, points);
-                        } else {
-                            return target.addChild(name);
+                        
+                        // Wrap returned Promise that resolves to TreeNode
+                        if (result instanceof Promise) {
+                            return result.then(res => {
+                                if (res instanceof TreeNode) {
+                                    return this.createCompatibleNode(res);
+                                }
+                                return res;
+                            });
                         }
+                        
+                        return result;
                     };
                 }
                 
-                if (prop === 'saveToGun' && typeof target.put === 'function') {
-                    // Map the old saveToGun method to put
-                    return function() {
-                        const data = {
-                            id: target.id,
-                            name: target.name,
-                            points: target.points,
-                            manualFulfillment: target.manualFulfillment,
-                            parent: target.parent?.id
-                        };
-                        return target.put(data);
-                    };
-                }
-                
-                // Special case for toJSON or serialization
-                if (prop === 'toJSON' || prop === Symbol.toPrimitive) {
-                    return function() {
-                        return {
-                            id: target.id,
-                            name: target.name,
-                            points: target.points,
-                            children: Array.from(target.children.values()),
-                            types: Array.from(target.types),
-                            fulfilled: target.fulfilled,
-                            desire: target.desire,
-                            weight: target.weight
-                        };
-                    };
-                }
-                
-                // Forward all other properties to the actual node
-                return Reflect.get(target, prop, receiver);
+                return value;
             }
         });
     }
