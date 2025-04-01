@@ -1,5 +1,5 @@
 import { gun, user } from './models/Gun';
-import { TreeNode } from './models/TreeNode';
+import { TreeNode } from './models/TreeNodeReactive';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
 import { updateUserProfile, loadUsers } from './utils/userUtils';
@@ -61,9 +61,23 @@ export class App {
 
         try {
             // Try to load existing root node first - using user public key as the node ID
-            console.log('[App] Attempting to load existing root node from path:', ['nodes', this.rootId]);
+            console.log('[App] Attempting to load existing root node with ID:', this.rootId);
+            
+            // Get the node using the static getNode method
+            const existingNode = TreeNode.getNode(this.rootId, this);
+            
+            // Try to wait for data to load
             this.rootNode = await Promise.race([
-                TreeNode.fromId(this.rootId),
+                new Promise<TreeNode>(resolve => {
+                    // Subscribe to check if the node exists
+                    existingNode.once().then(data => {
+                        if (data && data.name) {
+                            resolve(existingNode);
+                        } else {
+                            resolve(null as any);
+                        }
+                    });
+                }),
                 // Add a 5-second timeout
                 new Promise<null>(resolve => setTimeout(() => {
                     console.log('[App] Timeout waiting for root node, will create a new one');
@@ -74,14 +88,22 @@ export class App {
             // If root node doesn't exist, create it
             if (!this.rootNode) {
                 console.log('[App] Root node not found, creating new root node with name:', this.name);
-                this.rootNode = TreeNode.create(this.name, {
-                    id: this.rootId,
-                    parent: null
-                });
-                console.log('[App] New root node created with ID:', this.rootNode.id);
                 
-                // Ensure the name is persisted by explicitly setting it
-                this.rootNode.saveToGun();
+                // Create a new node with our ID
+                this.rootNode = TreeNode.getNode(this.rootId, this);
+                
+                // Set up its data
+                const nodeData = {
+                    id: this.rootId,
+                    name: this.name,
+                    points: 0,
+                    manualFulfillment: null
+                };
+                
+                // Save the data to Gun
+                this.rootNode.put(nodeData);
+                
+                console.log('[App] New root node created with ID:', this.rootNode.id);
             } else {
                 console.log('[App] Existing root node loaded successfully:', {
                     id: this.rootNode.id,
@@ -102,7 +124,7 @@ export class App {
             updateUserProfile(this.rootId, this.name);
             
             // Also store the node reference separately
-            gun.get('users').get(this.rootId).get('node').put(this.gunRef);
+            gun.get('users').get(this.rootId).get('node').put(gun.get('nodes').get(this.rootId));
             
             // Setup a ping every minute to keep our lastSeen timestamp fresh
             this.saveInterval = setInterval(() => {
@@ -131,11 +153,11 @@ export class App {
             console.log('[App] Checking for children in Gun...');
             const childrenCheck = await Promise.race([
                 new Promise<boolean>(resolve => {
-                    this.gunRef.get('children').once((data) => {
+                    gun.get('nodes').get(this.rootId).get('children').once((data) => {
                         console.log('[App] Children data in Gun:', data);
                         // Check if data exists and has properties other than '_'
                         const hasChildren = data && typeof data === 'object' && 
-                                         Object.keys(data).filter(k => k !== '_').length > 0;
+                                        Object.keys(data).filter(k => k !== '_').length > 0;
                         resolve(hasChildren);
                     });
                 }),
@@ -148,7 +170,7 @@ export class App {
             
             console.log('[App] Children check result:', { childrenCheck, localChildrenCount: this.rootNode.children.size });
             
-            // Initialize example data if needed
+            // Initialize example data if needed - use the TreeNode directly now
             if (!childrenCheck && this.rootNode.children.size === 0) {
                 console.log('[App] No children found, initializing example data');
                 await initializeExampleData(this.rootNode);
@@ -162,7 +184,7 @@ export class App {
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             console.log('[App] Creating treemap visualization');
-            // Create visualization with the loaded root
+            // Create visualization with the loaded root - use it directly
             this.treemap = createTreemap(this.rootNode, width, height);
             if (!this.treemap?.element) {
                 console.error('[App] Treemap element creation failed');
@@ -346,20 +368,23 @@ export class App {
         }
         
         try {
-            // Directly try to load the peer's root node using their public key
-            console.log(`[App] Loading peer root node directly with ID: ${peerPublicKey}`);
+            // Load the peer's root node using our getNode method
+            console.log(`[App] Loading peer root node with ID: ${peerPublicKey}`);
             
-            // Load the peer's root node
-            const peerRootNode = await Promise.race([
-                TreeNode.fromId(peerPublicKey),
+            // Get the node instance
+            const peerRootNode = TreeNode.getNode(peerPublicKey, this);
+            
+            // Check if it actually has data
+            const nodeData = await Promise.race([
+                peerRootNode.once(),
                 new Promise<null>(resolve => setTimeout(() => {
                     console.log(`[App] Timeout waiting for peer ${peerPublicKey}`);
                     resolve(null);
                 }, 5000))
             ]);
             
-            if (!peerRootNode) {
-                console.log(`[App] Failed to load peer tree: ${peerPublicKey}`);
+            if (!nodeData) {
+                console.log(`[App] Failed to load peer tree data: ${peerPublicKey}`);
                 return false;
             }
             
@@ -469,11 +494,6 @@ export class App {
         
         // Unsubscribe this node
         node.unsubscribe();
-        
-        // Unsubscribe all children
-        for (const child of Array.from(node.children.values())) {
-            this.cleanupTreeSubscriptions(child);
-        }
     }
 
     // Cleanup

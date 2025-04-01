@@ -1057,4 +1057,35 @@ export class TreeNode extends GunNode<TreeNodeData> {
       }
     };
   }
+
+  /**
+   * Get a single value from the node and resolve
+   * @returns Promise that resolves with the node value
+   */
+  public once(): Promise<TreeNodeData> {
+    // First try to use cached data if available
+    if (this._name) {
+      // If we already have basic data loaded, return it directly
+      const cachedData: TreeNodeData = {
+        id: this._id,
+        name: this._name,
+        points: this._points,
+        manualFulfillment: this._manualFulfillment,
+        parent: this._parent?.id
+      };
+      return Promise.resolve(cachedData);
+    }
+    
+    // Otherwise use superclass once() method with error handling
+    return super.once().catch(err => {
+      console.warn(`Error in TreeNode.once() for node ${this._id}:`, err);
+      // Return a minimal valid object even on error
+      return {
+        id: this._id,
+        name: '',
+        points: 0,
+        manualFulfillment: null
+      };
+    });
+  }
 } 

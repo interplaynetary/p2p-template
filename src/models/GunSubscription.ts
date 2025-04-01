@@ -143,14 +143,19 @@ export class GunSubscription<T = any> {
       
       // Create a timeout to avoid hanging forever
       const timeout = setTimeout(() => {
-        cleanup();
+        if (cleanup) {
+          cleanup(); // Ensure we clean up if we timeout
+        }
         reject(new Error('Gun once() timed out after 10 seconds'));
       }, 10000);
 
       // Set up a one-time handler
-      const cleanup = this.on((data) => {
+      let cleanup: SubscriptionCleanup | null = null;
+      cleanup = this.on((data) => {
         clearTimeout(timeout);
-        cleanup(); // Unsubscribe immediately
+        if (cleanup) {
+          cleanup(); // Only call if cleanup is defined
+        }
         resolve(data);
       });
     });

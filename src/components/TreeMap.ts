@@ -1,8 +1,12 @@
 import * as d3 from 'd3';
-import { TreeNode } from '../models/TreeNode';
+import { TreeNode } from '../models/TreeNodeReactive';
 import { getColorForName, getColorForUserId } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
 import { getUserName, loadUsers } from '../utils/userUtils';
+
+// Type definitions to fix type issues with d3 hierarchies
+type TreeNodeHierarchy = d3.HierarchyNode<TreeNode>;
+type TreeNodeRectangular = d3.HierarchyRectangularNode<TreeNode>;
 
 // TODO:
 // Extract various functions into helpers (in particular gun.js related stuff)
@@ -22,19 +26,19 @@ type TreemapInstance = {
     destroy: () => void;
     getCurrentView: () => TreeNode;
     getCurrentData: () => TreeNode;
-    zoomin: (node: TreeNode) => void;
-    zoomout: (node: TreeNode) => void;
+    zoomin: (node: TreeNodeRectangular) => void;
+    zoomout: (node: TreeNodeRectangular) => void;
 };
 
 export function createTreemap(data: TreeNode, width: number, height: number): TreemapInstance {
     // State variables for growth animation
     let growthInterval: number | null = null;
     let growthTimeout: number | null = null;
-    const GROWTH_RATE = (d: d3.HierarchyRectangularNode<TreeNode>) => d.data.points * 0.05;
+    const GROWTH_RATE = (d: TreeNodeRectangular) => d.data.points * 0.05;
     const GROWTH_TICK = 50;
     const GROWTH_DELAY = 500;
     let isGrowing = false;
-    const SHRINK_RATE = (d: d3.HierarchyRectangularNode<TreeNode>) => d.data.points * -0.05; // Negative growth rate for shrinking
+    const SHRINK_RATE = (d: TreeNodeRectangular) => d.data.points * -0.05; // Negative growth rate for shrinking
 
     // Helper functions
     const uid = (function() {
@@ -55,7 +59,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         .each(d => { (d as any).value = d.data.points || 0; });
 
     // Create treemap layout
-    let root = d3.treemap().tile(tile)(hierarchy);
+    let root = d3.treemap<TreeNode>().tile(tile)(hierarchy) as TreeNodeRectangular;
     let currentView = root;
 
     // Set initial domains
@@ -71,7 +75,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
     let group = svg.append("g")
         .call(render, root);
 
-    function tile(node: d3.HierarchyRectangularNode<TreeNode>, x0: number, y0: number, x1: number, y1: number) {
+    function tile(node: TreeNodeRectangular, x0: number, y0: number, x1: number, y1: number) {
         if (!node.children) return;
         
         // Calculate available space
@@ -110,10 +114,10 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         });
     }
   
-    function position(group, root) {
+    function position(group: d3.Selection<SVGGElement, unknown, null, undefined>, root: TreeNodeRectangular) {
         // Update all g elements except the navigation buttons
         group.selectAll("g:not(.home-button):not(.add-button):not(.peer-button)")
-            .attr("transform", d => {
+            .attr("transform", (d: any) => {
                 if (!d || typeof d.x0 === 'undefined') return '';
                 return d === root ? `translate(0,-50)` : `translate(${x(d.x0)},${y(d.y0)})`;
             });
@@ -124,24 +128,24 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             
         // Update peer button position (keep it to the left of the add button)
         group.selectAll(".peer-button")
-            .attr("transform", d => {
+            .attr("transform", (d: any) => {
                 const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
                 return `translate(${rectWidth - 60}, 25)`;
             });
             
         // Update add button position (keep it at the right)
         group.selectAll(".add-button")
-            .attr("transform", d => {
+            .attr("transform", (d: any) => {
                 const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
                 return `translate(${rectWidth - 20}, 25)`;
             });
 
         group.selectAll("rect")
-            .attr("width", d => {
+            .attr("width", (d: any) => {
                 if (!d || typeof d.x0 === 'undefined') return 0;
                 return d === root ? width : x(d.x1) - x(d.x0);
             })
-            .attr("height", d => {
+            .attr("height", (d: any) => {
                 if (!d || typeof d.y0 === 'undefined') return 0;
                 return d === root ? 50 : y(d.y1) - y(d.y0);
             });
@@ -150,7 +154,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         group.selectAll(".type-tags-container")
             .style("opacity", () => (window as any).app.isGrowingActive ? 0 : 1) // Hide during growing
             .style("transition", "opacity 0.15s ease") // Add smooth transition
-            .attr("transform", d => {
+            .attr("transform", (d: any) => {
                 if (!d || typeof d.x0 === 'undefined') return '';
                 const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
                 const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
@@ -170,12 +174,12 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             });
     }
   
-    function render(group: d3.Selection<SVGGElement, unknown, null, undefined>, root: d3.HierarchyRectangularNode<TreeNode>) {
+    function render(group: d3.Selection<SVGGElement, unknown, null, undefined>, root: TreeNodeRectangular) {
       // First, create groups only for nodes with value or root
       const nodeData = (root.children || []).concat(root);
 
         const node = group
-            .selectAll<SVGGElement, d3.HierarchyRectangularNode<TreeNode>>("g")
+            .selectAll<SVGGElement, TreeNodeRectangular>("g")
             .data(nodeData)
             .join("g")
             .filter(d => d === root || d.data.points > 0);
@@ -276,7 +280,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         });
 
     // Add tag pills for each type
-    typeContainer.each(function(d: d3.HierarchyRectangularNode<TreeNode>) {
+    typeContainer.each(function(d: TreeNodeRectangular) {
         if (!d || d === root) return; // Skip for root node
         
         const container = d3.select(this);
@@ -288,8 +292,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         // Skip all additions if rect is too small
         if (rectWidth < 60 || rectHeight < 60) return;
         
-        // Get type array safely using public getter
-        const typesArray = d.data.types ? Array.from(d.data.types) : [];
+        // Get type array from the Set
+        const typesArray = Array.from(d.data.types || new Set());
         
         // Create a tag wrapper to hold all pills in a flex layout
         const tagWrapper = container.append("foreignObject")
@@ -612,8 +616,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     adjustDropdownPosition();
                 }, {
                     filterText: filterText,
-                    excludeIds: d.data.types ? Array.from(d.data.types) : [],
-                    rootId: d.data.app.rootId
+                    excludeIds: Array.from(d.data.types || new Set()),
+                    rootId: d.data.app._app?.rootId || ''
                 });
                 
                 // Store cleanup function to cancel subscription when dropdown closes
@@ -1057,7 +1061,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             });
     }
 
-    function zoomin(d) {
+    function zoomin(d: TreeNodeRectangular) {
         console.log('Zooming in to:', d.data.name);
         currentView = d;
         const group0 = group.attr("pointer-events", "none");
@@ -1071,37 +1075,37 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         svg.transition()
             .duration(750)
             .call(t => group0.transition(t).remove()
-                .call(position, d.parent))
+                .call(position, d.parent as TreeNodeRectangular))
             .call(t => group1.transition(t)
-                .attrTween("opacity", () => d3.interpolate(0, 1))
+                .attrTween("opacity", () => d3.interpolate(0, 1) as any)
                 .call(position, d));
     }
   
-    function zoomout(d) {
+    function zoomout(d: TreeNodeRectangular) {
         console.log('Zooming out from:', d.data.name);
-        currentView = d.parent;
+        currentView = d.parent as TreeNodeRectangular;
         const group0 = group.attr("pointer-events", "none");
         
         // Update domains first
-        x.domain([d.parent.x0, d.parent.x1]);
-        y.domain([d.parent.y0, d.parent.y1]);
+        x.domain([d.parent!.x0, d.parent!.x1]);
+        y.domain([d.parent!.y0, d.parent!.y1]);
         
-        const group1 = group = svg.insert("g", "*").call(render, d.parent);
+        const group1 = group = svg.insert("g", "*").call(render, d.parent as TreeNodeRectangular);
         
         svg.transition()
             .duration(750)
             .call(t => group0.transition(t).remove()
-                .attrTween("opacity", () => d3.interpolate(1, 0))
+                .attrTween("opacity", () => d3.interpolate(1, 0) as any)
                 .call(position, d))
             .call(t => group1.transition(t)
-                .call(position, d.parent));
+                .call(position, d.parent as TreeNodeRectangular));
     }
 
     // Return public interface with functions to get current state
     return {
-        getCurrentView: () => currentView,
+        getCurrentView: () => currentView ? currentView.data : data,
         getCurrentData: () => data,
-        element: svg.node(),
+        element: svg.node() as unknown as HTMLElement,
         getRoot: () => root,
         zoomin,
         zoomout,
