@@ -259,7 +259,7 @@ export class GunSubscription<T = any> {
    * @returns A subscription to all values in the node
    */
   public each(): GunSubscription {
-    console.log(`[GunSubscription] Setting up each() subscription`);
+    // console.log(`[GunSubscription] Setting up each() subscription`);
     
     // Create a new subscription that will use .map() internally
     const mapSub = new GunSubscription([]);
@@ -272,13 +272,13 @@ export class GunSubscription<T = any> {
     // Create the stream with proper Gun map handling
     mapSub.stream = new ReadableStream({
       start: (controller) => {
-        console.log(`[GunSubscription] each() starting stream`);
+        // console.log(`[GunSubscription] each() starting stream`);
         
         // Force immediate emit of existing data
         this.gunRef.map().once((data: any, key: string) => {
           if (key === '_') return; // Skip Gun metadata
           
-          console.log(`[GunSubscription] each() initial data for key ${key}:`, data);
+          // console.log(`[GunSubscription] each() initial data for key ${key}:`, data);
           
           if (!data) return; // Skip null/undefined data
           
@@ -308,11 +308,11 @@ export class GunSubscription<T = any> {
           if (!mapSub.active) return;
           if (key === '_') return; // Skip Gun metadata
           
-          console.log(`[GunSubscription] each() update for key ${key}:`, data);
+          // console.log(`[GunSubscription] each() update for key ${key}:`, data);
           
           if (!data) {
             // Item was removed, we need to handle this
-            console.log(`[GunSubscription] each() key ${key} was removed`);
+            // console.log(`[GunSubscription] each() key ${key} was removed`);
             seenKeys.delete(key);
             
             // Emit a removal event
@@ -353,7 +353,7 @@ export class GunSubscription<T = any> {
         });
       },
       cancel: () => {
-        console.log(`[GunSubscription] each() subscription cancelled`);
+        // console.log(`[GunSubscription] each() subscription cancelled`);
         mapSub.unsubscribe();
       }
     });

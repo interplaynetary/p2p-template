@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { TreeNode } from '../models/TreeNode';
+import { TreeNode } from '../models/old/TreeNode';
 import { getColorForName, getColorForUserId } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
 import { getUserName, loadUsers } from '../utils/userUtils';

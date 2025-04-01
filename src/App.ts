@@ -2,12 +2,10 @@ import { gun, user } from './models/Gun';
 import { TreeNode } from './models/TreeNodeReactive';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
-import { updateUserProfile, loadUsers } from './utils/userUtils';
+import { updateUserProfile } from './utils/userUtils';
 import { initializeExampleData } from './example';
 import $ from 'jquery';
-
-// TODO:
-// We currently arent using handleResize, but we should probably use it?
+import * as d3 from 'd3';
 
 export class App {
     name: string = ''
@@ -24,6 +22,7 @@ export class App {
     gunRef: any = null
     // Map to store peer trees indexed by their public key
     peerTrees: Map<string, TreeNode> = new Map();
+    resizeObserver: ResizeObserver | null = null;
 
     
     constructor() {
@@ -149,6 +148,9 @@ export class App {
             const width = container.clientWidth;
             const height = container.clientHeight;
             console.log('[App] Container dimensions:', { width, height });
+            
+            // Set up resize observer for the container
+            this.setupResizeHandling(container);
             
             console.log('[App] Root node ready:', this.rootNode.name, 'ID:', this.rootNode.id);
             
@@ -324,24 +326,6 @@ export class App {
         console.log('currentView returning:', view);
         return view;
     }
-
-    handleResize() {
-        console.log('Resize handler triggered');
-        const container = document.getElementById('treemap-container');
-        if (!container) {
-            console.error('Container not found');
-            return;
-        }
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        console.log('Container resized to:', { width, height });
-        
-        if (this.treemap) {
-            this.treemap.update(width, height);
-            console.log('Treemap resized');
-        }
-    }
-
     
     get updateNeeded() {
         return this._updateNeeded;
@@ -444,136 +428,106 @@ export class App {
         }
     }
 
-    // Add a method to connect to another user's tree
-    async connectToPeer(peerPublicKey: string): Promise<boolean> {
-        console.log(`[App] Connecting to peer: ${peerPublicKey}`);
+    handleResize() {
+        console.log('Resize handler triggered');
+        const container = document.getElementById('treemap-container');
+        if (!container) {
+            console.error('Container not found');
+            return;
+        }
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        console.log('Container resized to:', { width, height });
         
-        // Skip if already connected
-        if (this.peerTrees.has(peerPublicKey)) {
-            console.log(`[App] Already connected to peer: ${peerPublicKey}`);
-            return true;
+        if (this.treemap) {
+            this.treemap.update(width, height);
+            console.log('Treemap resized');
+            
+            // Update header bar elements
+            this.updateHeaderElements(width);
         }
-        
-        try {
-            // Load the peer's root node using our getNode method
-            console.log(`[App] Loading peer root node with ID: ${peerPublicKey}`);
-            
-            // Get the node instance
-            const peerRootNode = TreeNode.getNode(peerPublicKey, this);
-            
-            // Check if it actually has data
-            const nodeData = await Promise.race([
-                peerRootNode.once(),
-                new Promise<null>(resolve => setTimeout(() => {
-                    console.log(`[App] Timeout waiting for peer ${peerPublicKey}`);
-                    resolve(null);
-                }, 5000))
-            ]);
-            
-            if (!nodeData) {
-                console.log(`[App] Failed to load peer tree data: ${peerPublicKey}`);
-                return false;
-            }
-            
-            // Store the peer's tree
-            this.peerTrees.set(peerPublicKey, peerRootNode);
-            console.log(`[App] Successfully connected to peer: ${peerRootNode.name}`);
-            console.log(`[App] Peer trees:`, this.peerTrees);
-            
-            // Update UI to reflect new connection
-            this.updateNeeded = true;
-            
-            return true;
-        } catch (error) {
-            console.error(`[App] Error connecting to peer: ${error}`);
-            return false;
-        }
-    }
-    
-    // Add a method to disconnect from a peer
-    disconnectPeer(peerPublicKey: string): boolean {
-        const peerTree = this.peerTrees.get(peerPublicKey);
-        if (peerTree) {
-            this.cleanupTreeSubscriptions(peerTree);
-            this.peerTrees.delete(peerPublicKey);
-            this.updateNeeded = true;
-            return true;
-        }
-        return false;
-    }
-    
-    // Add a method to App class
-    listConnectedPeers() {
-        return Array.from(this.peerTrees.keys()).map(key => ({
-          id: key,
-          name: this.peerTrees.get(key)?.name || 'Unknown'
-        }));
     }
 
-    // Add a method to discover other users
-    async discoverUsers(): Promise<{id: string, name: string, lastSeen: number}[]> {
-        console.log('[App] Discovering other users');
-        return new Promise((resolve) => {
-            const users: {id: string, name: string, lastSeen: number}[] = [];
-            let userLoader: (() => void) | null = null;
+    // New method to update header elements positions
+    private updateHeaderElements(width: number) {
+        try {
+            // Get the container height
+            const container = document.getElementById('treemap-container');
+            const height = container ? container.clientHeight : 0;
             
-            // Use our improved loadUsers utility which handles Gun subscriptions properly
-            userLoader = loadUsers((userList) => {
-                // Convert the basic user list to the format we need with lastSeen
-                const updatedUsers = userList.map(user => {
-                    // Check if we already have this user with lastSeen data
-                    const existingUser = users.find(u => u.id === user.id);
-                    return {
-                        id: user.id,
-                        name: user.name,
-                        lastSeen: existingUser?.lastSeen || Date.now() // Use existing timestamp or current time
-                    };
-                });
-                
-                // Replace our users array with the updated one
-                users.length = 0; 
-                users.push(...updatedUsers);
-                
-                // Update the UI when we find users
-                if (document.getElementById('user-list')) {
-                    const userListHtml = users.map(user => {
-                        const lastSeenDate = user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'Unknown';
-                        return `
-                            <li>
-                                <div>${user.name}</div>
-                                <div>Last seen: ${lastSeenDate}</div>
-                                <button class="connect-to-user" data-id="${user.id}">Connect</button>
-                            </li>
-                        `;
-                    }).join('');
-                    
-                    $('#user-list').html(userListHtml);
-                    
-                    // Re-add click handlers
-                    $('.connect-to-user').off('click').on('click', async function() {
-                        const userId = $(this).data('id');
-                        const success = await (window as any).app.connectToPeer(userId);
-                        
-                        if (success) {
-                            alert(`Connected to ${$(this).parent().find('div').first().text()}`);
-                            $('.node-popup').removeClass('active');
-                        } else {
-                            alert('Failed to connect to user');
-                        }
-                    });
-                }
-            });
+            // Select the SVG and update the viewBox
+            const svg = d3.select('#treemap-container svg');
+            if (!svg.empty()) {
+                svg.attr("viewBox", [0.5, -50.5, width, height + 50]);
+            }
             
-            // Return initial results after a brief timeout to allow some users to load
-            setTimeout(() => {
-                console.log(`[App] Discovered ${users.length} users so far`);
-                resolve(users);
-                
-                // Continue discovery in background for UI updates
-                // (We don't unsubscribe until the component is destroyed)
-            }, 1000);
-        });
+            // Update the header rect width
+            const headerRect = d3.select('#treemap-container rect[id^="leaf-"]');
+            if (!headerRect.empty()) {
+                headerRect.attr("width", width);
+            }
+            
+            // Update the header text position
+            const headerText = d3.select('#treemap-container text[font-weight="bold"]');
+            if (!headerText.empty()) {
+                headerText.attr("transform", `translate(${width / 2},25)`);
+            }
+            
+            // Update the peer button position
+            const peerButton = d3.select('#treemap-container .peer-button');
+            if (!peerButton.empty()) {
+                peerButton.attr("transform", `translate(${width - 60}, 25)`);
+            }
+            
+            // Update the add button position
+            const addButton = d3.select('#treemap-container .add-button');
+            if (!addButton.empty()) {
+                addButton.attr("transform", `translate(${width - 20}, 25)`);
+            }
+            
+            // Update type tags container position if needed
+            const typeTagsContainer = d3.select('#treemap-container .type-tags-container');
+            if (!typeTagsContainer.empty()) {
+                typeTagsContainer.attr("transform", `translate(${width / 2}, 49.4)`);
+            }
+            
+            console.log('[App] Header elements positions updated');
+        } catch (error) {
+            console.error('[App] Error updating header elements:', error);
+        }
     }
+
+    
+    // New method to set up resize handling
+    private setupResizeHandling(container: HTMLElement) {
+        console.log('[App] Setting up resize handling');
+        
+        // Clean up any existing observer
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+        
+        // Create a new ResizeObserver
+        this.resizeObserver = new ResizeObserver((entries) => {
+            // Use requestAnimationFrame to throttle resize events
+            window.requestAnimationFrame(() => {
+                if (!entries.length) return;
+                
+                console.log('[App] Container resize detected');
+                this.handleResize();
+            });
+        });
+        
+        // Start observing the container
+        this.resizeObserver.observe(container);
+        
+        // Also listen for window resize events as a fallback
+        window.addEventListener('resize', () => this.handleResize());
+        
+        console.log('[App] Resize handling setup complete');
+    }
+
     
     // Recursively cleanup subscriptions throughout the tree
     cleanupTreeSubscriptions(node: TreeNode | null) {
@@ -593,8 +547,18 @@ export class App {
             this.cleanupTreeSubscriptions(peerTree);
         }
         
+        // Clean up intervals
         clearInterval(this.updateInterval);
         clearInterval(this.saveInterval);
+        
+        // Clean up resize observer
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+        
+        // Remove window resize event listener
+        window.removeEventListener('resize', () => this.handleResize());
         
         // Clean up treemap if it exists
         if (this.treemap && typeof this.treemap.destroy === 'function') {

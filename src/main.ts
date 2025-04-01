@@ -321,7 +321,7 @@ function setupUIHandlers() {
             scanInterval = null;
         }
     }
-
+    /*
     // Connect to peer after scan
     $('#connect-peer').on('click', async function() {
         const peerKey = $('#manual-key').val() as string;
@@ -421,6 +421,7 @@ function setupUIHandlers() {
             }
         });
     });
+    */
 
     // Logout button handler
     $('#logout').on('click', function() {

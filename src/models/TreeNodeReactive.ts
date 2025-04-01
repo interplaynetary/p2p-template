@@ -135,24 +135,25 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Set up all reactive subscriptions to Gun data
    */
   private setupSubscriptions(): void {
-    console.log(`[TreeNode ${this._id}] Setting up subscriptions`);
+    // console.log(`[TreeNode ${this._id}] Setting up subscriptions`);
     
     // Subscribe to node data changes
     this.on((data) => {
-      console.log(`[TreeNode ${this._id}] Received data update:`, data);
+      // console.log(`[TreeNode ${this._id}] Received data update:`, data);
       let updated = false;
       
-      if (data.name !== this._name) {
+      // Only update if values actually changed
+      if (data.name !== undefined && data.name !== this._name) {
         this._name = data.name || '';
         updated = true;
       }
       
-      if (data.points !== this._points) {
+      if (data.points !== undefined && data.points !== this._points) {
         this._points = data.points || 0;
         updated = true;
       }
       
-      if (data.manualFulfillment !== this._manualFulfillment) {
+      if (data.manualFulfillment !== undefined && data.manualFulfillment !== this._manualFulfillment) {
         this._manualFulfillment = data.manualFulfillment;
         updated = true;
       }
@@ -172,7 +173,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
       
       // Request UI updates if needed
       if (updated) {
-        console.log(`[TreeNode ${this._id}] Properties updated, requesting UI update`);
+        // console.log(`[TreeNode ${this._id}] Properties updated, requesting UI update`);
         this._app.updateNeeded = true;
         this._app.pieUpdateNeeded = true;
       }
@@ -219,7 +220,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Subscribe to children collection
    */
   private subscribeToChildren(): void {
-    console.log(`[TreeNode ${this._id}] Setting up children subscription`);
+    // console.log(`[TreeNode ${this._id}] Setting up children subscription`);
     
     // Clean up existing subscription
     if (this._childrenSubscription) {
@@ -230,48 +231,88 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Set up new subscription using path abstraction
     const childrenNode = this.get('children');
     
-    console.log(`[TreeNode ${this._id}] Starting children each() subscription`);
+    // console.log(`[TreeNode ${this._id}] Starting children each() subscription`);
     
-    // Create a more robust subscription
-    this._childrenSubscription = childrenNode.each((childData) => {
-      const childId = childData._key;
-      
-      // Skip Gun metadata
-      if (childId === '_') return;
-      
-      console.log(`[TreeNode ${this._id}] Child data received:`, childId, childData);
-      
-      // If data is falsy, it means child was removed
-      if (!childData || childData.value === null) {
-        console.log(`[TreeNode ${this._id}] Removing child:`, childId);
-        // Remove from local collection
-        if (this._children.has(childId)) {
-          this._children.delete(childId);
+    // Track processed children to avoid duplicates
+    const processedChildren = new Set<string>();
+    
+    // Create a more robust subscription using a stream pattern
+    const stream = new ReadableStream({
+      start: (controller) => {
+        this._childrenSubscription = childrenNode.each((childData) => {
+          const childId = childData._key;
+          
+          // Skip Gun metadata and already processed children
+          if (childId === '_' || processedChildren.has(childId)) return;
+          
+          // console.log(`[TreeNode ${this._id}] Child data received:`, childId, childData);
+          
+          // If data is falsy, it means child was removed
+          if (!childData || childData.value === null) {
+            // console.log(`[TreeNode ${this._id}] Removing child:`, childId);
+            // Remove from local collection
+            if (this._children.has(childId)) {
+              this._children.delete(childId);
+              this._app.updateNeeded = true;
+              this._app.pieUpdateNeeded = true;
+            }
+            processedChildren.delete(childId);
+            return;
+          }
+          
+          // Skip if we already have this child
+          if (this._children.has(childId)) {
+            // console.log(`[TreeNode ${this._id}] Child already in local collection:`, childId);
+            processedChildren.add(childId);
+            return;
+          }
+          
+          // Load the child node
+          // console.log(`[TreeNode ${this._id}] Creating child node:`, childId);
+          const childNode = TreeNode.getNode(childId, this._app);
+          this._children.set(childId, childNode);
+          
+          // Ensure parent reference is correct
+          childNode.parent = this;
+          
+          // Mark as processed
+          processedChildren.add(childId);
+          
+          // Request UI updates
+          // console.log(`[TreeNode ${this._id}] Child added, requesting UI update`);
           this._app.updateNeeded = true;
           this._app.pieUpdateNeeded = true;
+          
+          // Emit to stream
+          controller.enqueue(childNode);
+        });
+      },
+      cancel: () => {
+        // Clean up subscription when stream is cancelled
+        if (this._childrenSubscription) {
+          this._childrenSubscription();
+          this._childrenSubscription = null;
         }
-        return;
       }
-      
-      // Skip if we already have this child
-      if (this._children.has(childId)) {
-        console.log(`[TreeNode ${this._id}] Child already in local collection:`, childId);
-        return;
-      }
-      
-      // Load the child node
-      console.log(`[TreeNode ${this._id}] Creating child node:`, childId);
-      const childNode = TreeNode.getNode(childId, this._app);
-      this._children.set(childId, childNode);
-      
-      // Ensure parent reference is correct
-      childNode.parent = this;
-      
-      // Request UI updates
-      console.log(`[TreeNode ${this._id}] Child added, requesting UI update`);
-      this._app.updateNeeded = true;
-      this._app.pieUpdateNeeded = true;
     });
+    
+    // Store the stream reader for cleanup
+    const reader = stream.getReader();
+    
+    // Process the stream
+    const processStream = async () => {
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          // Process child node if needed
+        }
+      } catch (err) {
+        console.error(`Error processing children stream for node ${this._id}:`, err);
+      }
+    };
+    
+    processStream();
   }
   
   /**
@@ -286,42 +327,85 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     // Set up new subscription using path abstraction
     const typesNode = this.get('types');
-    this._typesSubscription = typesNode.each((typeData) => {
-      const typeId = typeData._key;
-      
-      // Skip Gun metadata
-      if (typeId === '_') return;
-      
-      // If data is falsy, it means type was removed
-      if (!typeData) {
-        // Remove from local collection
-        if (this._types.has(typeId)) {
-          this._types.delete(typeId);
+    
+    // Track processed types to avoid duplicates
+    const processedTypes = new Set<string>();
+    
+    // Create a stream for types
+    const stream = new ReadableStream({
+      start: (controller) => {
+        this._typesSubscription = typesNode.each((typeData) => {
+          const typeId = typeData._key;
+          
+          // Skip Gun metadata and already processed types
+          if (typeId === '_' || processedTypes.has(typeId)) return;
+          
+          // If data is falsy, it means type was removed
+          if (!typeData) {
+            // Remove from local collection
+            if (this._types.has(typeId)) {
+              this._types.delete(typeId);
+              
+              // Update type index
+              const root = this.root;
+              root.removeFromTypeIndex(typeId, this._id);
+              
+              this._app.updateNeeded = true;
+              this._app.pieUpdateNeeded = true;
+            }
+            processedTypes.delete(typeId);
+            return;
+          }
+          
+          // Skip if we already have this type
+          if (this._types.has(typeId)) {
+            processedTypes.add(typeId);
+            return;
+          }
+          
+          // Add to local collection
+          this._types.add(typeId);
+          processedTypes.add(typeId);
           
           // Update type index
           const root = this.root;
-          root.removeFromTypeIndex(typeId, this._id);
+          root.addToTypeIndex(typeId, this._id);
           
+          // Request UI updates
           this._app.updateNeeded = true;
           this._app.pieUpdateNeeded = true;
+          
+          // Emit to stream
+          controller.enqueue(typeId);
+        });
+      },
+      cancel: () => {
+        // Clean up subscription when stream is cancelled
+        if (this._typesSubscription) {
+          this._typesSubscription();
+          this._typesSubscription = null;
         }
-        return;
       }
-      
-      // Skip if we already have this type
-      if (this._types.has(typeId)) return;
-      
-      // Add to local collection
-      this._types.add(typeId);
-      
-      // Update type index
-      const root = this.root;
-      root.addToTypeIndex(typeId, this._id);
-      
-      // Request UI updates
-      this._app.updateNeeded = true;
-      this._app.pieUpdateNeeded = true;
     });
+    
+    // Store the stream reader for cleanup
+    const reader = stream.getReader();
+    
+    // Process the stream
+    const processStream = async () => {
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          // Process type if needed
+          this.updateRecognitionSubscriptions();
+        }
+      } catch (err) {
+        console.error(`Error processing types stream for node ${this._id}:`, err);
+      }
+    };
+    
+    processStream();
   }
   
   /**
@@ -332,21 +416,20 @@ export class TreeNode extends GunNode<TreeNodeData> {
     const potentialRecognizers = Array.from(TreeNode._registry.values())
       .filter(node => node._types.has(this._id));
     
+    // Track current recognizers for cleanup
+    const currentRecognizers = new Set(this._recognitionSubscriptions.keys());
+    
     // Subscribe to each node that isn't already subscribed
     potentialRecognizers.forEach(node => {
       if (!this._recognitionSubscriptions.has(node.id)) {
         this.subscribeToNodeRecognition(node.id);
       }
+      // Remove from cleanup set if still valid
+      currentRecognizers.delete(node.id);
     });
     
     // Clean up subscriptions for nodes that no longer have us as a type
-    const nodesToUnsubscribe = Array.from(this._recognitionSubscriptions.keys())
-      .filter(nodeId => {
-        const node = TreeNode._registry.get(nodeId);
-        return !node || !node._types.has(this._id);
-      });
-    
-    nodesToUnsubscribe.forEach(nodeId => {
+    currentRecognizers.forEach(nodeId => {
       this.unsubscribeFromNodeRecognition(nodeId);
     });
   }
@@ -360,22 +443,56 @@ export class TreeNode extends GunNode<TreeNodeData> {
     const node = TreeNode.getNode(nodeId, this._app);
     const sharesNode = node.get('sharesOfGeneralFulfillment');
     
-    const cleanup = sharesNode.on((data) => {
-      if (!data) return;
-      
-      // Check if our ID is in the shares
-      if (data[this._id] !== undefined && typeof data[this._id] === 'number') {
-        // Update local recognition data
-        this._sharesOfOthersRecognition[nodeId] = data[this._id];
+    // Create a stream for recognition data
+    const stream = new ReadableStream({
+      start: (controller) => {
+        const cleanup = sharesNode.on((data) => {
+          if (!data) return;
+          
+          // Check if our ID is in the shares
+          if (data[this._id] !== undefined && typeof data[this._id] === 'number') {
+            const newValue = data[this._id];
+            
+            // Only update if the value changed
+            if (this._sharesOfOthersRecognition[nodeId] !== newValue) {
+              // Update local recognition data
+              this._sharesOfOthersRecognition[nodeId] = newValue;
+              
+              // Request UI updates
+              this._app.updateNeeded = true;
+              this._app.pieUpdateNeeded = true;
+              
+              // Emit to stream
+              controller.enqueue({ nodeId, value: newValue });
+            }
+          }
+        });
         
-        // Request UI updates
-        this._app.updateNeeded = true;
-        this._app.pieUpdateNeeded = true;
+        // Store subscription for cleanup
+        this._recognitionSubscriptions.set(nodeId, cleanup);
+      },
+      cancel: () => {
+        this.unsubscribeFromNodeRecognition(nodeId);
       }
     });
     
-    // Store subscription for cleanup
-    this._recognitionSubscriptions.set(nodeId, cleanup);
+    // Store the stream reader for cleanup
+    const reader = stream.getReader();
+    
+    // Process the stream
+    const processStream = async () => {
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          // Process recognition update if needed
+        }
+      } catch (err) {
+        console.error(`Error processing recognition stream for node ${this._id} from ${nodeId}:`, err);
+      }
+    };
+    
+    processStream();
   }
   
   /**
@@ -388,6 +505,10 @@ export class TreeNode extends GunNode<TreeNodeData> {
       cleanup();
       this._recognitionSubscriptions.delete(nodeId);
       delete this._sharesOfOthersRecognition[nodeId];
+      
+      // Request UI updates since recognition data changed
+      this._app.updateNeeded = true;
+      this._app.pieUpdateNeeded = true;
     }
   }
   

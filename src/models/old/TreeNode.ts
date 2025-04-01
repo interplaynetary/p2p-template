@@ -1,15 +1,9 @@
-import { App } from '../App';
-import { readFromGunPath } from './FuncGun';
-import { gun } from './Gun';
+import { App } from '../../App';
+import { readFromGunPath } from '../FuncGun';
+import { gun } from '../Gun';
 
 // Are our nodes saving to the gun-space or the user-space
 // Late: From public to user-spaces (so that overwriting is not possible)
-
-// Create a tree for all those we recognize and subscribe to their changes so that we can calculate mutual-recognition
-
-// So we know we need to mantain in our own cache, the trees of:
-// - All nodes we recognize
-// THAT IS IT.
 
 // couldnt we pass children into the TreeNode constructor? As well as the addChild constructor?
 // Now we need to change our isContributor logic to be more Gun Based
