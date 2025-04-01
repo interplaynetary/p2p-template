@@ -1,5 +1,5 @@
 import { gun, user } from './models/Gun';
-import { TreeNode } from './models/TreeNodeReactive';
+import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
 import { updateUserProfile } from './utils/userUtils';

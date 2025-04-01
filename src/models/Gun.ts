@@ -7,25 +7,87 @@ import SEA from 'gun/sea.js'
 // import 'gun/lib/rindexed'
 // import 'gun/lib/webrtc'
 
-// Initialize Gun with SEA
-console.log('Initializing Gun with peer:', ['http://127.0.0.1:5500/gun']);
-
-export let gun = Gun({
+// Initialize Gun with peer and storage
+export const gun = Gun({
   peers: ['http://127.0.0.1:5500/gun'],
   localStorage: true
-})
+});
 
 // Get authenticated user space
 export const user = gun.user();
 
-// Modified to return a Promise so we can wait for recall to complete
+// Recall user session - returns a promise for async/await support
 export const recallUser = (): Promise<void> => {
   return new Promise((resolve) => {
-    user.recall({ sessionStorage: true }, () => {
-      console.log('User recall completed');
+    // Already authenticated? Resolve immediately
+    if (user.is?.pub) {
       resolve();
+      return;
+    }
+
+    // Set up one-time auth handler
+    const authHandler = () => {
+      (gun as any).off('auth', authHandler);
+      resolve();
+    };
+    gun.on('auth', authHandler);
+
+    // Attempt recall
+    user.recall({ sessionStorage: true });
+
+    // Safety timeout
+    setTimeout(() => {
+      (gun as any).off('auth', authHandler);
+      resolve();
+    }, 1000);
+  });
+};
+
+// Single authentication function that handles both login and signup
+export const authenticate = async (alias: string, pass: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // First try to login
+    user.auth(alias, pass, (ack: any) => {
+      if (!ack.err) {
+        resolve();
+        return;
+      }
+      
+      // If login fails, create and authenticate new user
+      user.create(alias, pass, (createAck: any) => {
+        if (createAck.err) {
+          reject(new Error(createAck.err));
+          return;
+        }
+        
+        // After creation, authenticate
+        user.auth(alias, pass, (authAck: any) => {
+          authAck.err ? reject(new Error(authAck.err)) : resolve();
+        });
+      });
     });
   });
+};
+
+// Clean logout that clears storage
+export const logout = () => {
+  user.leave();
+  sessionStorage.clear();
+  localStorage.clear();
+};
+
+// Helper to get encrypted user paths
+export const getPath = async (path: string) => {
+  if (!user.is) return null;
+  const pair = (user as any)._.sea;  // Type assertion for internal Gun property
+  const proof = await SEA.work(path, pair);
+  return proof ? `~${user.is.pub}/${proof}` : null;
+};
+
+// Get user's nodes graph
+export const getNodesGraph = async () => {
+  const path = await getPath('nodes');
+  return path ? user.get(path) : null;
 };
 
 /*
@@ -57,45 +119,3 @@ await gun.get('~'+bob.pub).get('AliceOnly').get('do-not-tell-anyone').put(enc, n
 await gun.get('~'+bob.pub).get('AliceOnly').get('do-not-tell-anyone').once(console.log) // return 'enc'
 })();
 */
-
-// Single authentication function that handles both login and signup
-export const authenticate = async (alias: string, pass: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // First try to login
-    user.auth(alias, pass, (ack: any) => {
-      if (!ack.err) {
-        console.log('Auth successful')
-        resolve()
-        return
-      }
-      
-      // If login fails, try to create account
-      user.create(alias, pass, (createAck: any) => {
-        if (createAck.err) {
-          reject(new Error(createAck.err))
-          return
-        }
-        console.log('Auth successful')
-        resolve()
-      })
-    })
-  })
-}
-
-export const logout = () => {
-  user.leave()
-}
-
-// Helper to get encrypted paths
-export const getPath = async (path: string) => {
-  if (!user.is) return null
-  const pair = (user as any)._.sea
-  const proof = await SEA.work(path, pair)
-  return proof ? `~${user.is.pub}/${proof}` : null
-}
-
-// Root nodes for our data structure - in user's encrypted space
-export const getNodesGraph = async () => {
-  const path = await getPath('nodes')
-  return path ? user.get(path) : null
-}

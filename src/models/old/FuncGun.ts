@@ -1,4 +1,4 @@
-import { user, gun } from './Gun'
+import { user, gun } from '../Gun'
 
 /**
  * Writes data to a specified path in Gun database.

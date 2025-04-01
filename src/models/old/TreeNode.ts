@@ -1,5 +1,5 @@
 import { App } from '../../App';
-import { readFromGunPath } from '../FuncGun';
+import { readFromGunPath } from './FuncGun';
 import { gun } from '../Gun';
 
 // Are our nodes saving to the gun-space or the user-space

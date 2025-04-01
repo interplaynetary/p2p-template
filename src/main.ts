@@ -1,5 +1,5 @@
 import { App } from './App';
-import * as GunX from './models/Gun';
+import { user, recallUser, authenticate, logout} from './models/Gun';
 import './style.css';
 import $ from 'jquery';
 import encodeQR from '@paulmillr/qr';
@@ -9,19 +9,19 @@ let app: App | undefined;
 
 // Initialize function that handles recall and app initialization
 async function initializeApp() {
+    console.log('Starting app initialization...');    
     console.log('Attempting to recall user session');
-    await GunX.recallUser();
-    
+    await recallUser();
     // Check if the user is authenticated after recall
-    if (GunX.user.is) {
-        console.log('User session recalled successfully', GunX.user.is.pub);
+    if (user.is && user.is.pub) {
+        console.log('User session recalled successfully', user.is.pub);
         const authContainer = document.getElementById('auth-container');
         if (authContainer) {
             authContainer.classList.add('hidden');
-            console.log('Auth container hidden due to successful recall');
         }
         
         try {
+            console.log('Initializing app with authenticated user');
             app = new App();
             await app.initialize();
             console.log('App initialized after session recall:', app);
@@ -36,7 +36,7 @@ async function initializeApp() {
             }
         }
     } else {
-        console.log('No user session found, showing login form');
+        console.log('No valid user session found, showing login form');
         // Show auth container if no user session
         const authContainer = document.getElementById('auth-container');
         if (authContainer) {
@@ -52,7 +52,7 @@ async function handleAuth(event: Event) {
     const password = (document.getElementById('password') as HTMLInputElement).value;
 
     try {
-        await GunX.authenticate(username, password);
+        await authenticate(username, password);
         console.log('Login successful');
     } catch(error) {
         console.log('Auth failed:', error);
@@ -203,7 +203,7 @@ function setupUIHandlers() {
 
     function generateQRCode() {
         // Use the existing 'player' Gun reciever instance
-        const publicKey = GunX.user.is?.pub;  // Add optional chaining for safety
+        const publicKey = user.is?.pub;  // Add optional chaining for safety
         
         if (!publicKey) {
             console.log('Reciever not logged in yet');
@@ -425,7 +425,7 @@ function setupUIHandlers() {
 
     // Logout button handler
     $('#logout').on('click', function() {
-        GunX.logout();
+        logout();
         location.reload(); // Refresh the page to show login screen
     });
 }
