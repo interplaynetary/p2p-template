@@ -216,6 +216,37 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     // Set up new subscription using path abstraction
     const childrenNode = this.get('children');
+    
+    // First, try to get initial children data all at once
+    childrenNode.once().then(initialData => {
+      if (initialData && typeof initialData === 'object') {
+        // Process initial children data
+        Object.keys(initialData).forEach(childId => {
+          // Skip Gun metadata
+          if (childId === '_') return;
+          
+          // Skip if already added
+          if (this._children.has(childId)) return;
+          
+          // Load the child node if data exists
+          if (initialData[childId]) {
+            const childNode = TreeNode.getNode(childId, this._app);
+            this._children.set(childId, childNode);
+            
+            // Ensure parent reference is correct
+            childNode.parent = this;
+            
+            // Request UI updates
+            this._app.updateNeeded = true;
+            this._app.pieUpdateNeeded = true;
+          }
+        });
+      }
+    }).catch(err => {
+      console.warn(`Error loading initial children for node ${this._id}:`, err);
+    });
+    
+    // Set up ongoing reactive subscription
     this._childrenSubscription = childrenNode.each((childData) => {
       const childId = childData._key;
       

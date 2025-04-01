@@ -146,11 +146,15 @@ export class GunSubscription<T = any> {
         if (cleanup) {
           cleanup(); // Ensure we clean up if we timeout
         }
-        reject(new Error('Gun once() timed out after 10 seconds'));
+        // Resolve with null rather than rejecting to prevent breaking app flow
+        resolve(null as any);
+        console.warn('Gun once() timed out after 10 seconds');
       }, 10000);
 
-      // Set up a one-time handler
+      // Declare cleanup variable first
       let cleanup: SubscriptionCleanup | null = null;
+      
+      // Set up a one-time handler
       cleanup = this.on((data) => {
         clearTimeout(timeout);
         if (cleanup) {

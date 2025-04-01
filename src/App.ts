@@ -124,7 +124,7 @@ export class App {
             updateUserProfile(this.rootId, this.name);
             
             // Also store the node reference separately
-            gun.get('users').get(this.rootId).get('node').put(gun.get('nodes').get(this.rootId));
+            gun.get('users').get(this.rootId).get('node').put(this.gunRef);
             
             // Setup a ping every minute to keep our lastSeen timestamp fresh
             this.saveInterval = setInterval(() => {
@@ -153,11 +153,11 @@ export class App {
             console.log('[App] Checking for children in Gun...');
             const childrenCheck = await Promise.race([
                 new Promise<boolean>(resolve => {
-                    gun.get('nodes').get(this.rootId).get('children').once((data) => {
+                    this.gunRef.get('children').once((data) => {
                         console.log('[App] Children data in Gun:', data);
                         // Check if data exists and has properties other than '_'
                         const hasChildren = data && typeof data === 'object' && 
-                                        Object.keys(data).filter(k => k !== '_').length > 0;
+                                         Object.keys(data).filter(k => k !== '_').length > 0;
                         resolve(hasChildren);
                     });
                 }),
@@ -170,10 +170,12 @@ export class App {
             
             console.log('[App] Children check result:', { childrenCheck, localChildrenCount: this.rootNode.children.size });
             
-            // Initialize example data if needed - use the TreeNode directly now
+            // Initialize example data if needed - wrap the root node in compatibility layer if needed
             if (!childrenCheck && this.rootNode.children.size === 0) {
                 console.log('[App] No children found, initializing example data');
-                await initializeExampleData(this.rootNode);
+                // Adapt the TreeNode to the interface expected by initializeExampleData if needed
+                const compatibleNode = this.createCompatibleNode(this.rootNode);
+                await initializeExampleData(compatibleNode);
                 console.log('[App] Example data initialization complete');
             } else {
                 console.log('[App] Root node already has children, skipping example data');
@@ -184,8 +186,9 @@ export class App {
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             console.log('[App] Creating treemap visualization');
-            // Create visualization with the loaded root - use it directly
-            this.treemap = createTreemap(this.rootNode, width, height);
+            // Create visualization with the loaded root - adapt if needed
+            const compatibleNode = this.createCompatibleNode(this.rootNode);
+            this.treemap = createTreemap(compatibleNode, width, height);
             if (!this.treemap?.element) {
                 console.error('[App] Treemap element creation failed');
                 throw new Error('Treemap element is null'); 
@@ -227,6 +230,104 @@ export class App {
             console.error('[App] Initialization failed with error:', error);
             throw error;
         }
+    }
+
+    // Helper method to create a compatibility wrapper for components expecting old TreeNode interface
+    private createCompatibleNode(node: TreeNode | null): any {
+        if (!node) return null;
+        
+        // Return a proxy that adapts our new TreeNode to the interface expected by components
+        return new Proxy(node, {
+            get: (target, prop, receiver) => {
+                // Special handling for properties that might be missing or different
+                if (prop === 'gunRef') {
+                    // Provide a gun reference directly as expected by old components
+                    return gun.get('nodes').get(target.id);
+                }
+                
+                if (prop === 'childrenArray') {
+                    // Convert Map to Array for components that expect an array
+                    return Array.from(target.children.values());
+                }
+                
+                if (prop === 'hasChildren') {
+                    // Convert to boolean property
+                    return target.children.size > 0;
+                }
+                
+                if (prop === 'app') {
+                    // Return the app instance
+                    return this;
+                }
+                
+                if (prop === 'typeIndex') {
+                    // Legacy components might expect typeIndex
+                    return {};
+                }
+                
+                if (prop === 'nodeSubscription') {
+                    // Legacy components might expect nodeSubscription
+                    return () => {}; // No-op function for cleanup
+                }
+                
+                if (prop === 'calculateSharesOfGeneralFulfillment') {
+                    // Backward compatibility for old methods
+                    return function() {
+                        if (typeof target[prop] === 'function') {
+                            return target[prop]();
+                        }
+                        return {};
+                    };
+                }
+                
+                if (prop === 'addChild' && typeof target[prop] === 'function') {
+                    // Wrap addChild to handle different parameter structures
+                    return function(name: string, points: number | any) {
+                        // Handle both old style (name, points) and new style (name, options)
+                        if (typeof points === 'number') {
+                            return target.addChild(name, { points });
+                        } else if (typeof points === 'object') {
+                            return target.addChild(name, points);
+                        } else {
+                            return target.addChild(name);
+                        }
+                    };
+                }
+                
+                if (prop === 'saveToGun' && typeof target.put === 'function') {
+                    // Map the old saveToGun method to put
+                    return function() {
+                        const data = {
+                            id: target.id,
+                            name: target.name,
+                            points: target.points,
+                            manualFulfillment: target.manualFulfillment,
+                            parent: target.parent?.id
+                        };
+                        return target.put(data);
+                    };
+                }
+                
+                // Special case for toJSON or serialization
+                if (prop === 'toJSON' || prop === Symbol.toPrimitive) {
+                    return function() {
+                        return {
+                            id: target.id,
+                            name: target.name,
+                            points: target.points,
+                            children: Array.from(target.children.values()),
+                            types: Array.from(target.types),
+                            fulfilled: target.fulfilled,
+                            desire: target.desire,
+                            weight: target.weight
+                        };
+                    };
+                }
+                
+                // Forward all other properties to the actual node
+                return Reflect.get(target, prop, receiver);
+            }
+        });
     }
 
     get currentView() {
@@ -321,7 +422,8 @@ export class App {
         if (container && this.treemap && this.rootNode) {
             this.treemap.destroy();
             container.innerHTML = '';
-            this.treemap = createTreemap(this.rootNode, container.clientWidth, container.clientHeight);
+            const compatibleNode = this.createCompatibleNode(this.rootNode);
+            this.treemap = createTreemap(compatibleNode, container.clientWidth, container.clientHeight);
             if (this.treemap.element) {
                 container.appendChild(this.treemap.element);
             }
@@ -343,7 +445,8 @@ export class App {
         pieContainer.innerHTML = '';
         
         try {
-            const newPieChart = await createPieChart(this.rootNode);
+            const compatibleNode = this.createCompatibleNode(this.rootNode);
+            const newPieChart = await createPieChart(compatibleNode);
             if (!newPieChart) {
                 console.error('Failed to create pie chart');
                 return;
