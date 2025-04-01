@@ -2,14 +2,12 @@ import { gun, user } from './models/Gun';
 import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
+import { updateUserProfile, loadUsers } from './utils/userUtils';
 import { initializeExampleData } from './example';
 import $ from 'jquery';
 
 // TODO:
 // We currently arent using handleResize, but we should probably use it?
-
-// This seems unneeded:
-// gun.get('users').get(this.rootId).get('name').put(this.name); // Keep name updated
 
 export class App {
     name: string = ''
@@ -98,21 +96,18 @@ export class App {
                 }
             }
 
-            // Create a reference to this node in the users path
+            // Create a reference to this node in the users path and update our profile
             console.log('[App] Creating user reference in users path:', this.rootId);
-            // Always ensure the user's name is saved correctly in the users path
-            gun.get('users').get(this.rootId).put({
-                node: this.gunRef,  // Reference to the actual node
-                lastSeen: Date.now()
-            });
-
-            // Setup a regular ping to keep user data fresh
+            // Using simpler updateUserProfile function
+            updateUserProfile(this.rootId, this.name);
+            
+            // Also store the node reference separately
+            gun.get('users').get(this.rootId).get('node').put(this.gunRef);
+            
+            // Setup a ping every minute to keep our lastSeen timestamp fresh
             this.saveInterval = setInterval(() => {
-                const timestamp = Date.now();
-                // Update lastSeen in both paths
-                this.gunRef.get('lastSeen').put(timestamp);
-                gun.get('users').get(this.rootId).get('lastSeen').put(timestamp);
-            }, 60000); // Update every minute
+                updateUserProfile(this.rootId, this.name);
+            }, 60000);
 
             console.log('[App] Root node setup complete, initializing UI');
             const container = document.getElementById('treemap-container');
@@ -408,55 +403,62 @@ export class App {
         console.log('[App] Discovering other users');
         return new Promise((resolve) => {
             const users: {id: string, name: string, lastSeen: number}[] = [];
-            const seenIds = new Set<string>();
+            let userLoader: (() => void) | null = null;
             
-            // Use on() instead of once() to get live updates
-            gun.get('users').map().on(async (data, key) => {
-                console.log('[App] Found user:', data);
-                if (data && key !== this.rootId && !seenIds.has(key)) {
-                    console.log(`[App] Found user: ${data.name} (${key})`);
-                    seenIds.add(key);
-                    users.push({
-                        id: key,
-                        name: (await TreeNode.fromId(key)).name || 'Unknown',
-                        lastSeen: data.lastSeen || 0
-                    });
+            // Use our improved loadUsers utility which handles Gun subscriptions properly
+            userLoader = loadUsers((userList) => {
+                // Convert the basic user list to the format we need with lastSeen
+                const updatedUsers = userList.map(user => {
+                    // Check if we already have this user with lastSeen data
+                    const existingUser = users.find(u => u.id === user.id);
+                    return {
+                        id: user.id,
+                        name: user.name,
+                        lastSeen: existingUser?.lastSeen || Date.now() // Use existing timestamp or current time
+                    };
+                });
+                
+                // Replace our users array with the updated one
+                users.length = 0; 
+                users.push(...updatedUsers);
+                
+                // Update the UI when we find users
+                if (document.getElementById('user-list')) {
+                    const userListHtml = users.map(user => {
+                        const lastSeenDate = user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'Unknown';
+                        return `
+                            <li>
+                                <div>${user.name}</div>
+                                <div>Last seen: ${lastSeenDate}</div>
+                                <button class="connect-to-user" data-id="${user.id}">Connect</button>
+                            </li>
+                        `;
+                    }).join('');
                     
-                    // Update the UI when we find new users
-                    if (document.getElementById('user-list')) {
-                        const userListHtml = users.map(user => {
-                            const lastSeenDate = user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'Unknown';
-                            return `
-                                <li>
-                                    <div>${user.name}</div>
-                                    <div>Last seen: ${lastSeenDate}</div>
-                                    <button class="connect-to-user" data-id="${user.id}">Connect</button>
-                                </li>
-                            `;
-                        }).join('');
+                    $('#user-list').html(userListHtml);
+                    
+                    // Re-add click handlers
+                    $('.connect-to-user').off('click').on('click', async function() {
+                        const userId = $(this).data('id');
+                        const success = await (window as any).app.connectToPeer(userId);
                         
-                        $('#user-list').html(userListHtml);
-                        
-                        // Re-add click handlers
-                        $('.connect-to-user').off('click').on('click', async function() {
-                            const userId = $(this).data('id');
-                            const success = await (window as any).app.connectToPeer(userId);
-                            
-                            if (success) {
-                                alert(`Connected to ${$(this).parent().find('div').first().text()}`);
-                                $('.node-popup').removeClass('active');
-                            } else {
-                                alert('Failed to connect to user');
-                            }
-                        });
-                    }
+                        if (success) {
+                            alert(`Connected to ${$(this).parent().find('div').first().text()}`);
+                            $('.node-popup').removeClass('active');
+                        } else {
+                            alert('Failed to connect to user');
+                        }
+                    });
                 }
             });
             
-            // Return initial results after a timeout
+            // Return initial results after a brief timeout to allow some users to load
             setTimeout(() => {
                 console.log(`[App] Discovered ${users.length} users so far`);
                 resolve(users);
+                
+                // Continue discovery in background for UI updates
+                // (We don't unsubscribe until the component is destroyed)
             }, 1000);
         });
     }

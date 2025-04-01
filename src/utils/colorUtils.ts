@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 const nameColors = new Map();
+
 const colorScale = d3.scaleOrdinal()
     .range([
         ...d3.schemePastel1,
@@ -14,4 +15,8 @@ export function getColorForName(name) {
         nameColors.set(name, colorScale(name));
     }
     return nameColors.get(name);
+}
+
+export function getColorForUserId(userId: string) {
+    return getColorForName(userId);
 }

@@ -1,6 +1,8 @@
 import * as d3 from 'd3';
-import { getColorForName } from '../utils/colorUtils';
+import { getUserName } from '../utils/userUtils';
+import { getColorForUserId } from '../utils/colorUtils';
 import { TreeNode } from '../models/TreeNode';
+
 
 export function createPieChart(data: TreeNode) {
     // Get the container dimensions
@@ -30,17 +32,8 @@ export function createPieChart(data: TreeNode) {
         return createPlaceholderPieChart(width, height, radius);
     }
     
-    // Create a map of node IDs to TreeNode objects for later reference
-    const nodeMap = new Map<string, TreeNode>();
+    // No need to reconstruct nodes since we can use getUserName
     
-    // Get node objects for each ID directly from nodeCache
-    for (const [nodeId] of pieData) {
-        const node = TreeNode.getNodeById(nodeId);
-        if (node) {
-            nodeMap.set(nodeId, node);
-        }
-    }
-
     // Create pie layout
     const pie = d3.pie<[string, number]>()
         .value(d => d[1])  // Use the mutualFulfillmentDistribution value
@@ -66,16 +59,14 @@ export function createPieChart(data: TreeNode) {
         .data(arcs)
         .join("path")
         .attr("fill", d => {
-            // Try to get the node object from the map, or use a default color
-            const node = nodeMap.get(d.data[0]);
-            return node ? getColorForName(node.name) : getColorForName(d.data[0]);
+            // Use the node ID to get a name for the color
+            return getColorForUserId(d.data[0]);
         })
         .attr("d", d => arc(d as any))  // Type assertion to fix type error
         .append("title") 
         .text(d => {
-            const node = nodeMap.get(d.data[0]);
-            const name = node ? node.name : d.data[0];
-            return `${name}: ${(d.data[1] * 100).toFixed(1)}%`;
+            const nodeName = getUserName(d.data[0]);
+            return `${nodeName}: ${(d.data[1] * 100).toFixed(1)}%`;
         });
 
     // Add labels with node names
@@ -93,11 +84,11 @@ export function createPieChart(data: TreeNode) {
         .style("pointer-events", "none")
         .style("text-shadow", "0px 0px 2px rgba(0,0,0,0.8)")
         .text(d => {
-            const node = nodeMap.get(d.data[0]);
-            if (node && node.name.length < 10) {
-                return node.name;
+            const nodeName = getUserName(d.data[0]);
+            if (nodeName.length < 10) {
+                return nodeName;
             }
-            // Don't show text for long names or if node isn't loaded
+            // Don't show text for long names
             return "";
         });
 

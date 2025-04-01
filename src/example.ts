@@ -1,4 +1,4 @@
-import { TreeNode } from './models/mid/TreeNode';
+import { TreeNode } from '../../experiments/mid/TreeNode';
 
 // Export the initialization function
 export async function initializeExampleData(root: TreeNode) {

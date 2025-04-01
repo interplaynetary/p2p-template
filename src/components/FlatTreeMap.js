@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 import { getColorForName } from '../utils/colorUtils.js';
 import { calculateFontSize } from '../utils/fontUtils.js';
 
-// lets just visualize: shareOfGeneralFulfillment(rootNode) for the proportions!
+// lets just visualize: rootNode.sharesOfGeneralFulfillment for the proportions!
 // and the mutual-recognition of each relation!
 // lets display each role, and see the state for desire, mutual-desire, playing, mutual-playing, surplus
 // lets display the incoming char-stream for each node! (messaging) each one should scale to show a proportion of the total-chars.

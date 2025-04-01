@@ -1,9 +1,8 @@
 import * as d3 from 'd3';
-import { getColorForName } from '../utils/colorUtils';
-import { calculateFontSize, name } from '../utils/fontUtils';
 import { TreeNode } from '../models/TreeNode';
-import { usersMap, getUserName } from '../utils/names';
-import { gun } from '../models/Gun';
+import { getColorForName, getColorForUserId } from '../utils/colorUtils';
+import { calculateFontSize, name } from '../utils/fontUtils';
+import { getUserName, loadUsers } from '../utils/userUtils';
 
 // TODO:
 // Extract various functions into helpers (in particular gun.js related stuff)
@@ -13,7 +12,8 @@ import { gun } from '../models/Gun';
 
 
 // lets clean up the App.ts especially everything related to adding peers
-// lets extract the utility functions
+
+// Let's extract all gun related things into their own components
 
 // Create a type for the treemap return value
 type TreemapInstance = {
@@ -332,7 +332,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .style("display", "flex")
                 .style("align-items", "center")
                 .style("border-radius", "10px")
-                .style("background", getColorForName(getUserName(type)))
+                .style("background", getColorForUserId(type))
                 .style("padding", "2px 8px")
                 .style("margin", "2px")
                 .style("height", "20px")
@@ -409,7 +409,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             tagPill.attr("title", `${getUserName(type)}: Click to view tree, click × to remove`);
         });
         
-        // Create search dropdown for add tag button
+        // Add tag button click handler
         addTagButton.on("click", (event) => {
             event.stopPropagation();
             
@@ -432,6 +432,37 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .style("display", "flex")
                 .style("flex-direction", "column")
                 .style("z-index", "99999"); // Even higher z-index to ensure it's above everything
+            
+            // Function to adjust dropdown position to keep it in viewport
+            function adjustDropdownPosition() {
+                const dropdown = dropdownContainer.node();
+                if (!dropdown) return;
+                
+                const rect = dropdown.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Check right edge
+                if (rect.right > viewportWidth - 10) {
+                    dropdownContainer.style("left", `${viewportWidth - rect.width - 10}px`);
+                }
+                
+                // Check left edge
+                if (rect.left < 10) {
+                    dropdownContainer.style("left", "10px");
+                }
+                
+                // Check bottom edge
+                if (rect.bottom > viewportHeight - 10) {
+                    // If dropdown would go above the top, position it at the top with padding
+                    if (event.clientY - rect.height < 10) {
+                        dropdownContainer.style("top", "10px");
+                    } else {
+                        // Otherwise, position above the click
+                        dropdownContainer.style("top", `${event.clientY - rect.height - 10}px`);
+                    }
+                }
+            }
             
             // Store any active gun subscriptions for cleanup
             let gunSubscriptions = [];
@@ -483,103 +514,37 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .style("overflow-y", "auto")
                 .style("flex", "1");
                 
-            // Function to load and filter users
-            async function loadUsers(filterText = "") {
-                resultsContainer.html(""); // Clear previous results
+            let currentFilterText = "";
+            
+            // Load and display users using our new utility function
+            function updateUserList(filterText = "") {
+                currentFilterText = filterText;
                 
-                // Show loading indicator
-                const loadingIndicator = resultsContainer.append("div")
+                // Show loading indicator first
+                resultsContainer.html("");
+                resultsContainer.append("div")
                     .attr("class", "loading-indicator")
                     .style("padding", "8px")
                     .style("text-align", "center")
                     .style("color", "#888")
                     .style("font-size", "11px")
-                    .text("Loading...");
+                    .text("Loading users...");
                 
-                // Collect users for batched display
-                const users: Array<{id: string, name: string}> = [];
-                let foundUsers = false;
-                let userCount = 0;
-                
-                // First check already cached users
-                for (const [userId, userName] of usersMap.entries()) {
-                    // Skip if it's the root node or already a type
-                    if (userId === d.data.app.rootId || (d.data.types && d.data.types.has(userId))) {
-                        continue;
+                // The cleanup function for previous subscription if any
+                if (gunSubscriptions.length > 0) {
+                    const lastSubscription = gunSubscriptions.pop();
+                    if (typeof lastSubscription === 'function') {
+                        lastSubscription();
                     }
-                    
-                    // Apply filter if needed
-                    if (filterText && !userName.toLowerCase().includes(filterText.toLowerCase())) {
-                        continue;
-                    }
-                    
-                    // Add to the display list
-                    users.push({ id: userId, name: userName });
-                    userCount++;
-                    foundUsers = true;
                 }
                 
-                // Then get any additional users from Gun that aren't already cached
-                const gunQuery = gun.get('users').map().on((userData, userId) => {
-                    // Skip if already processed from cache
-                    if (usersMap.has(userId) || !userData || !userId || userId === d.data.app.rootId) {
-                        return;
-                    }
-                    
-                    // Check if this user is already a type on the node
-                    if (d.data.types && d.data.types.has(userId)) {
-                        return;
-                    }
-                    
-                    // Get user name using our global getUserName function
-                    // This will add the user to usersMap for future use
-                    const userName = getUserName(userId);
-                    
-                    // If we got a fallback ID, trigger a longer lookup
-                    if (userName === userId) {
-                        // This will eventually update usersMap when the gun.once callback fires
-                        return;
-                    }
-                    
-                    // Apply filter if needed
-                    if (filterText && !userName.toLowerCase().includes(filterText.toLowerCase())) {
-                        return;
-                    }
-                    
-                    // Add to users collection if not already there
-                    if (!users.some(u => u.id === userId)) {
-                        const userInfo = { id: userId, name: userName };
-                        users.push(userInfo);
-                        userCount++;
-                        foundUsers = true;
-                        
-                        // Update the display immediately
-                        updateUsersList();
-                    }
-                });
-                
-                // If we already have users from cache, update immediately
-                if (users.length > 0) {
-                    updateUsersList();
-                }
-                
-                // Add subscription to cleanup list
-                gunSubscriptions.push(gunQuery);
-                
-                // Function to update the displayed list
-                function updateUsersList() {
-                    // Only update if we have users
-                    if (users.length === 0) return;
-                    
-                    // Remove loading indicator once we have data
-                    if (loadingIndicator) {
-                        loadingIndicator.remove();
-                    }
-                    
-                    // Clear and recreate the list
+                // Load users with reactive subscription
+                const cleanup = loadUsers((users) => {
+                    // Clear results container when we have data
                     resultsContainer.html("");
                     
-                    if (!foundUsers) {
+                    // Show message if no users found
+                    if (users.length === 0) {
                         resultsContainer.append("div")
                             .style("padding", "8px")
                             .style("text-align", "center")
@@ -589,10 +554,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                         return;
                     }
                     
-                    // Sort users by name
-                    users.sort((a, b) => a.name.localeCompare(b.name));
-                    
-                    // Create user items for all found users
+                    // Create user items
                     users.forEach(user => {
                         // Create user item
                         const userItem = resultsContainer.append("div")
@@ -610,7 +572,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                         userItem.append("div")
                             .style("width", "10px")
                             .style("height", "10px")
-                            .style("background", getColorForName(user.name))
+                            .style("background", getColorForUserId(user.id))
                             .style("border-radius", "50%")
                             .style("margin-right", "6px");
                         
@@ -648,15 +610,22 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     
                     // Re-adjust position if needed after content changes
                     adjustDropdownPosition();
-                }
+                }, {
+                    filterText: filterText,
+                    excludeIds: d.data.types ? Array.from(d.data.types) : [],
+                    rootId: d.data.app.rootId
+                });
+                
+                // Store cleanup function to cancel subscription when dropdown closes
+                gunSubscriptions.push(cleanup);
             }
             
             // Initial load of users
-            loadUsers();
+            updateUserList();
             
             // Handle search input
             searchInput.on("input", function() {
-                loadUsers(this.value);
+                updateUserList(this.value);
             });
             
             // Close dropdown when clicking outside
@@ -674,32 +643,6 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             
             // Move the dropdown to the body's end to ensure it's on top of all elements
             document.body.appendChild(dropdownContainer.node());
-
-            // Function to check and adjust dropdown position to keep in viewport
-            function adjustDropdownPosition() {
-                const dropdown = dropdownContainer.node();
-                if (!dropdown) return;
-                
-                const rect = dropdown.getBoundingClientRect();
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-                
-                // Check right edge
-                if (rect.right > viewportWidth) {
-                    dropdownContainer.style("left", `${viewportWidth - rect.width - 10}px`);
-                }
-                
-                // Check bottom edge
-                if (rect.bottom > viewportHeight) {
-                    // If dropdown would go above the top, position it at the top with some padding
-                    if (event.clientY - rect.height < 10) {
-                        dropdownContainer.style("top", "10px");
-                    } else {
-                        // Otherwise, position above the click
-                        dropdownContainer.style("top", `${event.clientY - rect.height - 10}px`);
-                    }
-                }
-            }
             
             // Adjust position after creation
             setTimeout(adjustDropdownPosition, 0);
