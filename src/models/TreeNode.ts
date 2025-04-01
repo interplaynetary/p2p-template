@@ -3,6 +3,14 @@ import { GunNode } from './GunNode';
 import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './GunSubscription';
 import { gun } from './Gun';
 
+
+// We added normalization to ensure that the shares of recognition sum to 1
+// now we need to ensure that the other has not tampered with their _sharesOfOthersRecognition
+// Because it is on this basis that we calculate mutual-recognition
+
+// Or is it actually ok? Since we would only be lying to ourselves?
+// And this lie is itself normalized within ourselves in the mutuality distribution?
+
 // Define the core data structure of a TreeNode
 export interface TreeNodeData {
   id: string;
@@ -25,19 +33,24 @@ export class TreeNode extends GunNode<TreeNodeData> {
   private _manualFulfillment: number | null = null;
   private _children: Map<string, TreeNode> = new Map();
   private _types: Set<string> = new Set();
+  private _recognitionSubscriptions: Map<string, () => void> = new Map();
   private _sharesOfOthersRecognition: {[key: string]: number} = {};
   
   // Subscriptions for cleanup
   private _parentSubscription: SubscriptionCleanup | null = null;
   private _childrenSubscription: SubscriptionCleanup | null = null;
   private _typesSubscription: SubscriptionCleanup | null = null;
-  private _recognitionSubscriptions: Map<string, SubscriptionCleanup> = new Map();
   
   // Reference to App
   private _app: App;
   
   // Static registry for nodes to avoid duplicates
   private static _registry: Map<string, TreeNode> = new Map();
+  
+  // Add at class level
+  private _sharesCalculationScheduled: boolean = false;
+  private _lastSharesCalculation: number = 0;
+  private _cachedShares: {[key: string]: number} | null = null;
   
   /**
    * Create a new TreeNode or get an existing one from registry
@@ -56,6 +69,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
     TreeNode._registry.set(id, node);
     return node;
   }
+
   
   /**
    * Create a new node with the given name and options
@@ -130,6 +144,12 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Set up data subscriptions
     this.setupSubscriptions();
   }
+
+    // Helper property
+    private get isRoot(): boolean {
+      return !this._parent;
+    }
+  
   
   /**
    * Set up all reactive subscriptions to Gun data
@@ -142,7 +162,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
       // console.log(`[TreeNode ${this._id}] Received data update:`, data);
       let updated = false;
       
-      // Only update if values actually changed
+      // Track if we need to recalculate shares
+      let needsSharesRecalculation = false;
+      
       if (data.name !== undefined && data.name !== this._name) {
         this._name = data.name || '';
         updated = true;
@@ -151,29 +173,30 @@ export class TreeNode extends GunNode<TreeNodeData> {
       if (data.points !== undefined && data.points !== this._points) {
         this._points = data.points || 0;
         updated = true;
+        needsSharesRecalculation = true;  // Points affect weights
       }
       
       if (data.manualFulfillment !== undefined && data.manualFulfillment !== this._manualFulfillment) {
         this._manualFulfillment = data.manualFulfillment;
         updated = true;
+        needsSharesRecalculation = true;  // Fulfillment affects recognition
       }
       
-      // Handle parent changes
       if (data.parent !== undefined) {
-        // If we have a parent ID but no parent object,
-        // or parent ID changed, load the new parent
-        if (
-          (data.parent && (!this._parent || this._parent.id !== data.parent)) ||
-          (!data.parent && this._parent)
-        ) {
+        if ((data.parent && (!this._parent || this._parent.id !== data.parent)) ||
+            (!data.parent && this._parent)) {
           this.updateParent(data.parent || null);
           updated = true;
+          needsSharesRecalculation = true;  // Parent affects weights
         }
       }
       
-      // Request UI updates if needed
+      // Schedule shares recalculation if needed
+      if (needsSharesRecalculation && this.isRoot) {
+        this.scheduleSharesCalculation();
+      }
+      
       if (updated) {
-        // console.log(`[TreeNode ${this._id}] Properties updated, requesting UI update`);
         this._app.updateNeeded = true;
         this._app.pieUpdateNeeded = true;
       }
@@ -185,8 +208,35 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Subscribe to types
     this.subscribeToTypes();
     
-    // Subscribe to recognition
-    this.updateRecognitionSubscriptions();
+    // Only set up recognition subscriptions if we're the root node
+    if (!this._parent) {
+      this.setupRecognitionSubscriptions();
+
+      // Re-setup recognition when types change anywhere in the tree
+      this.get('types').on(() => {
+        if (this.isRoot) {
+          this.scheduleSharesCalculation();
+        }
+      });
+
+      // Re-setup recognition when children change anywhere in the tree
+      this.get('children').on(() => {
+        if (this.isRoot) {
+          this.scheduleSharesCalculation();
+        }
+      });
+    }
+  }
+
+  private scheduleSharesCalculation() {
+    if (this._sharesCalculationScheduled) return;
+    this._sharesCalculationScheduled = true;
+    
+    // Use setTimeout instead of requestAnimationFrame since this is Node-compatible
+    setTimeout(() => {
+      this.calculateSharesOfGeneralFulfillment();
+      this._sharesCalculationScheduled = false;
+    }, 1000);  // Debounce for 1 second
   }
   
   /**
@@ -398,7 +448,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
           const { value, done } = await reader.read();
           if (done) break;
           // Process type if needed
-          this.updateRecognitionSubscriptions();
+          this.setupRecognitionSubscriptions();
         }
       } catch (err) {
         console.error(`Error processing types stream for node ${this._id}:`, err);
@@ -409,107 +459,70 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
   
   /**
-   * Update which nodes we're subscribed to for recognition
+   * Set up subscriptions to recognition data from other nodes
+   * Only called on root node
    */
-  private updateRecognitionSubscriptions(): void {
-    // Find nodes that might recognize us
-    const potentialRecognizers = Array.from(TreeNode._registry.values())
-      .filter(node => node._types.has(this._id));
+  private setupRecognitionSubscriptions(): void {
+    if (this._parent) {
+      console.warn('setupRecognitionSubscriptions called on non-root node');
+      return;
+    }
+
+    // Get all types that appear in our tree
+    const relevantTypes = new Set<string>();
     
-    // Track current recognizers for cleanup
-    const currentRecognizers = new Set(this._recognitionSubscriptions.keys());
-    
-    // Subscribe to each node that isn't already subscribed
-    potentialRecognizers.forEach(node => {
-      if (!this._recognitionSubscriptions.has(node.id)) {
-        this.subscribeToNodeRecognition(node.id);
-      }
-      // Remove from cleanup set if still valid
-      currentRecognizers.delete(node.id);
-    });
-    
-    // Clean up subscriptions for nodes that no longer have us as a type
-    currentRecognizers.forEach(nodeId => {
-      this.unsubscribeFromNodeRecognition(nodeId);
-    });
-  }
-  
-  /**
-   * Subscribe to a node's recognition of us
-   * @param nodeId Node ID to subscribe to
-   */
-  private subscribeToNodeRecognition(nodeId: string): void {
-    // Create a temporary node to access the shares path
-    const node = TreeNode.getNode(nodeId, this._app);
-    const sharesNode = node.get('sharesOfGeneralFulfillment');
-    
-    // Create a stream for recognition data
-    const stream = new ReadableStream({
-      start: (controller) => {
-        const cleanup = sharesNode.on((data) => {
-          if (!data) return;
-          
-          // Check if our ID is in the shares
-          if (data[this._id] !== undefined && typeof data[this._id] === 'number') {
-            const newValue = data[this._id];
-            
-            // Only update if the value changed
-            if (this._sharesOfOthersRecognition[nodeId] !== newValue) {
-              // Update local recognition data
-              this._sharesOfOthersRecognition[nodeId] = newValue;
-              
-              // Request UI updates
-              this._app.updateNeeded = true;
-              this._app.pieUpdateNeeded = true;
-              
-              // Emit to stream
-              controller.enqueue({ nodeId, value: newValue });
-            }
-          }
-        });
-        
-        // Store subscription for cleanup
-        this._recognitionSubscriptions.set(nodeId, cleanup);
-      },
-      cancel: () => {
-        this.unsubscribeFromNodeRecognition(nodeId);
-      }
-    });
-    
-    // Store the stream reader for cleanup
-    const reader = stream.getReader();
-    
-    // Process the stream
-    const processStream = async () => {
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          // Process recognition update if needed
-        }
-      } catch (err) {
-        console.error(`Error processing recognition stream for node ${this._id} from ${nodeId}:`, err);
-      }
+    // Helper to collect types from a node and its children
+    const collectTypes = (node: TreeNode) => {
+      // Add this node's types
+      node.types.forEach(typeId => relevantTypes.add(typeId));
+      // Recurse through children
+      node.children.forEach(child => collectTypes(child));
     };
     
-    processStream();
-  }
-  
-  /**
-   * Unsubscribe from a node's recognition
-   * @param nodeId Node ID to unsubscribe from
-   */
-  private unsubscribeFromNodeRecognition(nodeId: string): void {
-    const cleanup = this._recognitionSubscriptions.get(nodeId);
-    if (cleanup) {
-      cleanup();
-      this._recognitionSubscriptions.delete(nodeId);
-      delete this._sharesOfOthersRecognition[nodeId];
+    // Start from our root (this node)
+    collectTypes(this);
+
+    // Clean up existing subscriptions
+    this._recognitionSubscriptions.forEach(cleanup => cleanup());
+    this._recognitionSubscriptions.clear();
+    this._sharesOfOthersRecognition = {};
+
+    // Subscribe to sharesOfGeneralFulfillment for each type
+    relevantTypes.forEach(typeId => {
+      // Get the node reference for this type
+      const typeNode = gun.get('nodes').get(typeId);
       
-      // Request UI updates since recognition data changed
-      this._app.updateNeeded = true;
-      this._app.pieUpdateNeeded = true;
-    }
+      // Subscribe to its shares and store the cleanup function
+      const subscription = typeNode.get('sharesOfGeneralFulfillment').on((shares) => {
+        if (!shares) return;
+
+        // Extract valid numeric shares
+        const validShares = Object.entries(shares)
+          .filter(([_, value]) => typeof value === 'number')
+          .map(([key, value]) => [key, value as number] as const);
+        
+        // Calculate sum for normalization
+        const sum = validShares.reduce((acc, [_, val]) => acc + val, 0);
+        
+        // If we have valid shares, normalize and store our share if present
+        if (sum > 0) {
+          // Find our normalized share
+          const ourShare = validShares.find(([key, _]) => key === this._id);
+          if (ourShare) {
+            this._sharesOfOthersRecognition[typeId] = ourShare[1] / sum;
+            
+            // Request UI updates
+            this._app.updateNeeded = true;
+            this._app.pieUpdateNeeded = true;
+          }
+        }
+      });
+
+      // Store cleanup function that will properly unsubscribe
+      this._recognitionSubscriptions.set(typeId, () => {
+        subscription.off();
+      });
+    });
   }
   
   // PROPERTIES
@@ -953,59 +966,78 @@ export class TreeNode extends GunNode<TreeNodeData> {
   // RECOGNITION METHODS
   
   /**
-   * Calculate this node's share of recognition for a type
-   * @param typeId Type ID
-   * @returns Share value
+   * Calculate recognition of a specific instance
+   */
+  private recognitionOf(instance: TreeNode): number {
+    const fulfillmentWeight = instance.fulfilled * instance.weight;
+    const contributorCount = instance._types.size;
+    return contributorCount > 0
+      ? fulfillmentWeight / contributorCount
+      : fulfillmentWeight;
+  }
+
+  /**
+   * Calculate total recognition for a type
    */
   public shareOfGeneralFulfillment(typeId: string): number {
-    const instances = this.getInstances(typeId);
-    const share = Array.from(instances).reduce((sum, instanceId) => {
-      const node = TreeNode._registry.get(instanceId);
-      if (!node) return sum;
-      
-      const contributorTypesCount = node._types.size;
-      const fulfillmentWeight = node.fulfilled * node.weight;
-      
-      const weightShare = contributorTypesCount > 0
-        ? fulfillmentWeight / contributorTypesCount
-        : fulfillmentWeight;
-      
-      return sum + weightShare;
-    }, 0);
-    
-    return share;
+    return Array.from(this.getInstances(typeId))
+      .map(id => TreeNode._registry.get(id))
+      .filter((instance): instance is TreeNode => instance !== undefined)
+      .reduce((sum, instance) => sum + this.recognitionOf(instance), 0);
   }
-  
+
+  /**
+   * Calculate and normalize shares for all types
+   */
+  private calculateShares(): {[key: string]: number} {
+    // Get all shares with their values
+    const shares = Array.from(this.root._typeIndex.keys())
+      .map(typeId => ({
+        typeId,
+        value: this.shareOfGeneralFulfillment(typeId)
+      }));
+    
+    // Calculate total for normalization
+    const total = shares.reduce((sum, { value }) => sum + value, 0);
+    
+    // Convert to normalized object
+    return shares.reduce((obj, { typeId, value }) => ({
+      ...obj,
+      [typeId]: total > 0 ? value / total : 0
+    }), {});
+  }
+
   /**
    * Calculate and persist this node's shares of general fulfillment
-   * @returns Object with type IDs as keys and share values
+   * Uses caching to avoid unnecessary calculations
    */
   public calculateSharesOfGeneralFulfillment(): {[key: string]: number} {
-    const shares: {[key: string]: number} = {};
+    const now = Date.now();
     
-    // Calculate share for each type
-    for (const typeId of this.root._typeIndex.keys()) {
-      const share = this.shareOfGeneralFulfillment(typeId);
-      shares[typeId] = share;
+    // Use cached value if recent enough
+    if (this._cachedShares && now - this._lastSharesCalculation < 5000) {
+      return this._cachedShares;
     }
+
+    // Calculate new shares
+    const shares = this.calculateShares();
     
-    // Persist to Gun using path abstraction
-    const sharesNode = this.get('sharesOfGeneralFulfillment');
-    sharesNode.put(shares);
+    // Cache the results
+    this._cachedShares = shares;
+    this._lastSharesCalculation = now;
     
-    // Subscription will handle the recognition updates 
+    // Persist to Gun
+    this.get('sharesOfGeneralFulfillment').put(shares);
     
     return shares;
   }
   
   /**
    * Calculate mutual fulfillment with a type
-   * @param typeId Type ID
-   * @returns Mutual fulfillment value
    */
   public mutualFulfillment(typeId: string): number {
     const recognitionFromHere = this.shareOfGeneralFulfillment(typeId);
-    const recognitionFromThere = this._sharesOfOthersRecognition[typeId] || 0;
+    const recognitionFromThere = this.root._sharesOfOthersRecognition[typeId] || 0;
     return Math.min(recognitionFromHere, recognitionFromThere);
   }
   
@@ -1055,9 +1087,12 @@ export class TreeNode extends GunNode<TreeNodeData> {
       this._typesSubscription = null;
     }
     
-    // Clean up recognition subscriptions
-    this._recognitionSubscriptions.forEach(cleanup => cleanup());
-    this._recognitionSubscriptions.clear();
+    // Only clean up recognition subscriptions if we're the root
+    if (!this._parent) {
+      this._recognitionSubscriptions.forEach(cleanup => cleanup());
+      this._recognitionSubscriptions.clear();
+      this._sharesOfOthersRecognition = {};
+    }
     
     // Remove from registry
     TreeNode._registry.delete(this._id);

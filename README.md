@@ -273,8 +273,8 @@ This is Hegel's resolution of the master-slave dialectic realized in practice: m
 - [Glossary](GLOSSARY.md)
 - [Dialectics of Love (Hegel and Mutual Recognition)](resources/love.md) Free-Association can be seen as the social-material inversion of Hegel's dialectics of Desire, Recognition, and Love
 - [Free-Association as the Psychoanalysis of the Economic Unconscious](resources/matheme.md)
-- **Inteface Overview (Older Version)**
-[![Interface Overview (Old)](https://img.youtube.com/vi/ro-y4MnOgNo/maxresdefault.jpg)](https://youtu.be/ro-y4MnOgNo?si=ae1nC7-uIwQ0t-YN)
+- [Security Through Mathematical Invariance in Distributed Recognition Systems](resources/security.md) From Preventing Attacks to Making Them Mathematically Irrelevant
 
-Inteface Overview (Outdated)
-[![Interface Overview (Outdated)](https://img.youtube.com/vi/ro-y4MnOgNo/maxresdefault.jpg)](https://youtu.be/ro-y4MnOgNo?si=ae1nC7-uIwQ0t-YN)
+- **Inteface Overview (Older Version)**
+
+[![Interface Overview (Old)](https://img.youtube.com/vi/ro-y4MnOgNo/hqdefault.jpg)](https://youtu.be/ro-y4MnOgNo?si=ae1nC7-uIwQ0t-YN)

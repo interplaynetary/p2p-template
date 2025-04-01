@@ -1,19 +1,13 @@
 import * as d3 from 'd3';
-import { TreeNode } from '../models/old/TreeNode';
+import { TreeNode } from '../../../experiments/4-1-25-old/TreeNode';
 import { getColorForName, getColorForUserId } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
 import { getUserName, loadUsers } from '../utils/userUtils';
 
 // TODO:
-// Extract various functions into helpers (in particular gun.js related stuff)
 // when we navigate into a type, the backbutton no longer works
 // we can no longer navigate to a type
 // when adding children we no longer automatically zoom-in (commons has working functionality for this)
-
-
-// lets clean up the App.ts especially everything related to adding peers
-
-// Let's extract all gun related things into their own components
 
 // Create a type for the treemap return value
 type TreemapInstance = {

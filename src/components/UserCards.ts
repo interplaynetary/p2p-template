@@ -1,6 +1,6 @@
 import { gun } from '../models/Gun';
 import { App } from '../App';
-import { TreeNode } from '../models/old/TreeNode';
+import { TreeNode } from '../../../experiments/4-1-25-old/TreeNode';
 import { getColorForName } from '../utils/colorUtils';
 
 // Could maybe be repurposed as a generic Cards component (for dragging and dropping nodes)
