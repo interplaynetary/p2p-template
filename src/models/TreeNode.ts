@@ -20,6 +20,8 @@ export interface TreeNodeData {
   parent?: string;
 }
 
+// calculateSharesOfGeneralFulfillment is called on time-interval
+
 /**
  * Reactive TreeNode implementation following Gun.js best practices
  * Embraces the reactive nature of Gun by treating all data as streams

@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 import { TreeNode } from '../models/TreeNode';
 import { getColorForName, getColorForUserId } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
-import { getUserName, loadUsers } from '../utils/userUtils';
+import { getUserName, loadUsers, onUserNameResolved, usersMap } from '../utils/userUtils';
 
 // TODO:
 // when we navigate into a type, the backbutton no longer works
@@ -334,16 +334,29 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .style("font-size", "10px")
                 .style("white-space", "nowrap");
                 
-            // Tag name
-            tagPill.append("span")
+            // Tag name - create a span that will be updated when name resolves
+            const nameSpan = tagPill.append("span")
                 .style("color", "white")
                 .style("margin-right", "4px")
-                .style("text-shadow", "0 1px 1px rgba(0,0,0,0.3)")
-                .text(() => {
-                    // Truncate text if too long
-                    const userName = getUserName(type);
-                    return userName.length > 10 ? userName.substring(0, 8) + "..." : userName;
-                });
+                .style("text-shadow", "0 1px 1px rgba(0,0,0,0.3)");
+                
+            // Set initial text 
+            const initialName = getUserName(type);
+            updateNameSpan(nameSpan, initialName);
+            
+            // Set up subscription to name changes
+            const cleanupNameSub = onUserNameResolved(type, (userId, resolvedName) => {
+                // Update the name when it resolves
+                updateNameSpan(nameSpan, resolvedName);
+                
+                // Also update the tooltip
+                tagPill.attr("title", `${resolvedName}: Click to view tree, click × to remove`);
+            });
+            
+            // Function to truncate and update name text
+            function updateNameSpan(span, name) {
+                span.text(name.length > 10 ? name.substring(0, 8) + "..." : name);
+            }
                 
             // X button
             tagPill.append("span")
@@ -357,7 +370,13 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .text("×")
                 .on("click", (event) => {
                     event.stopPropagation();
-                    console.log('Removing type:', getUserName(type), 'from node:', d.data.name);
+                    
+                    // Get current resolved name for logging
+                    const currentName = usersMap.has(type) ? usersMap.get(type)! : type;
+                    console.log('Removing type:', currentName, 'from node:', d.data.name);
+                    
+                    // Clean up name subscription
+                    cleanupNameSub();
                     
                     // Remove the type from the node
                     d.data.removeType(type);
@@ -375,7 +394,9 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 // Don't handle if clicking on X button
                 if (event.target.classList.contains("remove-tag")) return;
                 
-                console.log('Tag clicked, navigating to type:', getUserName(type));
+                // Get the current resolved name for logging
+                const currentName = usersMap.has(type) ? usersMap.get(type)! : type;
+                console.log('Tag clicked, navigating to type:', currentName);
                 event.stopPropagation();
                 
                 // Get the type node from the hierarchy
@@ -400,8 +421,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 render(group, root);
             });
             
-            // Add tooltip
-            tagPill.attr("title", `${getUserName(type)}: Click to view tree, click × to remove`);
+            // Add tooltip with initial name
+            tagPill.attr("title", `${initialName}: Click to view tree, click × to remove`);
         });
         
         // Add tag button click handler
@@ -464,17 +485,18 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             
             // Function to clean up and close dropdown
             function closeDropdown() {
-                // Unsubscribe from all Gun listeners
-                gunSubscriptions.forEach(unsub => {
-                    if (typeof unsub === 'function') {
-                        unsub();
-                    }
-                });
-                
-                // Remove dropdown element
+                // Remove the dropdown from DOM
                 dropdownContainer.remove();
                 
-                // Remove global click handler
+                // Clean up all active subscriptions
+                while (gunSubscriptions.length > 0) {
+                    const cleanup = gunSubscriptions.pop();
+                    if (typeof cleanup === 'function') {
+                        cleanup();
+                    }
+                }
+                
+                // Clean up event listener
                 d3.select("body").on("click.dropdown", null);
             }
             
@@ -571,9 +593,20 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                             .style("border-radius", "50%")
                             .style("margin-right", "6px");
                         
-                        // Add name
-                        userItem.append("div")
-                            .text(user.name);
+                        // Add name span for reactive updates
+                        const nameSpan = userItem.append("div");
+                        
+                        // Initial name display
+                        nameSpan.text(user.name || user.id);
+                        
+                        // Set up subscription to name changes - store cleanup in gunSubscriptions array
+                        const cleanup = onUserNameResolved(user.id, (userId, resolvedName) => {
+                            // Update the name when it resolves
+                            nameSpan.text(resolvedName);
+                        });
+                        
+                        // Store cleanup function
+                        gunSubscriptions.push(cleanup);
                         
                         // Hover effect
                         userItem
