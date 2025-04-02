@@ -16,7 +16,7 @@ export interface TreeNodeData {
   id: string;
   name: string;
   points: number;
-  manualFulfillment: number | null;
+  manualFulfillment: number;
   parent?: string;
 }
 
@@ -30,9 +30,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
   // Local state derived from Gun data
   private _id: string;
   private _name: string = '';
-  private _points: number = 0;
+  private _points: number = 1; // default 1
   private _parent: TreeNode | null = null;
-  private _manualFulfillment: number | null = null;
+  private _manualFulfillment: number = 1; // for testing, will be default 0?
   private _children: Map<string, TreeNode> = new Map();
   private _types: Set<string> = new Set();
   private _recognitionSubscriptions: Map<string, () => void> = new Map();
@@ -53,6 +53,25 @@ export class TreeNode extends GunNode<TreeNodeData> {
   private _sharesCalculationScheduled: boolean = false;
   private _lastSharesCalculation: number = 0;
   private _cachedShares: {[key: string]: number} | null = null;
+  
+  // Add these at the class level, right after other private fields
+  private _sharesDebouncerTimeout: any = null;
+  private _sharesCalculationCooldown: number = 5000; // 5 second cooldown
+  private _calculationCache: Map<string, { timestamp: number, value: any }> = new Map();
+  
+  // Add these at the class level, right after other static fields
+  private static _startupMode: boolean = true;
+  private static _pendingUpdates: Map<string, any> = new Map();
+  private static _updateBatchTimeout: any = null;
+  private static _startupModeTimeout: any = null;
+  private static _loggingEnabled: boolean = false; // Add logging control flag
+  
+  // Helper method to log only when enabled
+  private static log(message: string, ...args: any[]) {
+    if (TreeNode._loggingEnabled) {
+      console.log(message, ...args);
+    }
+  }
   
   /**
    * Create a new TreeNode or get an existing one from registry
@@ -143,8 +162,31 @@ export class TreeNode extends GunNode<TreeNodeData> {
     this._id = id;
     this._app = app;
     
-    // Set up data subscriptions
+    // Start with a recent timestamp
+    this._lastSharesCalculation = Date.now() - 1000;
+    
+    // Setup subscriptions with a slight delay to prevent startup floods
+    setTimeout(() => {
     this.setupSubscriptions();
+      
+      // Set an automatic timeout to end startup mode
+      if (TreeNode._startupMode && !TreeNode._startupModeTimeout) {
+        TreeNode._startupModeTimeout = setTimeout(() => {
+          TreeNode.log(`[TreeNode] Ending startup mode`);
+          TreeNode._startupMode = false;
+          TreeNode._startupModeTimeout = null;
+          
+          // Enable logging after startup phase
+          TreeNode._loggingEnabled = true;
+          
+          // Process any pending updates in startup mode
+          if (TreeNode._pendingUpdates.size > 0) {
+            TreeNode.log(`[TreeNode] Processing ${TreeNode._pendingUpdates.size} pending updates from startup`);
+            TreeNode.processBatchUpdates();
+          }
+        }, 3000);
+      }
+    }, 100);
   }
 
     // Helper property
@@ -231,14 +273,96 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
 
   private scheduleSharesCalculation() {
+    // Skip if already scheduled
     if (this._sharesCalculationScheduled) return;
-    this._sharesCalculationScheduled = true;
     
-    // Use setTimeout instead of requestAnimationFrame since this is Node-compatible
-    setTimeout(() => {
-      this.calculateSharesOfGeneralFulfillment();
+    // Skip if in cooldown period
+    const now = Date.now();
+    if (now - this._lastSharesCalculation < this._sharesCalculationCooldown) {
+      TreeNode.log(`[${this._name}] Skipping shares calculation - in cooldown period (${Math.round((now - this._lastSharesCalculation) / 1000)}s / ${this._sharesCalculationCooldown / 1000}s)`);
+      return;
+    }
+    
+    this._sharesCalculationScheduled = true;
+    TreeNode.log(`[${this._name}] Scheduling shares calculation`);
+    
+    // Clear any existing timeout to implement true debouncing
+    if (this._sharesDebouncerTimeout) {
+      clearTimeout(this._sharesDebouncerTimeout);
+    }
+    
+    // Special handling for startup mode - significantly reduce the number of calls
+    if (TreeNode._startupMode) {
+      // During startup, be much more aggressive with batching
+      // Only process near the end of startup mode
+      this._sharesDebouncerTimeout = setTimeout(() => {
+        this._sharesDebouncerTimeout = null;
       this._sharesCalculationScheduled = false;
-    }, 1000);  // Debounce for 1 second
+        
+        // Calculate but don't update Gun immediately
+        const oldShares = this._cachedShares;
+        const newShares = this.calculateShares();
+        
+        // Cache the new values
+        if (!oldShares || !this.areSharesEqual(oldShares, newShares)) {
+          TreeNode.log(`[${this._name}] Shares changed during startup, queueing for later update`);
+          this._cachedShares = newShares;
+          this._lastSharesCalculation = Date.now();
+          
+          // Queue the update instead of doing it immediately
+          TreeNode.scheduleBatchUpdate(
+            [...this.getPath(), 'sharesOfGeneralFulfillment'], 
+            newShares
+          );
+          
+          // Still trigger UI update
+          this._app.pieUpdateNeeded = true;
+        }
+      }, 2500); // Longer timeout during startup, nearly at the end of startup mode
+      return;
+    }
+    
+    // Standard debounced calculation
+    this._sharesDebouncerTimeout = setTimeout(() => {
+      // Get current shares
+      const oldShares = this._cachedShares;
+      
+      // Calculate new shares
+      const newShares = this.calculateShares();
+      
+      // Only save if values have changed
+      if (!oldShares || !this.areSharesEqual(oldShares, newShares)) {
+        TreeNode.log(`[${this._name}] Shares changed, saving to Gun`);
+        this._cachedShares = newShares;
+        this._lastSharesCalculation = Date.now();
+        
+        // Use batch update instead of direct put
+        TreeNode.scheduleBatchUpdate(
+          [...this.getPath(), 'sharesOfGeneralFulfillment'], 
+          newShares
+        );
+        
+        // Trigger UI update only after actual changes
+        this._app.pieUpdateNeeded = true;
+      } else {
+        TreeNode.log(`[${this._name}] Shares unchanged, skipping update`);
+      }
+      
+      this._sharesCalculationScheduled = false;
+      this._sharesDebouncerTimeout = null;
+    }, 1000);
+  }
+  
+  // Helper to compare share objects
+  private areSharesEqual(a: {[key: string]: number}, b: {[key: string]: number}): boolean {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    
+    if (keysA.length !== keysB.length) return false;
+    
+    return keysA.every(key => 
+      keysB.includes(key) && Math.abs(a[key] - b[key]) < 0.0001
+    );
   }
   
   /**
@@ -404,6 +528,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
               
               this._app.updateNeeded = true;
               this._app.pieUpdateNeeded = true;
+              
+              // Schedule shares recalculation on the root node
+              if (root) {
+                root.scheduleSharesCalculation();
+              }
             }
             processedTypes.delete(typeId);
             return;
@@ -426,6 +555,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
           // Request UI updates
           this._app.updateNeeded = true;
           this._app.pieUpdateNeeded = true;
+          
+          // Schedule shares recalculation on the root node
+          if (root) {
+            root.scheduleSharesCalculation();
+          }
           
           // Emit to stream
           controller.enqueue(typeId);
@@ -450,7 +584,12 @@ export class TreeNode extends GunNode<TreeNodeData> {
           const { value, done } = await reader.read();
           if (done) break;
           // Process type if needed
+          if (this.isRoot) {
           this.setupRecognitionSubscriptions();
+          } else {
+            // If not root, notify the root that types have changed
+            this.root.setupRecognitionSubscriptions();
+          }
         }
       } catch (err) {
         console.error(`Error processing types stream for node ${this._id}:`, err);
@@ -460,70 +599,146 @@ export class TreeNode extends GunNode<TreeNodeData> {
     processStream();
   }
   
+  // Add recognition subscription debouncing
+  private _recognitionSetupTimeout: any = null;
+  private _lastRecognitionSetup: number = 0;
+  private _recognitionSetupCooldown: number = 2000; // 2 second cooldown
+  
   /**
    * Set up subscriptions to recognition data from other nodes
    * Only called on root node
    */
   private setupRecognitionSubscriptions(): void {
-    if (this._parent) {
-      console.warn('setupRecognitionSubscriptions called on non-root node');
+    if (this._parent) return;
+
+    // Skip if already processing or in cooldown
+    const now = Date.now();
+    if (this._recognitionSetupTimeout || 
+        (now - this._lastRecognitionSetup < this._recognitionSetupCooldown && !TreeNode._startupMode)) {
       return;
     }
 
+    // During startup mode, be much more conservative with subscription setup
+    if (TreeNode._startupMode) {
+      // Defer to end of startup for all recognition setup
+      this._recognitionSetupTimeout = setTimeout(() => {
+        this._recognitionSetupTimeout = null;
+        this._lastRecognitionSetup = Date.now();
+        this._actualSetupRecognitionSubscriptions();
+      }, 2400); // Do this right before startup mode ends
+      return;
+    }
+    
+    // Standard debounced setup during normal operation
+    this._recognitionSetupTimeout = setTimeout(() => {
+      this._recognitionSetupTimeout = null;
+      this._lastRecognitionSetup = Date.now();
+      this._actualSetupRecognitionSubscriptions();
+    }, 300);
+  }
+
+  // Actual implementation separated for clarity
+  private _actualSetupRecognitionSubscriptions(): void {
     // Get all types that appear in our tree
     const relevantTypes = new Set<string>();
     
     // Helper to collect types from a node and its children
     const collectTypes = (node: TreeNode) => {
-      // Add this node's types
       node.types.forEach(typeId => relevantTypes.add(typeId));
-      // Recurse through children
       node.children.forEach(child => collectTypes(child));
     };
     
     // Start from our root (this node)
     collectTypes(this);
 
-    // Clean up existing subscriptions
-    this._recognitionSubscriptions.forEach(cleanup => cleanup());
-    this._recognitionSubscriptions.clear();
-    this._sharesOfOthersRecognition = {};
+    // Skip if no types have changed
+    const currentTypeIds = Array.from(this._recognitionSubscriptions.keys());
+    const newTypeIds = Array.from(relevantTypes);
+    
+    if (currentTypeIds.length === newTypeIds.length && 
+        currentTypeIds.every(id => relevantTypes.has(id))) {
+      TreeNode.log(`[${this._name}] Recognition subscriptions unchanged, skipping setup`);
+      return; // No changes to subscriptions needed
+    }
 
-    // Subscribe to sharesOfGeneralFulfillment for each type
-    relevantTypes.forEach(typeId => {
-      // Get the node reference for this type
-      const typeNode = gun.get('nodes').get(typeId);
+    TreeNode.log(`[${this._name}] Setting up recognition subscriptions for ${relevantTypes.size} types:`, newTypeIds);
+
+    // Find types to remove (in current subscriptions but not in relevantTypes)
+    const typesToRemove = currentTypeIds.filter(typeId => !relevantTypes.has(typeId));
+    
+    // Find types to add (in relevantTypes but not in current subscriptions)
+    const typesToAdd = newTypeIds.filter(typeId => !this._recognitionSubscriptions.has(typeId));
+    
+    // Remove subscriptions no longer needed
+    typesToRemove.forEach(typeId => {
+      TreeNode.log(`[${this._name}] Removing subscription to ${typeId}`);
+      const cleanup = this._recognitionSubscriptions.get(typeId);
+      if (cleanup) {
+        cleanup();
+        this._recognitionSubscriptions.delete(typeId);
+        delete this._sharesOfOthersRecognition[typeId];
+      }
+    });
+    
+    // Add new subscriptions using GunSubscription's map/filter capabilities
+    typesToAdd.forEach(typeId => {
+      TreeNode.log(`[${this._name}] Adding subscription to ${typeId}`);
       
-      // Subscribe to its shares and store the cleanup function
-      const subscription = typeNode.get('sharesOfGeneralFulfillment').on((shares) => {
-        if (!shares) return;
-
-        // Extract valid numeric shares
+      // Create a subscription with built-in filtering and mapping
+      const sub = new GunSubscription<any>(['nodes', typeId, 'sharesOfGeneralFulfillment']);
+      
+      // Transform the raw data stream to extract only what we need
+      const transformedSub = sub.map(shares => {
+        if (!shares) return null;
+        
+        // Extract and normalize the shares in the mapping function
         const validShares = Object.entries(shares)
-          .filter(([_, value]) => typeof value === 'number')
+          .filter(([key, value]) => typeof value === 'number' && key !== '_')
           .map(([key, value]) => [key, value as number] as const);
+        
+        // Skip further processing if no valid shares
+        if (validShares.length === 0) return null;
         
         // Calculate sum for normalization
         const sum = validShares.reduce((acc, [_, val]) => acc + val, 0);
+        if (sum <= 0) return null;
         
-        // If we have valid shares, normalize and store our share if present
-        if (sum > 0) {
-          // Find our normalized share
+        // Find our share in the normalized data
           const ourShare = validShares.find(([key, _]) => key === this._id);
-          if (ourShare) {
-            this._sharesOfOthersRecognition[typeId] = ourShare[1] / sum;
+        if (!ourShare) return null;
+        
+        // Return a simplified object with just what we need
+        return {
+          typeId,
+          normalizedShare: ourShare[1] / sum,
+          raw: ourShare[1],
+          sum
+        };
+      });
+      
+      // Subscribe only to the transformed data
+      const cleanup = transformedSub.on(result => {
+        if (!result) return;
+        
+        const oldShare = this._sharesOfOthersRecognition[typeId] || 0;
+        
+        // Only update if the share changed significantly
+        if (Math.abs(result.normalizedShare - oldShare) > 0.0001) {
+          TreeNode.log(`[${this._name}] Share changed from ${oldShare} to ${result.normalizedShare}, updating UI`);
+          
+          // Store the new value
+          this._sharesOfOthersRecognition[typeId] = result.normalizedShare;
               
               // Request UI updates
               this._app.updateNeeded = true;
               this._app.pieUpdateNeeded = true;
-            }
-          }
-        });
-        
-      // Store cleanup function that will properly unsubscribe
-      this._recognitionSubscriptions.set(typeId, () => {
-        subscription.off();
+        } else {
+          TreeNode.log(`[${this._name}] Share unchanged (${oldShare}), skipping update`);
+        }
       });
+      
+      // Store the cleanup function
+      this._recognitionSubscriptions.set(typeId, cleanup);
     });
   }
   
@@ -661,11 +876,47 @@ export class TreeNode extends GunNode<TreeNodeData> {
       return this;
     }
     
+    // If this node has children, remove them first since contributions shouldn't have children
+    if (this._children.size > 0) {
+      console.log(`[TreeNode ${this._id}] Node is becoming a contribution, removing ${this._children.size} children`);
+      
+      // Create a copy of the children keys to avoid modification during iteration
+      const childIds = Array.from(this._children.keys());
+      
+      // Remove each child in Gun
+      for (const childId of childIds) {
+        // Remove from Gun database
+        const childrenNode = this.get('children');
+        childrenNode.get(childId).put(null);
+      }
+      
+      // Also clear the local children collection immediately
+      // This ensures the node behaves as a contribution right away
+      // even before Gun sync completes
+      this._children.clear();
+    }
+    
     // Add to Gun using path abstraction
     const typesNode = this.get('types');
     typesNode.get(typeId).put({ value: true } as any);
     
-    // Let the subscription handle the local update
+    // Immediately add to local types collection
+    this._types.add(typeId);
+    
+    // Update type index in root
+    const root = this.root;
+    root.addToTypeIndex(typeId, this._id);
+    
+    // Request UI updates
+    this._app.updateNeeded = true;
+    this._app.pieUpdateNeeded = true;
+    
+    // Schedule shares calculation
+    if (root) {
+      root.scheduleSharesCalculation();
+    }
+    
+    // Let the subscription handle the rest
     return this;
   }
   
@@ -853,15 +1104,32 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Get this node's fulfillment value
    */
   get fulfilled(): number {
-    // For leaf nodes
+    console.log(`[${this._name}] Calculating fulfillment...`);
+    console.log(`  - Has children: ${this._children.size > 0}`);
+    console.log(`  - Is contribution: ${this.isContribution}`);
+    console.log(`  - Has manual fulfillment: ${this._manualFulfillment !== null}`);
+    console.log(`  - Manual fulfillment value: ${this._manualFulfillment}`);
+
+    // IMPORTANT: If this is a contribution, it should have fulfillment=1.0
+    // regardless of children (to handle race conditions during type assignment)
+    if (this.isContribution) {
+      console.log(`  - Node is a contribution, fulfillment = 1.0 (regardless of children)`);
+      return 1.0;
+    }
+
+    // For leaf nodes (no children)
     if (this._children.size === 0) {
-      return this.isContribution ? 1 : 0;
+      // Non-contribution leaf node has zero fulfillment
+      console.log(`  - Leaf non-contribution node, fulfillment = 0.0`);
+      return 0.0;
     }
     
     // If fulfillment was manually set and node has contributor children
     if (this._manualFulfillment !== null && this.hasDirectContributionChild) {
+      console.log(`  - Using manual fulfillment for node with contribution children`);
       // If we only have contributor children
       if (!this.hasNonContributionChild) {
+        console.log(`  - Only has contribution children, using manual value: ${this._manualFulfillment}`);
         return this._manualFulfillment;
       }
       
@@ -870,17 +1138,26 @@ export class TreeNode extends GunNode<TreeNodeData> {
       const contributionChildrenWeight = this.contributionChildrenWeight;
       const nonContributionFulfillment = this.nonContributionChildrenFulfillment;
       
-      return (
+      const result = (
         this._manualFulfillment * contributionChildrenWeight +
         nonContributionFulfillment * (1 - contributionChildrenWeight)
       );
+      
+      console.log(`  - Hybrid node, result = ${result}`);
+      console.log(`    - Contribution weight: ${contributionChildrenWeight}`);
+      console.log(`    - Non-contribution fulfillment: ${nonContributionFulfillment}`);
+      
+      return result;
     }
     
     // Default case: calculate from all children
-    return Array.from(this._children.values()).reduce(
+    const childrenFulfillment = Array.from(this._children.values()).reduce(
       (sum, child) => sum + child.fulfilled * child.shareOfParent,
       0
     );
+    
+    console.log(`  - Default case, calculated from children: ${childrenFulfillment}`);
+    return childrenFulfillment;
   }
   
   /**
@@ -971,21 +1248,81 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Calculate recognition of a specific instance
    */
   private recognitionOf(instance: TreeNode): number {
-    const fulfillmentWeight = instance.fulfilled * instance.weight;
+    const fulfilled = instance.fulfilled;
+    const weight = instance.weight;
+    const fulfillmentWeight = fulfilled * weight;
     const contributorCount = instance._types.size;
-    return contributorCount > 0
+    
+    console.log(`[${this._name}] Recognition details for ${instance._name}:`);
+    console.log(`  - Fulfilled: ${fulfilled}`);
+    console.log(`  - Weight: ${weight}`);
+    console.log(`  - FulfillmentWeight: ${fulfillmentWeight}`);
+    console.log(`  - Contributor count: ${contributorCount}`);
+    
+    const result = contributorCount > 0
       ? fulfillmentWeight / contributorCount
       : fulfillmentWeight;
+      
+    console.log(`  - Final recognition: ${result}`);
+    
+    return result;
   }
 
   /**
    * Calculate total recognition for a type
    */
   public shareOfGeneralFulfillment(typeId: string): number {
-    return Array.from(this.getInstances(typeId))
-      .map(id => TreeNode._registry.get(id))
-      .filter((instance): instance is TreeNode => instance !== undefined)
-      .reduce((sum, instance) => sum + this.recognitionOf(instance), 0);
+    // Create a cache key for this calculation
+    const cacheKey = `share_${typeId}`;
+    
+    // Check if we have a recent cached value
+    const cached = this._calculationCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cached && now - cached.timestamp < 2000) {
+      // Use cached value if less than 2 seconds old
+      return cached.value;
+    }
+    
+    // Get all instances of this type
+    const instances = this.getInstances(typeId);
+    console.log(`[${this._name}] Calculating share for type ${typeId}, found ${instances.size} instances`);
+    
+    if (instances.size === 0) {
+      this._calculationCache.set(cacheKey, {
+        timestamp: now,
+        value: 0
+      });
+      return 0;
+    }
+    
+    // Calculate sum of recognition for all instances
+    const totalRecognition = Array.from(instances)
+      .map(id => {
+        const instance = TreeNode._registry.get(id);
+        if (!instance) {
+          console.warn(`[${this._name}] Instance ${id} not found in registry`);
+          return 0;
+        }
+        
+        const recognition = this.recognitionOf(instance);
+        // Log less frequently to reduce noise
+        if (Math.random() < 0.3) {
+          console.log(`[${this._name}] Recognition of ${instance._name} (${id}): ${recognition}`);
+        }
+        return recognition;
+      })
+      .reduce((sum, val) => sum + val, 0);
+    
+    console.log(`[${this._name}] Total recognition for type ${typeId}: ${totalRecognition}`);
+    
+    // Cache the result
+    this._calculationCache.set(cacheKey, {
+      timestamp: now,
+      value: totalRecognition
+    });
+    
+    return totalRecognition;
   }
 
   /**
@@ -1016,8 +1353,12 @@ export class TreeNode extends GunNode<TreeNodeData> {
   public calculateSharesOfGeneralFulfillment(): {[key: string]: number} {
     const now = Date.now();
     
-    // Use cached value if recent enough
-    if (this._cachedShares && now - this._lastSharesCalculation < 5000) {
+    // Use cached value if recent enough and available
+    if (this._cachedShares && now - this._lastSharesCalculation < this._sharesCalculationCooldown) {
+      // Log once in a while to show we're using cached values
+      if (Math.random() < 0.1) {
+        console.log(`[${this._name}] Using cached shares, age: ${Math.round((now - this._lastSharesCalculation)/1000)}s`);
+      }
       return this._cachedShares;
     }
 
@@ -1028,8 +1369,15 @@ export class TreeNode extends GunNode<TreeNodeData> {
     this._cachedShares = shares;
     this._lastSharesCalculation = now;
     
-    // Persist to Gun
+    // Check if shares have changed before saving to Gun
+    const sharesSame = this._cachedShares && this.areSharesEqual(shares, this._cachedShares);
+    
+    if (!sharesSame) {
+      console.log(`[${this._name}] Saving shares to Gun:`, shares);
     this.get('sharesOfGeneralFulfillment').put(shares);
+    } else {
+      console.log(`[${this._name}] Shares unchanged, skipping Gun update`);
+    }
     
     return shares;
   }
@@ -1038,34 +1386,100 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Calculate mutual fulfillment with a type
    */
   public mutualFulfillment(typeId: string): number {
+    // Create a cache key for this calculation
+    const cacheKey = `mutual_${typeId}`;
+    
+    // Check if we have a recent cached value
+    const cached = this._calculationCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cached && now - cached.timestamp < 3000) {
+      // Use cached value if less than 3 seconds old
+      return cached.value;
+    }
+    
+    // Calculate fresh value
     const recognitionFromHere = this.shareOfGeneralFulfillment(typeId);
     const recognitionFromThere = this.root._sharesOfOthersRecognition[typeId] || 0;
-    return Math.min(recognitionFromHere, recognitionFromThere);
+    
+    console.log(`[${this._name}] Mutual fulfillment with ${typeId}:`);
+    console.log(`  - Recognition from here: ${recognitionFromHere}`);
+    console.log(`  - Recognition from there: ${recognitionFromThere}`);
+    
+    const result = Math.min(recognitionFromHere, recognitionFromThere);
+    console.log(`  - Mutual fulfillment result: ${result}`);
+    
+    // Cache the result
+    this._calculationCache.set(cacheKey, {
+      timestamp: now,
+      value: result
+    });
+    
+    return result;
   }
   
   /**
    * Get the distribution of mutual fulfillment across types
    */
   get mutualFulfillmentDistribution(): Map<string, number> {
-    const types = this.rootTypes.filter(typeId => 
-      this.getInstances(typeId).size > 0
-    );
+    // Create a cache key
+    const cacheKey = `mutualDist`;
     
+    // Check if we have a recent cached value
+    const cached = this._calculationCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cached && now - cached.timestamp < 2000) {
+      // Use cached value if less than 2 seconds old
+      return cached.value;
+    }
+    
+    // Get all types from the root's type index
+    const types = this.rootTypes;
+    
+    // Add debugging but limit frequency
+    console.log(`[${this._name}] Getting mutual fulfillment distribution, found ${types.length} types:`, types);
+    console.log(`[${this._name}] Current sharesOfOthersRecognition:`, this.root._sharesOfOthersRecognition);
+    
+    // Calculate raw distribution values
     const rawDistribution = types
-      .map(typeId => ({
+      .map(typeId => {
+        const instanceCount = this.getInstances(typeId).size;
+        const mutualValue = this.mutualFulfillment(typeId);
+        console.log(`[${this._name}] Type ${typeId} has ${instanceCount} instances, mutual value: ${mutualValue}`);
+        
+        return {
         typeId,
-        value: this.mutualFulfillment(typeId)
-      }))
-      .filter(entry => entry.value > 0);
+          value: mutualValue,
+          hasInstances: instanceCount > 0
+        };
+      })
+      .filter(entry => entry.value > 0 && entry.hasInstances);
     
+    console.log(`[${this._name}] Raw distribution after filtering:`, 
+      rawDistribution.map(d => `${d.typeId}: ${d.value}`));
+    
+    // Calculate total for normalization
     const total = rawDistribution.reduce((sum, entry) => sum + entry.value, 0);
+    console.log(`[${this._name}] Total mutual fulfillment: ${total}`);
     
-    return new Map(
+    // Create the normalized distribution map
+    const result = new Map(
       rawDistribution.map(entry => [
         entry.typeId,
         total > 0 ? entry.value / total : 0
       ])
     );
+    
+    console.log(`[${this._name}] Final distribution map has ${result.size} entries`);
+    
+    // Cache the result
+    this._calculationCache.set(cacheKey, {
+      timestamp: now,
+      value: result
+    });
+    
+    return result;
   }
   
   // CLEANUP
@@ -1107,6 +1521,22 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Unsubscribe all nodes
     TreeNode._registry.forEach(node => node.unsubscribe());
     TreeNode._registry.clear();
+    
+    // Clear any pending timeouts
+    if (TreeNode._updateBatchTimeout) {
+      clearTimeout(TreeNode._updateBatchTimeout);
+      TreeNode._updateBatchTimeout = null;
+    }
+    
+    if (TreeNode._startupModeTimeout) {
+      clearTimeout(TreeNode._startupModeTimeout);
+      TreeNode._startupModeTimeout = null;
+    }
+    
+    // Reset startup mode
+    TreeNode._startupMode = true;
+    TreeNode._loggingEnabled = false;
+    TreeNode._pendingUpdates.clear();
   }
 
   /**
@@ -1243,5 +1673,49 @@ export class TreeNode extends GunNode<TreeNodeData> {
         return cleanup;
       }
     };
+  }
+
+  // Add new static methods for batched updates
+  private static scheduleBatchUpdate(path: string[], data: any) {
+    // Store update in pending batch
+    const pathKey = path.join('/');
+    TreeNode._pendingUpdates.set(pathKey, { path, data });
+    
+    // Don't schedule processing during startup mode
+    if (TreeNode._startupMode) {
+      return;
+    }
+    
+    // Schedule batch processing if not already scheduled
+    if (!TreeNode._updateBatchTimeout) {
+      TreeNode._updateBatchTimeout = setTimeout(() => {
+        TreeNode.processBatchUpdates();
+      }, 500);
+    }
+  }
+
+  private static processBatchUpdates() {
+    if (TreeNode._pendingUpdates.size === 0) {
+      TreeNode._updateBatchTimeout = null;
+      return;
+    }
+    
+    console.log(`[TreeNode] Processing batch of ${TreeNode._pendingUpdates.size} Gun updates`);
+    
+    // Process all pending updates in a single batch
+    TreeNode._pendingUpdates.forEach(({ path, data }) => {
+      // Start with the root Gun instance
+      let ref: any = gun;
+      // Navigate to the target path
+      for (const segment of path) {
+        ref = ref.get(segment);
+      }
+      // Update the data
+      ref.put(data);
+    });
+    
+    // Clear the batch
+    TreeNode._pendingUpdates.clear();
+    TreeNode._updateBatchTimeout = null;
   }
 } 

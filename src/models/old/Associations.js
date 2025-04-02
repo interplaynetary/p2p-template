@@ -1,4 +1,4 @@
-import { Node } from '../../../experiments/old/previous/Node';
+import { Node } from '../../../../experiments/old/previous/Node';
 
 class SocialNode extends Node {
     constructor(name, parent = null, types = [], isContributor = true) {

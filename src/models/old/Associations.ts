@@ -1,7 +1,11 @@
-import { Reactive, Computed, ReactiveEntity } from './Reactive';
-import { App } from '../App';
-import { gun } from './Gun';
-import { TreeNode, TreeNodeData } from './ReactTreeNode';
+import { Reactive, Computed, ReactiveEntity } from '../Reactive';
+import { App } from '../../App';
+import { gun } from '../Gun';
+import { TreeNode } from '../ReactTreeNode';
+
+// I wonder if we could reorganize this Make it much simpler such that a role is an independent thing that can point to another role as its counterpart. And that can be a one way direction and then it can also be bi directional potentially, if both point at each other. And that each or any role could actually also point to another node as its type in the sense of its association. So rather than creating an association with a fixed number of things, nodes would point towards the thing that they are trying to categorize themselves as. 
+// Please create this simpler implementation in roles.ts 
+// Don't bother with any of the reactivity stuff just now. Like, let's just focus on getting this data structure, the interfaces and types set out in a very elegant and simply way. 
 
 // Types for our domain entities
 export interface SocialNodeData {
@@ -272,6 +276,243 @@ export class ProviderRole extends Role {
     };
   }
 }
+
+/**
+ * Association entity representing a relationship between social nodes
+ */
+export class Association extends ReactiveEntity<AssociationData> {
+  private static _registry = new Map<string, Association>();
+  
+  private _associations = new Reactive<AssociationInstance[]>([]);
+  private _compositions = new Reactive<string[]>([]);
+  
+  // Declare reactive properties
+  declare public name: string;
+  
+  /**
+   * Get an association by ID or create a new one
+   */
+  public static getAssociation(id: string, app: App): Association {
+    let association = Association._registry.get(id);
+    
+    if (!association) {
+      association = new Association(id, app);
+      Association._registry.set(id, association);
+    }
+    
+    return association;
+  }
+  
+  /**
+   * Create a new association
+   */
+  public static async create(
+    name: string,
+    options: {
+      totalShares?: number,
+      initialHolder?: SocialNode,
+      compositions?: string[],
+      id?: string
+    },
+    app: App
+  ): Promise<Association> {
+    const id = options.id || crypto.randomUUID();
+    
+    // Create data
+    const data: AssociationData = {
+      id,
+      name,
+      compositions: options.compositions || []
+    };
+    
+    // Get or create association
+    const association = Association.getAssociation(id, app);
+    
+    // Store in Gun
+    await association.gunNode.put(data);
+    
+    // Set properties
+    association.name = name;
+    association._compositions.value = options.compositions || [];
+    
+    // Create initial shares
+    if (options.initialHolder && options.totalShares) {
+      for (let i = 0; i < options.totalShares; i++) {
+        association.socialRelation(options.initialHolder, options.initialHolder);
+      }
+    }
+    
+    return association;
+  }
+  
+  private constructor(id: string, app: App) {
+    super(id, app);
+    
+    // Define reactive properties
+    this.defineReactiveProperty('name', '', ['associations', id, 'name']);
+    
+    // Set up subscriptions
+    this.setupSubscriptions();
+  }
+  
+  private setupSubscriptions(): void {
+    // Subscribe to compositions
+    const compositionsSub = this.gunNode.get('compositions').stream().each();
+    const subscription = compositionsSub.on(data => {
+      if (!data || typeof data !== 'object') return;
+      
+      if (data._removed) {
+        // Remove composition
+        const compositions = [...this._compositions.value];
+        const index = compositions.indexOf(data._key);
+        if (index >= 0) {
+          compositions.splice(index, 1);
+          this._compositions.value = compositions;
+        }
+        return;
+      }
+      
+      // Add composition
+      const compositions = [...this._compositions.value];
+      if (!compositions.includes(data._key)) {
+        compositions.push(data._key);
+        this._compositions.value = compositions;
+      }
+    });
+    
+    this.addSubscription(subscription);
+    
+    // Subscribe to instances
+    const instancesSub = this.gunNode.get('instances').stream().each();
+    const instancesSubscription = instancesSub.on(async (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      if (data._removed) {
+        // Handle instance removal (more complex - would need instance IDs)
+        return;
+      }
+      
+      // Get holders
+      if (data.userHolder && data.providerHolder) {
+        const userHolder = await SocialNodeFactory.getNode(data.userHolder, this._app);
+        const providerHolder = await SocialNodeFactory.getNode(data.providerHolder, this._app);
+        
+        // Check if we already have this instance
+        const exists = this._associations.value.some(assoc => 
+          assoc.userRole.holder.id === userHolder.id && 
+          assoc.providerRole.holder.id === providerHolder.id
+        );
+        
+        if (!exists) {
+          // Create the association locally
+          this.createLocalRelation(userHolder, providerHolder, data._key);
+        }
+      }
+    });
+    
+    this.addSubscription(instancesSubscription);
+  }
+  
+  /**
+   * Create a local association instance without persisting to Gun
+   */
+  private createLocalRelation(userHolder: SocialNode, providerHolder: SocialNode, id?: string): AssociationInstance {
+    // Create mutually referencing roles
+    const association: AssociationInstance = {} as any;
+    
+    // Create the roles with circular references
+    const userRole = new UserRole(this, userHolder, null as any);
+    const providerRole = new ProviderRole(this, providerHolder, userRole);
+    userRole.providerRole = providerRole;
+    
+    // Complete the association
+    association.userRole = userRole;
+    association.providerRole = providerRole;
+    
+    // Store the association
+    const associations = [...this._associations.value];
+    associations.push(association);
+    this._associations.value = associations;
+    
+    // Add this association to the holders
+    userHolder.addAssociation(this);
+    if (providerHolder.id !== userHolder.id) {
+      providerHolder.addAssociation(this);
+    }
+    
+    // Set up role holder change subscriptions
+    userRole.onHolderChange(newHolder => {
+      // Update the Gun record if this instance has an ID
+      if (id) {
+        gun.get('associations').get(this.id).get('instances').get(id).get('userHolder').put(newHolder.id);
+      }
+    });
+    
+    providerRole.onHolderChange(newHolder => {
+      // Update the Gun record if this instance has an ID
+      if (id) {
+        gun.get('associations').get(this.id).get('instances').get(id).get('providerHolder').put(newHolder.id);
+      }
+    });
+    
+    return association;
+  }
+  
+  /**
+   * Create a social relation between two nodes
+   */
+  public socialRelation(userRoleHolder: SocialNode, providerRoleHolder: SocialNode): AssociationInstance {
+    // Create a unique ID for this relation
+    const assocId = crypto.randomUUID();
+    
+    // Store in Gun first
+    gun.get('associations').get(this.id).get('instances').get(assocId).put({
+      userHolder: userRoleHolder.id,
+      providerHolder: providerRoleHolder.id
+    });
+    
+    // Create the local relation
+    return this.createLocalRelation(userRoleHolder, providerRoleHolder, assocId);
+  }
+  
+  /**
+   * Get all association instances
+   */
+  get associations(): AssociationInstance[] {
+    return [...this._associations.value];
+  }
+  
+  /**
+   * Get all compositions
+   */
+  get compositions(): string[] {
+    return [...this._compositions.value];
+  }
+  
+  /**
+   * Get the status of this association
+   */
+  getStatus() {
+    return {
+      id: this.id,
+      name: this.name,
+      totalShares: this._associations.value.length,
+      composes: this.compositions,
+      associations: this._associations.value.map(association => ({
+        userRole: association.userRole.getStatus(),
+        providerRole: association.providerRole.getStatus()
+      }))
+    };
+  }
+  
+  /**
+   * Subscribe to changes in association instances
+   */
+  onAssociationsChange(callback: (associations: AssociationInstance[]) => void): () => void {
+    return this._associations.subscribe(callback);
+  }
+}
+
 
 /**
  * Implement a better registry pattern using WeakMap for the SocialNodeFactory
@@ -742,241 +983,5 @@ export class SocialNode {
    */
   onHoldingChange(callback: (holdings: Set<Role>) => void): () => void {
     return this._holding.subscribe(callback);
-  }
-}
-
-/**
- * Association entity representing a relationship between social nodes
- */
-export class Association extends ReactiveEntity<AssociationData> {
-  private static _registry = new Map<string, Association>();
-  
-  private _associations = new Reactive<AssociationInstance[]>([]);
-  private _compositions = new Reactive<string[]>([]);
-  
-  // Declare reactive properties
-  declare public name: string;
-  
-  /**
-   * Get an association by ID or create a new one
-   */
-  public static getAssociation(id: string, app: App): Association {
-    let association = Association._registry.get(id);
-    
-    if (!association) {
-      association = new Association(id, app);
-      Association._registry.set(id, association);
-    }
-    
-    return association;
-  }
-  
-  /**
-   * Create a new association
-   */
-  public static async create(
-    name: string,
-    options: {
-      totalShares?: number,
-      initialHolder?: SocialNode,
-      compositions?: string[],
-      id?: string
-    },
-    app: App
-  ): Promise<Association> {
-    const id = options.id || crypto.randomUUID();
-    
-    // Create data
-    const data: AssociationData = {
-      id,
-      name,
-      compositions: options.compositions || []
-    };
-    
-    // Get or create association
-    const association = Association.getAssociation(id, app);
-    
-    // Store in Gun
-    await association.gunNode.put(data);
-    
-    // Set properties
-    association.name = name;
-    association._compositions.value = options.compositions || [];
-    
-    // Create initial shares
-    if (options.initialHolder && options.totalShares) {
-      for (let i = 0; i < options.totalShares; i++) {
-        association.socialRelation(options.initialHolder, options.initialHolder);
-      }
-    }
-    
-    return association;
-  }
-  
-  private constructor(id: string, app: App) {
-    super(id, app);
-    
-    // Define reactive properties
-    this.defineReactiveProperty('name', '', ['associations', id, 'name']);
-    
-    // Set up subscriptions
-    this.setupSubscriptions();
-  }
-  
-  private setupSubscriptions(): void {
-    // Subscribe to compositions
-    const compositionsSub = this.gunNode.get('compositions').stream().each();
-    const subscription = compositionsSub.on(data => {
-      if (!data || typeof data !== 'object') return;
-      
-      if (data._removed) {
-        // Remove composition
-        const compositions = [...this._compositions.value];
-        const index = compositions.indexOf(data._key);
-        if (index >= 0) {
-          compositions.splice(index, 1);
-          this._compositions.value = compositions;
-        }
-        return;
-      }
-      
-      // Add composition
-      const compositions = [...this._compositions.value];
-      if (!compositions.includes(data._key)) {
-        compositions.push(data._key);
-        this._compositions.value = compositions;
-      }
-    });
-    
-    this.addSubscription(subscription);
-    
-    // Subscribe to instances
-    const instancesSub = this.gunNode.get('instances').stream().each();
-    const instancesSubscription = instancesSub.on(async (data) => {
-      if (!data || typeof data !== 'object') return;
-      
-      if (data._removed) {
-        // Handle instance removal (more complex - would need instance IDs)
-        return;
-      }
-      
-      // Get holders
-      if (data.userHolder && data.providerHolder) {
-        const userHolder = await SocialNodeFactory.getNode(data.userHolder, this._app);
-        const providerHolder = await SocialNodeFactory.getNode(data.providerHolder, this._app);
-        
-        // Check if we already have this instance
-        const exists = this._associations.value.some(assoc => 
-          assoc.userRole.holder.id === userHolder.id && 
-          assoc.providerRole.holder.id === providerHolder.id
-        );
-        
-        if (!exists) {
-          // Create the association locally
-          this.createLocalRelation(userHolder, providerHolder, data._key);
-        }
-      }
-    });
-    
-    this.addSubscription(instancesSubscription);
-  }
-  
-  /**
-   * Create a local association instance without persisting to Gun
-   */
-  private createLocalRelation(userHolder: SocialNode, providerHolder: SocialNode, id?: string): AssociationInstance {
-    // Create mutually referencing roles
-    const association: AssociationInstance = {} as any;
-    
-    // Create the roles with circular references
-    const userRole = new UserRole(this, userHolder, null as any);
-    const providerRole = new ProviderRole(this, providerHolder, userRole);
-    userRole.providerRole = providerRole;
-    
-    // Complete the association
-    association.userRole = userRole;
-    association.providerRole = providerRole;
-    
-    // Store the association
-    const associations = [...this._associations.value];
-    associations.push(association);
-    this._associations.value = associations;
-    
-    // Add this association to the holders
-    userHolder.addAssociation(this);
-    if (providerHolder.id !== userHolder.id) {
-      providerHolder.addAssociation(this);
-    }
-    
-    // Set up role holder change subscriptions
-    userRole.onHolderChange(newHolder => {
-      // Update the Gun record if this instance has an ID
-      if (id) {
-        gun.get('associations').get(this.id).get('instances').get(id).get('userHolder').put(newHolder.id);
-      }
-    });
-    
-    providerRole.onHolderChange(newHolder => {
-      // Update the Gun record if this instance has an ID
-      if (id) {
-        gun.get('associations').get(this.id).get('instances').get(id).get('providerHolder').put(newHolder.id);
-      }
-    });
-    
-    return association;
-  }
-  
-  /**
-   * Create a social relation between two nodes
-   */
-  public socialRelation(userRoleHolder: SocialNode, providerRoleHolder: SocialNode): AssociationInstance {
-    // Create a unique ID for this relation
-    const assocId = crypto.randomUUID();
-    
-    // Store in Gun first
-    gun.get('associations').get(this.id).get('instances').get(assocId).put({
-      userHolder: userRoleHolder.id,
-      providerHolder: providerRoleHolder.id
-    });
-    
-    // Create the local relation
-    return this.createLocalRelation(userRoleHolder, providerRoleHolder, assocId);
-  }
-  
-  /**
-   * Get all association instances
-   */
-  get associations(): AssociationInstance[] {
-    return [...this._associations.value];
-  }
-  
-  /**
-   * Get all compositions
-   */
-  get compositions(): string[] {
-    return [...this._compositions.value];
-  }
-  
-  /**
-   * Get the status of this association
-   */
-  getStatus() {
-    return {
-      id: this.id,
-      name: this.name,
-      totalShares: this._associations.value.length,
-      composes: this.compositions,
-      associations: this._associations.value.map(association => ({
-        userRole: association.userRole.getStatus(),
-        providerRole: association.providerRole.getStatus()
-      }))
-    };
-  }
-  
-  /**
-   * Subscribe to changes in association instances
-   */
-  onAssociationsChange(callback: (associations: AssociationInstance[]) => void): () => void {
-    return this._associations.subscribe(callback);
   }
 }
