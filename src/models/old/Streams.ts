@@ -1,15 +1,7 @@
-import { App } from '../App';
-import { GunNode } from './GunNode';
-import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './GunSubscription';
-import { gun } from './Gun';
-
-
-// We added normalization to ensure that the shares of recognition sum to 1
-// now we need to ensure that the other has not tampered with their _sharesOfOthersRecognition
-// Because it is on this basis that we calculate mutual-recognition
-
-// Or is it actually ok? Since we would only be lying to ourselves?
-// And this lie is itself normalized within ourselves in the mutuality distribution?
+import { App } from '../../App';
+import { GunNode } from '../GunNode';
+import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from '../GunSubscription';
+import { gun } from '../Gun';
 
 // Define the core data structure of a TreeNode
 export interface TreeNodeData {
@@ -18,6 +10,287 @@ export interface TreeNodeData {
   points: number;
   manualFulfillment: number | null;
   parent?: string;
+}
+
+/**
+ * A reactive value that can be observed for changes
+ */
+export class ReactiveValue<T> {
+  private _value: T;
+  private _observers: Set<(value: T) => void> = new Set();
+
+  constructor(initialValue: T) {
+    this._value = initialValue;
+  }
+
+  /**
+   * Get the current value
+   */
+  get value(): T {
+    return this._value;
+  }
+
+  /**
+   * Set a new value and notify observers
+   */
+  set value(newValue: T) {
+    if (this._value !== newValue) {
+      this._value = newValue;
+      this.notify();
+    }
+  }
+
+  /**
+   * Subscribe to changes in the value
+   * @param observer Function to call when value changes
+   * @returns Cleanup function to unsubscribe
+   */
+  subscribe(observer: (value: T) => void): () => void {
+    this._observers.add(observer);
+    // Call with current value immediately
+    observer(this._value);
+    
+    return () => {
+      this._observers.delete(observer);
+    };
+  }
+
+  /**
+   * Notify all observers about the current value
+   */
+  private notify(): void {
+    this._observers.forEach(observer => observer(this._value));
+  }
+}
+
+/**
+ * A derived value that depends on other reactive values
+ * The computation is done lazily and cached until invalidated
+ */
+export class DerivedValue<T> {
+  private _value: T | null = null;
+  private _compute: () => T;
+  private _observers: Set<(value: T) => void> = new Set();
+  private _dependencies: Set<ReactiveValue<any> | DerivedValue<any>> = new Set();
+  private _cleanup: (() => void)[] = [];
+
+  /**
+   * Create a derived value
+   * @param compute Function that computes the value
+   * @param dependencies Values this computation depends on
+   */
+  constructor(compute: () => T, dependencies: (ReactiveValue<any> | DerivedValue<any>)[] = []) {
+    this._compute = compute;
+    
+    // Set up dependency tracking
+    dependencies.forEach(dep => {
+      this._dependencies.add(dep);
+      this._cleanup.push(dep.subscribe(() => this.invalidate()));
+    });
+  }
+
+  /**
+   * Get the current value, computing it if needed
+   */
+  get value(): T {
+    if (this._value === null) {
+      this._value = this._compute();
+    }
+    return this._value;
+  }
+
+  /**
+   * Subscribe to changes in the value
+   * @param observer Function to call when value changes
+   * @returns Cleanup function to unsubscribe
+   */
+  subscribe(observer: (value: T) => void): () => void {
+    this._observers.add(observer);
+    // Call with current value immediately
+    observer(this.value);
+    
+    return () => {
+      this._observers.delete(observer);
+    };
+  }
+
+  /**
+   * Invalidate the cached value
+   */
+  invalidate(): void {
+    if (this._value !== null) {
+      this._value = null;
+      this.notify();
+    }
+  }
+
+  /**
+   * Notify all observers about the current value
+   */
+  private notify(): void {
+    this._observers.forEach(observer => observer(this.value));
+  }
+
+  /**
+   * Clean up all subscriptions
+   */
+  dispose(): void {
+    this._cleanup.forEach(cleanup => cleanup());
+    this._cleanup = [];
+    this._dependencies.clear();
+    this._observers.clear();
+  }
+
+  /**
+   * Create a Svelte-compatible store
+   */
+  toStore() {
+    return {
+      subscribe: (run: SubscriptionHandler<T>) => {
+        return this.subscribe(run);
+      }
+    };
+  }
+}
+
+/**
+ * A manager for batched updates
+ */
+export class BatchProcessor {
+  private _pendingUpdates = new Set<() => void>();
+  private _scheduled = false;
+  private _timeoutId: any = null;
+
+  /**
+   * Add an update to be processed
+   * @param update Function to call during batch processing
+   */
+  schedule(update: () => void): void {
+    this._pendingUpdates.add(update);
+    this.scheduleProcessing();
+  }
+
+  /**
+   * Schedule batch processing
+   */
+  private scheduleProcessing(): void {
+    if (this._scheduled) return;
+    this._scheduled = true;
+
+    // Use setTimeout to batch updates
+    this._timeoutId = setTimeout(() => {
+      this.processBatch();
+    }, 100); // 100ms debounce
+  }
+
+  /**
+   * Process all pending updates
+   */
+  processBatch(): void {
+    this._scheduled = false;
+    if (this._timeoutId) {
+      clearTimeout(this._timeoutId);
+      this._timeoutId = null;
+    }
+
+    // Copy to array to avoid modification during iteration
+    const updates = Array.from(this._pendingUpdates);
+    this._pendingUpdates.clear();
+
+    // Process all updates
+    updates.forEach(update => {
+      try {
+        update();
+      } catch (err) {
+        console.error('Error in batch update:', err);
+      }
+    });
+  }
+
+  /**
+   * Clear all pending updates
+   */
+  clear(): void {
+    this._pendingUpdates.clear();
+    if (this._timeoutId) {
+      clearTimeout(this._timeoutId);
+      this._timeoutId = null;
+    }
+    this._scheduled = false;
+  }
+}
+
+/**
+ * A cache for expensive computations with dependency tracking
+ */
+export class ComputationCache<K, V> {
+  private _cache = new Map<K, V>();
+  private _dependencies = new Map<K, Set<any>>();
+  private _computeFunc: (key: K) => V;
+
+  /**
+   * Create a computation cache
+   * @param computeFunc Function to compute value for a key
+   */
+  constructor(computeFunc: (key: K) => V) {
+    this._computeFunc = computeFunc;
+  }
+
+  /**
+   * Get a value from cache, computing it if needed
+   * @param key Cache key
+   * @returns Computed value
+   */
+  get(key: K): V {
+    if (!this._cache.has(key)) {
+      this._cache.set(key, this._computeFunc(key));
+    }
+    return this._cache.get(key)!;
+  }
+
+  /**
+   * Invalidate a specific key or all cache entries
+   * @param key Optional key to invalidate
+   */
+  invalidate(key?: K): void {
+    if (key !== undefined) {
+      this._cache.delete(key);
+    } else {
+      this._cache.clear();
+    }
+  }
+
+  /**
+   * Track a dependency for a key
+   * @param key Cache key
+   * @param dependency Object the key depends on
+   */
+  addDependency(key: K, dependency: any): void {
+    if (!this._dependencies.has(key)) {
+      this._dependencies.set(key, new Set());
+    }
+    this._dependencies.get(key)!.add(dependency);
+  }
+
+  /**
+   * Invalidate keys that depend on the given object
+   * @param dependency Object that may have dependencies
+   */
+  invalidateDependents(dependency: any): void {
+    for (const [key, deps] of this._dependencies.entries()) {
+      if (deps.has(dependency)) {
+        this._cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Clear the cache and all dependencies
+   */
+  clear(): void {
+    this._cache.clear();
+    this._dependencies.clear();
+  }
 }
 
 /**
@@ -51,6 +324,32 @@ export class TreeNode extends GunNode<TreeNodeData> {
   private _sharesCalculationScheduled: boolean = false;
   private _lastSharesCalculation: number = 0;
   private _cachedShares: {[key: string]: number} | null = null;
+  
+  // Batch processor for shares calculations
+  private static _sharesBatchProcessor = new BatchProcessor();
+  
+  // Cache for shares calculations with automatic dependency tracking
+  private static _sharesCache = new ComputationCache<string, {[key: string]: number}>(
+    (nodeId: string) => {
+      const node = TreeNode._registry.get(nodeId);
+      if (!node) return {};
+      return node.computeSharesDirectly();
+    }
+  );
+  
+  // Replace the existing _sharesCalculationScheduled with more powerful tracking
+  private _pointsReactive: ReactiveValue<number> = new ReactiveValue<number>(0);
+  private _nameReactive: ReactiveValue<string> = new ReactiveValue<string>('');
+  private _childrenReactive: ReactiveValue<Map<string, TreeNode>> = new ReactiveValue<Map<string, TreeNode>>(new Map());
+  private _typesReactive: ReactiveValue<Set<string>> = new ReactiveValue<Set<string>>(new Set());
+  private _manualFulfillmentReactive: ReactiveValue<number | null> = new ReactiveValue<number | null>(null);
+  
+  // Derived values that automatically update when dependencies change
+  private _sharesReactive: DerivedValue<{[key: string]: number}>;
+  private _weightReactive: DerivedValue<number>;
+  private _fulfilledReactive: DerivedValue<number>;
+  private _desireReactive: DerivedValue<number>;
+  private _shareOfParentReactive: DerivedValue<number>;
   
   /**
    * Create a new TreeNode or get an existing one from registry
@@ -141,6 +440,39 @@ export class TreeNode extends GunNode<TreeNodeData> {
     this._id = id;
     this._app = app;
     
+    // Initialize reactive values with default values
+    this._pointsReactive = new ReactiveValue<number>(0);
+    this._nameReactive = new ReactiveValue<string>('');
+    this._childrenReactive = new ReactiveValue<Map<string, TreeNode>>(new Map());
+    this._typesReactive = new ReactiveValue<Set<string>>(new Set());
+    this._manualFulfillmentReactive = new ReactiveValue<number | null>(null);
+    
+    // Initialize derived values with their computation functions
+    this._weightReactive = new DerivedValue<number>(
+      () => this.computeWeight(),
+      [this._pointsReactive, this._childrenReactive]
+    );
+    
+    this._fulfilledReactive = new DerivedValue<number>(
+      () => this.computeFulfilled(),
+      [this._manualFulfillmentReactive, this._childrenReactive]
+    );
+    
+    this._desireReactive = new DerivedValue<number>(
+      () => this.computeDesire(),
+      [this._pointsReactive]
+    );
+    
+    this._shareOfParentReactive = new DerivedValue<number>(
+      () => this.computeShareOfParent(),
+      [this._weightReactive]
+    );
+    
+    this._sharesReactive = new DerivedValue<{[key: string]: number}>(
+      () => this.getOrComputeShares(),
+      [this._pointsReactive, this._typesReactive, this._childrenReactive, this._manualFulfillmentReactive]
+    );
+    
     // Set up data subscriptions
     this.setupSubscriptions();
   }
@@ -228,15 +560,47 @@ export class TreeNode extends GunNode<TreeNodeData> {
     }
   }
 
+  /**
+   * Schedule shares calculation with improved reactive approach
+   */
   private scheduleSharesCalculation() {
-    if (this._sharesCalculationScheduled) return;
-    this._sharesCalculationScheduled = true;
+    // Only the root node should perform the calculation
+    if (!this.isRoot) {
+      this.root.scheduleSharesCalculation();
+      return;
+    }
     
-    // Use setTimeout instead of requestAnimationFrame since this is Node-compatible
-    setTimeout(() => {
-      this.calculateSharesOfGeneralFulfillment();
-      this._sharesCalculationScheduled = false;
-    }, 1000);  // Debounce for 1 second
+    // Add to batch processor
+    TreeNode._sharesBatchProcessor.schedule(() => {
+      this.invalidateShares();
+    });
+  }
+  
+  /**
+   * Invalidate the cached shares
+   */
+  private invalidateShares(): void {
+    // Invalidate the cache for this node
+    TreeNode._sharesCache.invalidate(this.id);
+    
+    // Force recalculation in the reactive system
+    this._sharesReactive.invalidate();
+  }
+  
+  /**
+   * Get the cached shares or compute them if needed
+   */
+  private getOrComputeShares(): {[key: string]: number} {
+    return TreeNode._sharesCache.get(this.id);
+  }
+  
+  /**
+   * Compute shares directly without using the cache
+   * This is the core calculation method
+   */
+  private computeSharesDirectly(): {[key: string]: number} {
+    this._lastSharesCalculation = Date.now();
+    return this.calculateShares();
   }
   
   /**
@@ -244,26 +608,28 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * @param parentId Parent node ID or null
    */
   private async updateParent(parentId: string | null): Promise<void> {
-    // Clean up previous parent subscription
-    if (this._parentSubscription) {
-      this._parentSubscription();
-      this._parentSubscription = null;
-    }
-    
-    // Clear existing parent
+    // Remove from old parent's children
     if (this._parent) {
-      this._parent._children.delete(this._id);
+      const oldParentChildren = this._parent.children;
+      oldParentChildren.delete(this.id);
+      this._parent._childrenReactive.value = new Map(oldParentChildren);
+    }
+
+    // Set new parent
+    if (parentId) {
+      const parentNode = TreeNode.getNode(parentId, this._app);
+      this._parent = parentNode;
+      
+      // Add to new parent's children
+      const newParentChildren = parentNode.children;
+      newParentChildren.set(this.id, this);
+      parentNode._childrenReactive.value = new Map(newParentChildren);
+    } else {
       this._parent = null;
     }
     
-    // Load new parent if provided
-    if (parentId) {
-      const parent = TreeNode.getNode(parentId, this._app);
-      this._parent = parent;
-      
-      // Add this node to parent's children
-      parent._children.set(this._id, this);
-    }
+    // Trigger a shares recalculation
+    this.scheduleSharesCalculation();
   }
   
   /**
@@ -510,14 +876,14 @@ export class TreeNode extends GunNode<TreeNodeData> {
           const ourShare = validShares.find(([key, _]) => key === this._id);
           if (ourShare) {
             this._sharesOfOthersRecognition[typeId] = ourShare[1] / sum;
-              
-              // Request UI updates
-              this._app.updateNeeded = true;
-              this._app.pieUpdateNeeded = true;
-            }
+            
+            // Request UI updates
+            this._app.updateNeeded = true;
+            this._app.pieUpdateNeeded = true;
           }
-        });
-        
+        }
+      });
+
       // Store cleanup function that will properly unsubscribe
       this._recognitionSubscriptions.set(typeId, () => {
         subscription.off();
@@ -545,10 +911,12 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Set node name
    */
   set name(value: string) {
-    if (value !== this._name) {
-      // Update in Gun first - local update will happen through the subscription
-      this.put({ name: value });
-      // Don't set this._name directly - let the subscription do it
+    if (this._name !== value) {
+      this._name = value;
+      this._nameReactive.value = value;
+      
+      // Store in database
+      this.chain.get('name').put(value);
     }
   }
   
@@ -592,12 +960,15 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Set node points
    */
   set points(value: number) {
-    if (value !== this._points) {
-      // Update in Gun first - local update will happen through the subscription
-      this.put({ points: value });
-      // Don't set this._points directly - let the subscription do it
+    if (this._points !== value) {
+      this._points = value;
+      this._pointsReactive.value = value;
       
-      // The pie chart update will be handled in the subscription handler
+      // Store in database
+      this.chain.get('points').put(value);
+      
+      // Schedule shares calculation
+      this.scheduleSharesCalculation();
     }
   }
   
@@ -612,12 +983,15 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Set manual fulfillment
    */
   set manualFulfillment(value: number | null) {
-    if (value !== this._manualFulfillment) {
-      // Update in Gun first - local update will happen through the subscription
-      this.put({ manualFulfillment: value });
-      // Don't set this._manualFulfillment directly - let the subscription do it
+    if (this._manualFulfillment !== value) {
+      this._manualFulfillment = value;
+      this._manualFulfillmentReactive.value = value;
       
-      // The pie chart update will be handled in the subscription handler
+      // Store in database
+      this.chain.get('manualFulfillment').put(value);
+      
+      // Schedule shares calculation
+      this.scheduleSharesCalculation();
     }
   }
   
@@ -650,20 +1024,23 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * @returns This node for chaining
    */
   public addType(typeId: string): TreeNode {
-    // Skip if already has type
-    if (this._types.has(typeId)) return this;
-    
-    // Skip invalid type IDs
-    if (!typeId || typeId === '#' || typeof typeId !== 'string') {
-      console.warn(`[TreeNode] Ignoring invalid type ID: ${typeId}`);
-      return this;
+    if (!this._types.has(typeId)) {
+      // Add to local set
+      this._types.add(typeId);
+      this._typesReactive.value = new Set(this._types);
+      
+      // Add to type index
+      this.addToTypeIndex(typeId, this.id);
+      
+      // Add to database
+      this.chain.get('types').get(typeId).put(true);
+      
+      // Set up recognition subscriptions
+      this.setupRecognitionSubscriptions();
+      
+      // Schedule shares calculation
+      this.scheduleSharesCalculation();
     }
-    
-    // Add to Gun using path abstraction
-    const typesNode = this.get('types');
-    typesNode.get(typeId).put({ value: true } as any);
-    
-    // Let the subscription handle the local update
     return this;
   }
   
@@ -673,23 +1050,23 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * @returns This node for chaining
    */
   public removeType(typeId: string): TreeNode {
-    // Skip if doesn't have type
-    if (!this._types.has(typeId)) return this;
-    
-    // Remove from Gun using path abstraction
-    const typesNode = this.get('types');
-    typesNode.get(typeId).put(null);
-    
-    // Remove locally (subscription will handle the rest)
-    this._types.delete(typeId);
-    
-    // Update type index
-    this.root.removeFromTypeIndex(typeId, this._id);
-    
-    // Request UI updates
-    this._app.updateNeeded = true;
-    this._app.pieUpdateNeeded = true;
-    
+    if (this._types.has(typeId)) {
+      // Remove from local set
+      this._types.delete(typeId);
+      this._typesReactive.value = new Set(this._types);
+      
+      // Remove from type index
+      this.removeFromTypeIndex(typeId, this.id);
+      
+      // Remove from database
+      this.chain.get('types').get(typeId).put(null);
+      
+      // Update recognition subscriptions
+      this.setupRecognitionSubscriptions();
+      
+      // Schedule shares calculation
+      this.scheduleSharesCalculation();
+    }
     return this;
   }
   
@@ -1006,7 +1383,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
       [typeId]: total > 0 ? value / total : 0
     }), {});
   }
-  
+
   /**
    * Calculate and persist this node's shares of general fulfillment
    * Uses caching to avoid unnecessary calculations
@@ -1089,13 +1466,23 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     // Only clean up recognition subscriptions if we're the root
     if (!this._parent) {
-    this._recognitionSubscriptions.forEach(cleanup => cleanup());
-    this._recognitionSubscriptions.clear();
+      this._recognitionSubscriptions.forEach(cleanup => cleanup());
+      this._recognitionSubscriptions.clear();
       this._sharesOfOthersRecognition = {};
     }
     
     // Remove from registry
     TreeNode._registry.delete(this._id);
+    
+    // Clean up reactive values
+    this._weightReactive.dispose();
+    this._fulfilledReactive.dispose();
+    this._desireReactive.dispose();
+    this._shareOfParentReactive.dispose();
+    this._sharesReactive.dispose();
+    
+    // Remove from cache
+    TreeNode._sharesCache.invalidate(this.id);
   }
   
   /**
@@ -1147,34 +1534,21 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * @param name The name of the calculated property
    * @returns A store that updates when the calculation changes
    */
-  public getDerivedStore(name: 'fulfilled' | 'desire' | 'weight' | 'shareOfParent') {
-    // Create initial subscription to node data to drive updates
-    const nodeSub = new GunSubscription<TreeNodeData>(this.getPath());
-    
-    // Configure the store with proper initial value
-    const initialValue = this[name];
-    
-    return {
-      subscribe: (run: SubscriptionHandler<any>) => {
-        // Keep track of the last value to avoid duplicate emissions
-        let lastValue = initialValue;
-        run(lastValue);
-        
-        // Subscribe to node data changes
-        const cleanup = nodeSub.on(() => {
-          // When data changes, recalculate the derived value
-          const newValue = this[name];
-          
-          // Only notify if the value changed
-          if (newValue !== lastValue) {
-            lastValue = newValue;
-            run(newValue);
-          }
-        });
-        
-        return cleanup;
-      }
-    };
+  public getDerivedStore(name: 'fulfilled' | 'desire' | 'weight' | 'shareOfParent' | 'shares') {
+    switch (name) {
+      case 'fulfilled':
+        return this._fulfilledReactive.toStore();
+      case 'desire':
+        return this._desireReactive.toStore();
+      case 'weight':
+        return this._weightReactive.toStore();
+      case 'shareOfParent':
+        return this._shareOfParentReactive.toStore();
+      case 'shares':
+        return this._sharesReactive.toStore();
+      default:
+        throw new Error(`Unknown derived value: ${name}`);
+    }
   }
 
   /**
@@ -1241,5 +1615,82 @@ export class TreeNode extends GunNode<TreeNodeData> {
         return cleanup;
       }
     };
+  }
+
+  /**
+   * Helper method to compute weight
+   */
+  private computeWeight(): number {
+    return this._points || 0;
+  }
+  
+  /**
+   * Helper method to compute fulfilled
+   */
+  private computeFulfilled(): number {
+    // If manually set, use that
+    if (this._manualFulfillment !== null) {
+      return this._manualFulfillment;
+    }
+    
+    // Otherwise calculate from children
+    const childrenMap = this._childrenReactive.value;
+    let total = 0;
+    
+    // Calculate from contribution and non-contribution children
+    if (childrenMap.size > 0) {
+      // Calculate contribution children fulfillment
+      const contributionChildren = Array.from(childrenMap.values())
+        .filter(child => child.isContribution);
+      if (contributionChildren.length > 0) {
+        const totalWeight = contributionChildren.reduce(
+          (sum, child) => sum + child.weight, 0
+        );
+        
+        if (totalWeight > 0) {
+          total += contributionChildren.reduce(
+            (sum, child) => sum + (child.weight / totalWeight) * child.fulfilled, 0
+          );
+        }
+      }
+      
+      // Add non-contribution children fulfillment
+      const nonContributionChildren = Array.from(childrenMap.values())
+        .filter(child => !child.isContribution);
+      if (nonContributionChildren.length > 0) {
+        total += nonContributionChildren.reduce(
+          (sum, child) => sum + child.fulfilled, 0
+        );
+      }
+    }
+    
+    return total;
+  }
+  
+  /**
+   * Helper method to compute desire
+   */
+  private computeDesire(): number {
+    return this._points || 0;
+  }
+  
+  /**
+   * Helper method to compute share of parent
+   */
+  private computeShareOfParent(): number {
+    if (!this._parent) return 0;
+    
+    const siblings = Array.from(this._parent.children.values());
+    const contributionSiblings = siblings.filter(child => child.isContribution);
+    
+    if (contributionSiblings.length === 0) return 0;
+    
+    const totalWeight = contributionSiblings.reduce(
+      (sum, child) => sum + child.weight, 0
+    );
+    
+    if (totalWeight === 0) return 0;
+    
+    return this.weight / totalWeight;
   }
 } 

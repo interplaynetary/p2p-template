@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { TreeNode } from '../../../experiments/4-1-25-old/TreeNode';
+import { TreeNode } from '../models/TreeNode';
 import { getColorForName, getColorForUserId } from '../utils/colorUtils';
 import { calculateFontSize, name } from '../utils/fontUtils';
 import { getUserName, loadUsers } from '../utils/userUtils';
@@ -16,6 +16,7 @@ type TreemapInstance = {
     destroy: () => void;
     getCurrentView: () => TreeNode;
     getCurrentData: () => TreeNode;
+    getRoot: () => d3.HierarchyRectangularNode<TreeNode>;
     zoomin: (node: TreeNode) => void;
     zoomout: (node: TreeNode) => void;
 };
@@ -382,14 +383,14 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 if (!typeNode) return;
                 
                 // Update current view
-                currentView = typeNode;
+                currentView = typeNode as d3.HierarchyRectangularNode<TreeNode>;
                 
                 // Clear existing content and recreate group
                 group.selectAll("*").remove();
                 
                 // Apply treemap layout
                 const treemap = d3.treemap().tile(tile);
-                root = treemap(hierarchy);
+                root = treemap(hierarchy) as d3.HierarchyRectangularNode<TreeNode>;
                 
                 // Reset domains
                 x.domain([root.x0, root.x1]);
@@ -607,7 +608,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 }, {
                     filterText: filterText,
                     excludeIds: d.data.types ? Array.from(d.data.types) : [],
-                    rootId: d.data.app.rootId
+                    rootId: d.data && (d.data as any).app ? (d.data as any).app.rootId : null
                 });
                 
                 // Store cleanup function to cancel subscription when dropdown closes
@@ -737,34 +738,45 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                 // Existing transitions
                                 nodes.transition()
                                     .duration(GROWTH_TICK)
-                                    .attr("transform", d => d === root ? 
-                                        `translate(0,-50)` : 
-                                        `translate(${x(d.x0)},${y(d.y0)})`);
+                                    .attr("transform", d => {
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        return nd === root ? 
+                                            `translate(0,-50)` : 
+                                            `translate(${x(nd.x0)},${y(nd.y0)})`;
+                                    });
                                 
                                 // Transition rectangles
                                 nodes.select("rect")
                                     .transition()
                                     .duration(GROWTH_TICK)
-                                    .attr("width", d => d === root ? 
-                                        width : 
-                                        Math.max(0, x(d.x1) - x(d.x0)))
-                                    .attr("height", d => d === root ? 
-                                        50 : 
-                                        Math.max(0, y(d.y1) - y(d.y0)));
+                                    .attr("width", d => {
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        return nd === root ? 
+                                            width : 
+                                            Math.max(0, x(nd.x1) - x(nd.x0));
+                                    })
+                                    .attr("height", d => {
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        return nd === root ? 
+                                            50 : 
+                                            Math.max(0, y(nd.y1) - y(nd.y0));
+                                    });
 
                                 // Update text positions
                                 nodes.select("text")
                                     .transition()
                                     .duration(GROWTH_TICK)
                                     .attr("transform", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
+                                        const rectHeight = nd === root ? 50 : y(nd.y1) - y(nd.y0);
                                         return `translate(${rectWidth / 2},${rectHeight / 2})`;
                                     })
                                     .style("font-size", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
-                                        return calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView) + "px";
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
+                                        const rectHeight = nd === root ? 50 : y(nd.y1) - y(nd.y0);
+                                        return calculateFontSize(nd, rectWidth, rectHeight, root, x, y, currentView) + "px";
                                     });
                                 
                                 // Update tag container positions
@@ -772,16 +784,17 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                     .transition()
                                     .duration(GROWTH_TICK)
                                     .attr("transform", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
-                                        const rectHeight = d === root ? 50 : y(d.y1) - y(d.y0);
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
+                                        const rectHeight = nd === root ? 50 : y(nd.y1) - y(nd.y0);
                                         
                                         // Position centered horizontally, below the text
                                         // Calculate vertical position based on text lines
-                                        const textLines = d === root ? 1 : 
-                                                          d.data.name.split(/(?=[A-Z][^A-Z])/g).length;
+                                        const textLines = nd === root ? 1 : 
+                                                         nd.data.name.split(/(?=[A-Z][^A-Z])/g).length;
                                         
                                         // Offset from center - move down by half the text height plus padding
-                                        const fontSize = calculateFontSize(d, rectWidth, rectHeight, root, x, y, currentView);
+                                        const fontSize = calculateFontSize(nd, rectWidth, rectHeight, root, x, y, currentView);
                                         const fontSizeNumber = typeof fontSize === 'number' ? 
                                             fontSize : 12; // Fallback to reasonable default
                                         const verticalOffset = (textLines * 1.2 * fontSizeNumber / 2) + 10;
@@ -794,11 +807,13 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                     .transition()
                                     .duration(GROWTH_TICK)
                                     .attr("x", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
                                         return -rectWidth / 2 + 10; // Adjust left position with padding
                                     })
                                     .attr("width", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
                                         return rectWidth - 20; // Full width minus padding
                                     });
 
@@ -807,7 +822,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                     .transition()
                                     .duration(GROWTH_TICK)
                                     .attr("transform", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
                                         return `translate(${rectWidth - 60}, 25)`;
                                     });
 
@@ -816,7 +832,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                     .transition()
                                     .duration(GROWTH_TICK)
                                     .attr("transform", d => {
-                                        const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
                                         return `translate(${rectWidth - 20}, 25)`;
                                     });
 
@@ -891,7 +908,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         }, { passive: false });
 
         // Check if view is empty (no children or all children have 0 points)
-        if ((!root.children || root.children.length === 0) && root !== data) {
+        if ((!root.children || root.children.length === 0) && 
+            !(root.data && root.data.id === data.id)) {
             group.append("text")
                 .attr("class", "helper-text")
                 .attr("text-anchor", "middle")
@@ -941,8 +959,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
 
                             // Apply treemap layout
                             const treemap = d3.treemap().tile(tile);
-                            root = treemap(hierarchy);
-                            currentView = root;
+                            root = treemap(hierarchy) as d3.HierarchyRectangularNode<TreeNode>;
+                            currentView = root as d3.HierarchyRectangularNode<TreeNode>;
                             
                             // Reset domains
                             x.domain([root.x0, root.x1]);
@@ -1067,7 +1085,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             .call(t => group0.transition(t).remove()
                 .call(position, d.parent))
             .call(t => group1.transition(t)
-                .attrTween("opacity", () => d3.interpolate(0, 1))
+                .attrTween("opacity", () => d3.interpolate("0", "1") as any)
                 .call(position, d));
     }
   
@@ -1085,7 +1103,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         svg.transition()
             .duration(750)
             .call(t => group0.transition(t).remove()
-                .attrTween("opacity", () => d3.interpolate(1, 0))
+                .attrTween("opacity", () => d3.interpolate("1", "0") as any)
                 .call(position, d))
             .call(t => group1.transition(t)
                 .call(position, d.parent));
@@ -1093,10 +1111,10 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
 
     // Return public interface with functions to get current state
     return {
-        getCurrentView: () => currentView,
+        getCurrentView: () => currentView as unknown as TreeNode,
         getCurrentData: () => data,
-        element: svg.node(),
-        getRoot: () => root,
+        element: svg.node() as unknown as HTMLElement,
+        getRoot: () => root as d3.HierarchyRectangularNode<TreeNode>,
         zoomin,
         zoomout,
         update: (newWidth: number, newHeight: number) => {

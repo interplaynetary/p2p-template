@@ -1,7 +1,7 @@
-import { App } from '../App';
-import { GunNode } from './GunNode';
-import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './GunSubscription';
-import { gun } from './Gun';
+import { App } from '../../App';
+import { GunNode } from '../GunNode';
+import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from '../GunSubscription';
+import { gun } from '../Gun';
 
 
 // We added normalization to ensure that the shares of recognition sum to 1

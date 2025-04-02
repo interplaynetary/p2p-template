@@ -4,7 +4,6 @@ import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
 import { updateUserProfile } from './utils/userUtils';
 import { initializeExampleData } from './example';
-import $ from 'jquery';
 import * as d3 from 'd3';
 
 export class App {
@@ -20,10 +19,7 @@ export class App {
     saveInterval: any = null
     window!: Window
     gunRef: any = null
-    // Map to store peer trees indexed by their public key
-    peerTrees: Map<string, TreeNode> = new Map();
-    resizeObserver: ResizeObserver | null = null;
-
+    resizeObserver: ResizeObserver | null = null
     
     constructor() {
         console.log('[App] Constructor started');
@@ -541,11 +537,6 @@ export class App {
     destroy() {
         // Clean up subscriptions in our tree
         this.cleanupTreeSubscriptions(this.rootNode);
-        
-        // Add cleanup for peer trees
-        for (const [_, peerTree] of this.peerTrees) {
-            this.cleanupTreeSubscriptions(peerTree);
-        }
         
         // Clean up intervals
         clearInterval(this.updateInterval);

@@ -23,6 +23,6 @@
     "allowJs": true,
     "checkJs": false,   
   },
-  "include": ["**/*.ts", "**/*.js"],
+  "include": ["**/*.ts", "**/*.js", "**/*.svelte"],
   "exclude": ["node_modules", "dist", "build"]
 }
