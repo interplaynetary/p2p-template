@@ -37,9 +37,9 @@ Your share of anyone's surplus = MR(You, Them) / Σ MR(Them, Each-of-Those-They-
 
 ## Why does any of that matter?
 
-Now that we have derived your **surplus-distribution**, we can distribute surplus! 
+Now that we have derived our **surplus-distributions**, we can distribute surplus! 
 
-You aren't just giving away surplus randomly, you give *precisely* to your own ***mutual*** fulfillment.
+With your **surplus-distribution**, you aren't just giving away surplus randomly, you give *precisely* to your own ***mutual*** fulfillment.
 
 Imagine you have 4 rooms in your apartment and you are using 1: you have 3 rooms surplus.
 
@@ -152,17 +152,6 @@ At each degree n:
 
 - Total Potential Transitive Access = Σ Transitive Share(You, Each) for All
 
-- Total Actual Transitive Access = 
-   Σ[ EffectiveTransitiveShare(You, Each) * Surplus(Each) ] for all Each in Network
-      Where:
-      Surplus(Node) = max(0, Available(Node) - Needed(Node))
-      
-      SurplusRatio(Node) = Surplus(Node) / Available(Node)
-      
-      EffectiveTransitiveShare(A, B) = 
-         DirectShare(A, B) + 
-         Σ[ DirectShare(A, C) * SurplusRatio(C) * EffectiveTransitiveShare(C, B) ]
-         for all immediate connections C of A where C ≠ B
    ```
 
 This exponential growth means that as free association spreads:

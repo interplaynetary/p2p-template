@@ -1,7 +1,7 @@
 import { Reactive, Computed, ReactiveEntity } from '../Reactive';
 import { App } from '../../App';
 import { gun } from '../Gun';
-import { TreeNode } from '../ReactTreeNode';
+import { TreeNode } from '../experiments/ReactTreeNode';
 
 // I wonder if we could reorganize this Make it much simpler such that a role is an independent thing that can point to another role as its counterpart. And that can be a one way direction and then it can also be bi directional potentially, if both point at each other. And that each or any role could actually also point to another node as its type in the sense of its association. So rather than creating an association with a fixed number of things, nodes would point towards the thing that they are trying to categorize themselves as. 
 // Please create this simpler implementation in roles.ts 

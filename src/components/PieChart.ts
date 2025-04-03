@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { getUserName } from '../utils/userUtils';
 import { getColorForUserId } from '../utils/colorUtils';
-import { TreeNode } from '../models/ReactTreeNode';
+import { TreeNode } from '../models/experiments/ReactTreeNode';
 
 
 export function createPieChart(data: TreeNode) {
