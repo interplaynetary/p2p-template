@@ -336,7 +336,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 
             // Tag name - create a span that will be updated when name resolves
             const nameSpan = tagPill.append("span")
-                .style("color", "white")
+                .style("color", "black")
                 .style("margin-right", "4px")
                 .style("text-shadow", "0 1px 1px rgba(0,0,0,0.3)");
                 
@@ -362,7 +362,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             tagPill.append("span")
                 .attr("class", "remove-tag")
                 .style("cursor", "pointer")
-                .style("color", "white")
+                .style("color", "black")
                 .style("font-size", "12px")
                 .style("line-height", "10px")
                 .style("opacity", "0.8")

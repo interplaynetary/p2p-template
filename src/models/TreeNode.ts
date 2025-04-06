@@ -22,6 +22,9 @@ export interface TreeNodeData {
 
 // calculateSharesOfGeneralFulfillment is called on time-interval
 
+// in order to calculate the shares of general fulfillment of us within another, 
+// we need to build a local representation of their tree, to do calculations on it
+
 /**
  * Reactive TreeNode implementation following Gun.js best practices
  * Embraces the reactive nature of Gun by treating all data as streams
@@ -162,12 +165,41 @@ export class TreeNode extends GunNode<TreeNodeData> {
     this._id = id;
     this._app = app;
     
+    console.log(`[TreeNode] Constructor for ${id}, initial name=${this._name}`);
+    
     // Start with a recent timestamp
     this._lastSharesCalculation = Date.now() - 1000;
     
+    // IMPORTANT FIX: Immediately load initial data synchronously
+    // This ensures the node has its name and other properties
+    // before any APIs like once() are called on it
+    this.getChain().once((data) => {
+      console.log(`[TreeNode] Immediate data load for ${id}:`, data ? 
+                  { name: data.name, points: data.points } : 'No data');
+      
+      if (data) {
+        if (data.name !== undefined) {
+          this._name = data.name || '';
+          console.log(`[TreeNode] Updated name to "${this._name}" for ${id}`);
+        }
+        
+        if (data.points !== undefined) {
+          this._points = data.points || 0;
+        }
+        
+        if (data.manualFulfillment !== undefined) {
+          this._manualFulfillment = data.manualFulfillment;
+        }
+        
+        // Don't handle parent here - it's more complex
+        TreeNode.log(`[TreeNode] Initial data loaded for ${id}, name=${this._name}`);
+      }
+    });
+    
     // Setup subscriptions with a slight delay to prevent startup floods
     setTimeout(() => {
-    this.setupSubscriptions();
+      console.log(`[TreeNode] Setting up subscriptions for ${id}, current name="${this._name}"`);
+      this.setupSubscriptions();
       
       // Set an automatic timeout to end startup mode
       if (TreeNode._startupMode && !TreeNode._startupModeTimeout) {
@@ -1325,10 +1357,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
     return totalRecognition;
   }
 
-  /**
-   * Calculate and normalize shares for all types
-   */
-  private calculateShares(): {[key: string]: number} {
+  
+  // This would be a new method to calculate relative shares
+  public relativeShareOfGeneralFulfillmentAmongTypes(): {[key: string]: number} {
     // Get all shares with their values
     const shares = Array.from(this.root._typeIndex.keys())
       .map(typeId => ({
@@ -1345,41 +1376,15 @@ export class TreeNode extends GunNode<TreeNodeData> {
       [typeId]: total > 0 ? value / total : 0
     }), {});
   }
-  
-  /**
-   * Calculate and persist this node's shares of general fulfillment
-   * Uses caching to avoid unnecessary calculations
-   */
-  public calculateSharesOfGeneralFulfillment(): {[key: string]: number} {
-    const now = Date.now();
-    
-    // Use cached value if recent enough and available
-    if (this._cachedShares && now - this._lastSharesCalculation < this._sharesCalculationCooldown) {
-      // Log once in a while to show we're using cached values
-      if (Math.random() < 0.1) {
-        console.log(`[${this._name}] Using cached shares, age: ${Math.round((now - this._lastSharesCalculation)/1000)}s`);
-      }
-      return this._cachedShares;
-    }
 
-    // Calculate new shares
-    const shares = this.calculateShares();
-    
-    // Cache the results
-    this._cachedShares = shares;
-    this._lastSharesCalculation = now;
-    
-    // Check if shares have changed before saving to Gun
-    const sharesSame = this._cachedShares && this.areSharesEqual(shares, this._cachedShares);
-    
-    if (!sharesSame) {
-      console.log(`[${this._name}] Saving shares to Gun:`, shares);
-    this.get('sharesOfGeneralFulfillment').put(shares);
-    } else {
-      console.log(`[${this._name}] Shares unchanged, skipping Gun update`);
-    }
-    
-    return shares;
+
+  public calculateShares(): {[key: string]: number} {
+    // we need to calculate the shares for all types, but also we need to store the weights of all nodes (even those without types?)
+      return Array.from(this.root._typeIndex.keys())
+        .reduce((obj, typeId) => ({
+          ...obj,
+          [typeId]: this.shareOfGeneralFulfillment(typeId)
+        }), {});
   }
   
   /**
@@ -1717,5 +1722,54 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Clear the batch
     TreeNode._pendingUpdates.clear();
     TreeNode._updateBatchTimeout = null;
+  }
+
+  /**
+   * Override once method to also update internal state
+   * @returns Promise resolving with node data
+   */
+  public once(): Promise<TreeNodeData> {
+    console.log(`[TreeNode] once() called for ${this._id}, current name="${this._name}"`);
+    
+    return new Promise<TreeNodeData>((resolve, reject) => {
+      super.once()
+        .then(data => {
+          console.log(`[TreeNode] once() received data for ${this._id}:`, 
+                     data ? { name: data.name, points: data.points } : 'No data');
+          
+          // Update internal state with the fetched data
+          if (data) {
+            // Only update if this is the expected data type
+            if (typeof data === 'object' && !Array.isArray(data)) {
+              const nodeData = data as any;
+              
+              // Process basic fields
+              if (nodeData.name !== undefined && nodeData.name !== this._name) {
+                const oldName = this._name;
+                this._name = nodeData.name || '';
+                console.log(`[TreeNode] once() updated name from "${oldName}" to "${this._name}" for ${this._id}`);
+              }
+              
+              if (nodeData.points !== undefined && nodeData.points !== this._points) {
+                this._points = nodeData.points || 0;
+              }
+              
+              if (nodeData.manualFulfillment !== undefined && nodeData.manualFulfillment !== this._manualFulfillment) {
+                this._manualFulfillment = nodeData.manualFulfillment;
+              }
+              
+              // Don't handle parent here - too complex for this context
+              TreeNode.log(`[TreeNode] Data updated in once() for ${this._id}, name=${this._name}`);
+            }
+          }
+          
+          console.log(`[TreeNode] once() resolving with name="${this._name}" for ${this._id}`);
+          resolve(data as TreeNodeData);
+        })
+        .catch(error => {
+          console.error(`[TreeNode] once() error for ${this._id}:`, error);
+          reject(error);
+        });
+    });
   }
 } 
