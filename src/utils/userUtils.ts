@@ -1,6 +1,5 @@
 import { gun } from '../models/Gun';
 import { GunSubscription } from '../models/GunSubscription';
-import { user } from '../models/Gun';
 
 // Global users Map for lightweight caching to avoid repeated lookups
 // This is just a performance optimization, not our source of truth
@@ -56,20 +55,15 @@ export function getUserName(userId: string): string {
     
     // Only set up subscription if not already subscribed
     if (!userSubscriptions.has(userId)) {
-        console.log(`Setting up subscription for user ${userId}`); 
-        
         // Set up subscription to user data
         const cleanupFn = gun.get('users').get(userId).on((userData: any) => {
             if (userData && userData.name) {
-                console.log(`Received name for ${userId}: ${userData.name}`);
                 // Store in cache for performance
                 updateUserName(userId, userData.name);
             } else if (userData && userData.node && userData.node['#']) {
-                console.log(`Following node reference for ${userId}`);
                 // Follow reference if user data is stored in a node
                 gun.get(userData.node['#']).on((nodeData: any) => {
                     if (nodeData && nodeData.name) {
-                        console.log(`Resolved name from node for ${userId}: ${nodeData.name}`);
                         updateUserName(userId, nodeData.name);
                     }
                 });
@@ -82,16 +76,6 @@ export function getUserName(userId: string): string {
                 cleanupFn.off();
             }
         });
-        
-        // For logged-in user, check if this is our own ID and we have a better name from login
-        if (user.is && user.is.pub === userId) {
-            // Try to get the actual username from localStorage or elsewhere
-            const storedAlias = localStorage.getItem('gundb-username');
-            if (storedAlias) {
-                console.log(`Setting current user name from stored alias: ${storedAlias}`);
-                updateUserName(userId, storedAlias);
-            }
-        }
     }
     
     // Return ID as a fallback while data loads
@@ -102,10 +86,8 @@ export function getUserName(userId: string): string {
  * Helper to update user name and trigger all appropriate callbacks
  */
 function updateUserName(userId: string, name: string): void {
-    // Skip if no change or if name is empty or just whitespace
-    if (usersMap.get(userId) === name || !name.trim()) return;
-    
-    console.log(`Updating user name: ${userId} => ${name}`);
+    // Skip if no change
+    if (usersMap.get(userId) === name) return;
     
     // Update the map
     usersMap.set(userId, name);
@@ -141,11 +123,6 @@ export function updateUserProfile(userId: string, name: string): void {
     
     // Store name in cache immediately for responsive UI
     updateUserName(userId, name);
-    
-    // If this is our username, store it in localStorage for persistence across sessions
-    if (user.is && user.is.pub === userId) {
-        localStorage.setItem('gundb-username', name);
-    }
     
     // Gun will automatically merge this data
     gun.get('users').get(userId).put({

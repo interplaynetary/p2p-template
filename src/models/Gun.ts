@@ -21,6 +21,18 @@ export const recallUser = (): Promise<void> => {
   return new Promise((resolve) => {
     // Already authenticated? Resolve immediately
     if (user.is?.pub) {
+      // Fetch and restore alias if needed
+      if (user.is.alias === user.is.pub) {
+        gun.get(`~${user.is.pub}`).get('alias').once((alias) => {
+          if (alias && typeof alias === 'string' && alias !== user.is.pub) {
+            // Update user.is.alias with the correct value
+            user.is.alias = alias;
+            console.log('Restored correct alias:', alias);
+          }
+          resolve();
+        });
+        return;
+      }
       resolve();
       return;
     }
@@ -28,8 +40,22 @@ export const recallUser = (): Promise<void> => {
     // Set up one-time auth handler
     const authHandler = () => {
       (gun as any).off('auth', authHandler);
-      resolve();
+      
+      // Check if alias equals pub key, which indicates a potential issue
+      if (user.is?.alias === user.is?.pub) {
+        gun.get(`~${user.is.pub}`).get('alias').once((alias) => {
+          if (alias && typeof alias === 'string' && alias !== user.is.pub) {
+            // Update user.is.alias with the correct value
+            user.is.alias = alias;
+            console.log('Restored correct alias:', alias);
+          }
+          resolve();
+        });
+      } else {
+        resolve();
+      }
     };
+    
     gun.on('auth', authHandler);
 
     // Attempt recall
@@ -38,7 +64,19 @@ export const recallUser = (): Promise<void> => {
     // Safety timeout
     setTimeout(() => {
       (gun as any).off('auth', authHandler);
-      resolve();
+      
+      // Same alias check on timeout
+      if (user.is?.pub && user.is?.alias === user.is?.pub) {
+        gun.get(`~${user.is.pub}`).get('alias').once((alias) => {
+          if (alias && typeof alias === 'string' && alias !== user.is.pub) {
+            user.is.alias = alias;
+            console.log('Restored correct alias on timeout:', alias);
+          }
+          resolve();
+        });
+      } else {
+        resolve();
+      }
     }, 1000);
   });
 };
@@ -46,14 +84,9 @@ export const recallUser = (): Promise<void> => {
 // Single authentication function that handles both login and signup
 export const authenticate = async (alias: string, pass: string): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // Save the username to localStorage BEFORE authentication completes
-    // This ensures we always have it available even in subsequent sessions
-    localStorage.setItem('gundb-username', alias);
-    
     // First try to login
     user.auth(alias, pass, (ack: any) => {
       if (!ack.err) {
-        console.log('Login successful, username saved:', alias);
         resolve();
         return;
       }
@@ -64,8 +97,6 @@ export const authenticate = async (alias: string, pass: string): Promise<void> =
           reject(new Error(createAck.err));
           return;
         }
-        
-        console.log('User created, username saved:', alias);
         
         // After creation, authenticate
         user.auth(alias, pass, (authAck: any) => {

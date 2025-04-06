@@ -7,3 +7,5 @@ For Today:
 
 - The names in the tags and of the root user seem to not be resolving to the names, and instead keep using IDs.
 - Is mutual-recognition calculating properly?
+
+- make colors persist across sessions! (So users can also change the colors!)

@@ -2,10 +2,12 @@ import { gun, user } from './models/Gun';
 import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
-import { updateUserProfile } from './utils/userUtils';
+import { updateUserProfile, getUserName } from './utils/userUtils';
 import { initializeExampleData } from './example';
 import * as d3 from 'd3';
 import { GunSubscription } from './models/GunSubscription';
+
+// could we simply store
 
 export class App {
     name: string = ''
@@ -29,32 +31,14 @@ export class App {
         console.log('[App] Constructor started');
         
         // More robust authentication check
-        if (!user.is || !user.is.pub) {
+        if (!user.is || !user.is.pub || !user.is.alias) {
             console.error('[App] User not properly authenticated!', user.is);
             throw new Error('Must be properly authenticated before initializing App');
         }
         
-        // Get user's public key for ID
+        this.name = user.is.alias as string || 'Unknown User';
+        console.log('[App] User name:', this.name);
         this.rootId = user.is.pub as string;
-        
-        // Try to get the real username, not just the pub key
-        const storedUsername = localStorage.getItem('gundb-username');
-        
-        if (storedUsername) {
-            // If we have a stored username, use that
-            this.name = storedUsername;
-            console.log('[App] Using stored username:', this.name);
-        } else if (user.is.alias && user.is.alias !== this.rootId) {
-            // If alias exists and is not the same as the pub key, it might be the real username
-            this.name = user.is.alias as string;
-            console.log('[App] Using alias from auth:', this.name);
-            // Store it for future use
-            localStorage.setItem('gundb-username', this.name);
-        } else {
-            // Default
-            this.name = 'User-' + this.rootId.substring(0, 5);
-            console.log('[App] Using default name:', this.name);
-        }
         
         // Ensure we have valid data
         if (!this.rootId) {
@@ -64,10 +48,8 @@ export class App {
         
         this.gunRef = gun.get('nodes').get(this.rootId);
         console.log('[App] User information:', { name: this.name, rootId: this.rootId });
-
-        // IMPORTANT: Store the user name in the global users map immediately
-        // This ensures the name is available for UI components even before Gun data loads
-        updateUserProfile(this.rootId, this.name);
+        // I dont understand how this.aname could possiblly equal user.is.pub?
+        // [App] User information: {name: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU', rootId: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU'}        
 
         (window as any).app = this;
         console.log('[App] App instance attached to window.app');
@@ -101,6 +83,9 @@ export class App {
             throw error;
         }
     }
+
+    // Or how after initialize:
+    // App initialized after session recall: App {name: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU', rootId: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU', rootNode: TreeNode, initializing: false, treemap: {…}, …}
 
     // Phase 1: Load the root node 
     private async _initPhase1_LoadRootNode() {
@@ -161,13 +146,6 @@ export class App {
                 name: this.rootNode.name,
                 childrenCount: this.rootNode.children.size
             });
-            
-            // Always update root node name from authentication data
-            // This ensures it's always correct even if Gun data is stale
-            if (this.name) {
-                console.log('[App] Updating root node name to match user name:', this.name);
-                this.rootNode.name = this.name;
-            }
         }
 
         // Create a reference to this node in the users path and update our profile
@@ -317,19 +295,50 @@ export class App {
         return new Proxy(node, {
             get: (target, prop, receiver) => {
                 // Special handling for specific properties that might have different names or behavior
+                if (prop === 'name') {
+                    return target.name;
+                }
+
                 if (prop === 'childrenArray') {
                     // Convert children Map to array for old components
                     return Array.from(target.children.values());
                 }
                 
-                if (prop === 'gunRef') {
-                    // Provide a compatible gunRef for old components
-                    return target.getChain();
+                if (prop === 'app') {
+                    // Return a proxy for the app instance that ensures rootId and other needed properties
+                    // are always accessible, even through nested property access patterns
+                    return new Proxy(this, {
+                        get: (appTarget, appProp) => {
+                            // Ensure rootId is available
+                            if (appProp === 'rootId') {
+                                return this.rootId;
+                            }
+                            return Reflect.get(appTarget, appProp);
+                        }
+                    });
                 }
                 
-                if (prop === 'app') {
-                    // Return the app instance
-                    return this;
+                if (prop === 'types') {
+                    // Get the types set from the target
+                    const typesSet = target.types;
+                    
+                    // Pre-trigger name resolution for all type IDs to populate the cache
+                    if (typesSet instanceof Set) {
+                        typesSet.forEach(typeId => {
+                            if (typeof typeId === 'string') {
+                                // This will subscribe to name updates
+                                getUserName(typeId);
+                            }
+                        });
+                    }
+                    
+                    return typesSet;
+                }
+                
+                // Special handling for (d.data as any).app.rootId pattern used in the TreeMap component
+                if (prop === 'rootId' && !('rootId' in target)) {
+                    // Return rootId from app if target doesn't have it directly
+                    return this.rootId;
                 }
                 
                 if (prop === 'hasChildren') {
@@ -346,23 +355,53 @@ export class App {
                     return typeIndex;
                 }
                 
-                // Special handling for name property
-                if (prop === 'name') {
-                    // If this is the root node (our user) and the name is the ID, use the app's name
-                    if (target.id === this.rootId && 
-                        (target.name === target.id || !target.name || target.name === '')) {
-                        return this.name;
-                    }
-                    // Otherwise use the node's name or look up in the users map
-                    const name = Reflect.get(target, prop, receiver);
-                    if (target.isContributor && name === target.id) {
-                        // Try to get a better name from the usersMap for contributor nodes
-                        const usersMap = (window as any).usersMap;
-                        if (usersMap && usersMap.has(target.id)) {
-                            return usersMap.get(target.id);
-                        }
-                    }
-                    return name;
+                // D3 compatibility - value is used by d3.hierarchy.sum()
+                if (prop === 'value') {
+                    return target.points;
+                }
+                
+                // Add more TreeMap specific compatibility properties
+                if (prop === 'isContribution' && typeof target.isContribution === 'undefined') {
+                    return false; // Default value if not present on the original node
+                }
+                
+                if (prop === 'hasDirectContributionChild' && typeof target.hasDirectContributionChild === 'undefined') {
+                    // If the property doesn't exist, derive it from children
+                    const children = Array.from(target.children.values());
+                    return children.some(child => child.isContribution === true);
+                }
+                
+                // Handle specific methods that might need adaptations
+                if (prop === 'addType' && typeof target.addType === 'function') {
+                    return (typeId: string) => {
+                        const result = target.addType(typeId);
+                        this._updateNeeded = true; // Mark tree for update when types change
+                        return this.createCompatibleNode(result);
+                    };
+                }
+                
+                if (prop === 'removeType' && typeof target.removeType === 'function') {
+                    return (typeId: string) => {
+                        const result = target.removeType(typeId);
+                        this._updateNeeded = true; // Mark tree for update when types change
+                        return this.createCompatibleNode(result);
+                    };
+                }
+                
+                if (prop === 'addChild' && typeof target.addChild === 'function') {
+                    return async (name: string, points?: number, typeIds?: string[], manualFulfillment?: number | null, id?: string) => {
+                        const result = await target.addChild(name, points, typeIds, manualFulfillment, id);
+                        this._updateNeeded = true; // Mark tree for update
+                        return this.createCompatibleNode(result);
+                    };
+                }
+                
+                if (prop === 'removeChild' && typeof target.removeChild === 'function') {
+                    return (childId: string) => {
+                        const result = target.removeChild(childId);
+                        this._updateNeeded = true; // Mark tree for update
+                        return this.createCompatibleNode(result);
+                    };
                 }
                 
                 // Get the property from the target
@@ -373,29 +412,98 @@ export class App {
                     return this.createCompatibleNode(value);
                 }
                 
-                // Handle functions that might expect different parameters
+                // Handle functions that might expect different parameters or return TreeNode
                 if (typeof value === 'function') {
                     return (...args: any[]) => {
-                        // Call the method on the target
-                        const result = value.apply(target, args);
-                        
-                        // Wrap returned TreeNode in compatibility wrapper
-                        if (result instanceof TreeNode) {
-                            return this.createCompatibleNode(result);
+                        try {
+                            // Call the method on the target
+                            const result = value.apply(target, args);
+                            
+                            // Wrap returned TreeNode in compatibility wrapper
+                            if (result instanceof TreeNode) {
+                                return this.createCompatibleNode(result);
+                            }
+                            
+                            // Wrap returned Promise that resolves to TreeNode
+                            if (result instanceof Promise) {
+                                return result.then(res => {
+                                    if (res instanceof TreeNode) {
+                                        return this.createCompatibleNode(res);
+                                    }
+                                    return res;
+                                });
+                            }
+                            
+                            // Handle arrays of TreeNodes
+                            if (Array.isArray(result)) {
+                                return result.map(item => 
+                                    item instanceof TreeNode ? 
+                                    this.createCompatibleNode(item) : 
+                                    item
+                                );
+                            }
+                            
+                            // Handle Maps or Sets containing TreeNodes
+                            if (result instanceof Map) {
+                                const wrappedMap = new Map();
+                                result.forEach((val, key) => {
+                                    wrappedMap.set(
+                                        key, 
+                                        val instanceof TreeNode ? 
+                                        this.createCompatibleNode(val) : 
+                                        val
+                                    );
+                                });
+                                return wrappedMap;
+                            }
+                            
+                            if (result instanceof Set) {
+                                const wrappedSet = new Set();
+                                result.forEach(val => {
+                                    wrappedSet.add(
+                                        val instanceof TreeNode ? 
+                                        this.createCompatibleNode(val) : 
+                                        val
+                                    );
+                                });
+                                return wrappedSet;
+                            }
+                            
+                            return result;
+                        } catch (err) {
+                            console.error(`Error in proxied method ${String(prop)}:`, err);
+                            throw err;
                         }
-                        
-                        // Wrap returned Promise that resolves to TreeNode
-                        if (result instanceof Promise) {
-                            return result.then(res => {
-                                if (res instanceof TreeNode) {
-                                    return this.createCompatibleNode(res);
-                                }
-                                return res;
-                            });
-                        }
-                        
-                        return result;
                     };
+                }
+                
+                // Handle specific collection types containing TreeNodes
+                if (value instanceof Map) {
+                    // Only wrap values if they are TreeNodes (like in the children map)
+                    const wrappedMap = new Map();
+                    value.forEach((val, key) => {
+                        wrappedMap.set(
+                            key, 
+                            val instanceof TreeNode ? 
+                            this.createCompatibleNode(val) : 
+                            val
+                        );
+                    });
+                    return wrappedMap;
+                }
+                
+                if (value instanceof Set && prop === 'types') {
+                    // Already handled by explicit types property handling above
+                    return value;
+                }
+                
+                if (Array.isArray(value)) {
+                    // Wrap array items that are TreeNodes
+                    return value.map(item => 
+                        item instanceof TreeNode ? 
+                        this.createCompatibleNode(item) : 
+                        item
+                    );
                 }
                 
                 return value;

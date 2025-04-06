@@ -1,8 +1,8 @@
-import { gun } from '../Gun';
-import { App } from '../../App';
-import { GunSubscription } from '../GunSubscription';
-import { GunNode } from '../GunNode';
-import { Reactive, Computed, ReactiveEntity, ComputationCache } from './Reactive'
+import { gun } from './Gun';
+import { App } from '../App';
+import { GunSubscription } from './GunSubscription';
+import { GunNode } from './GunNode';
+import { Reactive, Computed, ReactiveEntity, ComputationCache } from './experiments/Reactive'
 
 /**
  * Interface describing the data structure of a tree node
