@@ -1386,6 +1386,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     return result;
   }
+
   
   /**
    * Get the distribution of mutual fulfillment across types
@@ -1448,13 +1449,316 @@ export class TreeNode extends GunNode<TreeNodeData> {
       value: result
     });
     
+    // Convert Map to object for Gun storage
+    const distributionObj = Object.fromEntries(result);
+    
+    // Save to Gun database using the path abstraction
+    this.get('mutualFulfillmentDistribution').put(distributionObj as any);
+    
+    // Schedule social distribution update if this is a root node
+    if (this.isRoot) {
+      this.scheduleSocialDistributionUpdate();
+    }
+    
     return result;
   }
   
-  // CLEANUP
+  // Track social distribution subscriptions
+  private _socialDistributionSubscriptions: Map<string, SubscriptionCleanup> = new Map();
+  private _socialDistributionUpdateTimeout: any = null;
+  private _lastSocialDistributionUpdate: number = 0;
+  private _socialDistributionUpdateCooldown: number = 3000; // 3 second cooldown
   
   /**
-   * Clean up all subscriptions
+   * Schedule an update to social distribution with debouncing
+   */
+  private scheduleSocialDistributionUpdate(): void {
+    // Skip if already scheduled
+    if (this._socialDistributionUpdateTimeout) return;
+    
+    // Skip if in cooldown period
+    const now = Date.now();
+    if (now - this._lastSocialDistributionUpdate < this._socialDistributionUpdateCooldown) {
+      TreeNode.log(`[${this._name}] Skipping social distribution update - in cooldown period`);
+      return;
+    }
+    
+    TreeNode.log(`[${this._name}] Scheduling social distribution update`);
+    
+    // Set up debounce timeout
+    this._socialDistributionUpdateTimeout = setTimeout(() => {
+      this._socialDistributionUpdateTimeout = null;
+      this._lastSocialDistributionUpdate = Date.now();
+      
+      // Update social distribution
+      const distribution = this.calculateSocialDistribution();
+      
+      // Save to Gun
+      const distributionObj = Object.fromEntries(distribution);
+      this.get('socialDistribution').put(distributionObj as any);
+      
+      // Update UI
+      this._app.pieUpdateNeeded = true;
+    }, 1000);
+  }
+  
+  /**
+   * Set up subscriptions to mutual fulfillment distributions
+   * from nodes in our network
+   */
+  public setupSocialDistributionSubscriptions(): void {
+    // Only run on root nodes
+    if (!this.isRoot) return;
+    
+    // First get our own mutual distribution
+    const myDistribution = this.mutualFulfillmentDistribution;
+    
+    // Clean up existing subscriptions
+    this._socialDistributionSubscriptions.forEach(cleanup => cleanup());
+    this._socialDistributionSubscriptions.clear();
+    
+    // Subscribe to our own mutual distribution changes
+    const selfSub = new GunSubscription<any>([
+      ...this.getPath(), 
+      'mutualFulfillmentDistribution'
+    ]);
+    
+    const selfCleanup = selfSub.on(() => {
+      // When our own distribution changes, update social distribution
+      this.scheduleSocialDistributionUpdate();
+    });
+    
+    this._socialDistributionSubscriptions.set(this.id, selfCleanup);
+    
+    // Subscribe to first-level connections' mutual distributions
+    for (const [nodeId, proportion] of myDistribution.entries()) {
+      // Skip if proportion is too small
+      if (proportion < 0.001) continue;
+      
+      // Get the node
+      const node = TreeNode._registry.get(nodeId);
+      if (!node) continue;
+      
+      // Subscribe to this node's mutual distribution
+      const sub = new GunSubscription<any>([
+        ...node.getPath(), 
+        'mutualFulfillmentDistribution'
+      ]);
+      
+      const cleanup = sub.on(() => {
+        // When a connection's distribution changes, update our social distribution
+        this.scheduleSocialDistributionUpdate();
+      });
+      
+      this._socialDistributionSubscriptions.set(nodeId, cleanup);
+    }
+    
+    TreeNode.log(`[${this._name}] Set up ${this._socialDistributionSubscriptions.size} social distribution subscriptions`);
+  }
+  
+  /**
+   * Calculate the distribution of social shares (direct and transitive) across all nodes
+   * @returns Map of node IDs to their normalized social share values
+   */
+  public get socialDistribution(): Map<string, number> {
+    // Create a cache key for this calculation
+    const cacheKey = `socialDist_${this.id}`;
+    
+    // Check if we have a recent cached value
+    const cached = this._calculationCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cached && now - cached.timestamp < 3000) {
+      // Use cached value if less than 3 seconds old
+      return cached.value;
+    }
+    
+    // Calculate new social distribution
+    return this.calculateSocialDistribution();
+  }
+  
+  /**
+   * Calculate social distribution and update cache
+   * @returns Map of node IDs to their normalized social share values
+   */
+  private calculateSocialDistribution(): Map<string, number> {
+    const resultDistribution = new Map<string, number>();
+    const now = Date.now();
+    
+    // Run network traversal to build distribution
+    this.traverseDistributionNetwork(resultDistribution);
+    
+    // If no results, use local calculation
+    if (resultDistribution.size === 0) {
+      TreeNode.log(`[${this._name}] No p2p distribution data found, calculating locally`);
+      
+      // Direct connections from mutual fulfillment
+      const myDistribution = this.mutualFulfillmentDistribution;
+      for (const [nodeId, proportion] of myDistribution.entries()) {
+        if (proportion < 0.0001) continue;
+        resultDistribution.set(nodeId, proportion);
+      }
+    }
+    
+    // Normalize
+    const total = Array.from(resultDistribution.values()).reduce((sum, val) => sum + val, 0);
+    if (total > 0) {
+      for (const [key, value] of resultDistribution.entries()) {
+        resultDistribution.set(key, value / total);
+      }
+    }
+    
+    // Cache the result
+    this._calculationCache.set(`socialDist_${this.id}`, {
+      timestamp: now,
+      value: resultDistribution
+    });
+    
+    // Set up subscriptions if root node
+    if (this.isRoot && this._socialDistributionSubscriptions.size === 0) {
+      this.setupSocialDistributionSubscriptions();
+    }
+    
+    return resultDistribution;
+  }
+  
+  /**
+   * Traverse the p2p network to build the social distribution
+   * Uses a BFS approach to explore mutual fulfillment distributions
+   * @param result Map to accumulate social distribution
+   */
+  private traverseDistributionNetwork(result: Map<string, number>): void {
+    // Track visited nodes to prevent cycles
+    const visited = new Set<string>([this.id]);
+    
+    // Queue for BFS traversal
+    const queue: Array<{node: TreeNode, pathMultiplier: number}> = [];
+    
+    // Start with this node's mutual distribution
+    const myDistribution = this.mutualFulfillmentDistribution;
+    
+    // Initialize with direct connections
+    for (const [nodeId, proportion] of myDistribution.entries()) {
+      // Skip if proportion is effectively zero
+      if (proportion < 0.0001) continue;
+      
+      // Add the direct contribution to result
+      result.set(nodeId, proportion);
+      
+      // Get the node instance
+      const nextNode = TreeNode._registry.get(nodeId);
+      if (!nextNode) continue;
+      
+      // Add to queue for further traversal
+      queue.push({
+        node: nextNode,
+        pathMultiplier: proportion
+      });
+      
+      // Mark as visited
+      visited.add(nodeId);
+    }
+    
+    // Use BFS to explore the network (up to 5 levels deep)
+    let currentLevel = 0;
+    const MAX_DEPTH = 5;
+    
+    while (queue.length > 0 && currentLevel < MAX_DEPTH) {
+      const levelSize = queue.length;
+      
+      // Process all nodes at current level
+      for (let i = 0; i < levelSize; i++) {
+        const { node, pathMultiplier } = queue.shift()!;
+        
+        // Use cached mutual distribution if available
+        const nextDistribution = node._calculationCache.get('mutualDist')?.value;
+        if (!nextDistribution) {
+          // Try to get from gun, but we'll skip this node for now
+          // This will be picked up when subscriptions are established
+          this.getMutualDistributionFromGun(node.id);
+          continue;
+        }
+        
+        // Process each entry in the next distribution
+        for (const [nextNodeId, nextProportion] of nextDistribution.entries()) {
+          // Skip if already visited or proportion is too small
+          if (visited.has(nextNodeId) || nextProportion < 0.0001) continue;
+          
+          // Calculate transitive value
+          const transitiveValue = pathMultiplier * nextProportion;
+          
+          // Add to result (accumulate if already exists)
+          const currentValue = result.get(nextNodeId) || 0;
+          result.set(nextNodeId, currentValue + transitiveValue);
+          
+          // Get the next node
+          const nextNextNode = TreeNode._registry.get(nextNodeId);
+          if (!nextNextNode) continue;
+          
+          // Add to queue for next level
+          queue.push({
+            node: nextNextNode,
+            pathMultiplier: transitiveValue
+          });
+          
+          // Mark as visited
+          visited.add(nextNodeId);
+        }
+      }
+      
+      // Move to next level
+      currentLevel++;
+    }
+    
+    TreeNode.log(`[${this._name}] P2P traversal found ${result.size} connections across ${currentLevel} levels`);
+  }
+  
+  /**
+   * Get mutual fulfillment distribution from Gun and cache it locally
+   * Reuses Gun subscription mechanisms
+   */
+  private getMutualDistributionFromGun(nodeId: string): void {
+    // Get the node from registry
+    const node = TreeNode._registry.get(nodeId);
+    if (!node) return;
+    
+    // Create path to the mutual fulfillment distribution
+    const path = [...node.getPath(), 'mutualFulfillmentDistribution'];
+    
+    // Use existing GunSubscription pattern
+    const sub = new GunSubscription<any>(path);
+    
+    // Only get the value once to avoid memory leaks
+    sub.once()
+      .then(data => {
+        if (!data) return;
+        
+        // Convert object to Map
+        const distMap = new Map<string, number>();
+        Object.entries(data).forEach(([key, value]) => {
+          if (key !== '_' && typeof value === 'number') {
+            distMap.set(key, value as number);
+          }
+        });
+        
+        // Cache the result
+        node._calculationCache.set('mutualDist', {
+          timestamp: Date.now(),
+          value: distMap
+        });
+        
+        // If this is the root node, update social distribution
+        if (this.isRoot) {
+          this.scheduleSocialDistributionUpdate();
+        }
+      })
+      .catch(err => {
+        console.error(`[TreeNode] Error getting mutual distribution for ${nodeId}:`, err);
+      });
+  }
+  
+  /**
+   * Clean up all subscriptions including social distribution subscriptions
    */
   public unsubscribe(): void {
     if (this._parentSubscription) {
@@ -1474,9 +1778,19 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     // Only clean up recognition subscriptions if we're the root
     if (!this._parent) {
-    this._recognitionSubscriptions.forEach(cleanup => cleanup());
-    this._recognitionSubscriptions.clear();
+      this._recognitionSubscriptions.forEach(cleanup => cleanup());
+      this._recognitionSubscriptions.clear();
       this._sharesOfOthersRecognition = {};
+      
+      // Also clean up social distribution subscriptions
+      this._socialDistributionSubscriptions.forEach(cleanup => cleanup());
+      this._socialDistributionSubscriptions.clear();
+      
+      // Clear any pending timeouts
+      if (this._socialDistributionUpdateTimeout) {
+        clearTimeout(this._socialDistributionUpdateTimeout);
+        this._socialDistributionUpdateTimeout = null;
+      }
     }
     
     // Remove from registry

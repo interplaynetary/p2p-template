@@ -15,6 +15,24 @@ export interface Node {
   name: string;
 }
 
+/*
+export interface Role {
+  context: Node;
+  extensions: Map<string, Rules>;
+}
+
+export interface Rules {
+  [key: string]: Rule;
+}
+
+export interface Rule {
+  [key: string]: Rule;
+}
+*/
+
+// what would it mean to divide a proportion (of a type) not real number amount of a type according to mutual-fulfillment?
+
+
 /**
  * Role State enum representing the current state of a role
  */
