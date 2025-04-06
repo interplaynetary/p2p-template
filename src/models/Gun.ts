@@ -46,9 +46,14 @@ export const recallUser = (): Promise<void> => {
 // Single authentication function that handles both login and signup
 export const authenticate = async (alias: string, pass: string): Promise<void> => {
   return new Promise((resolve, reject) => {
+    // Save the username to localStorage BEFORE authentication completes
+    // This ensures we always have it available even in subsequent sessions
+    localStorage.setItem('gundb-username', alias);
+    
     // First try to login
     user.auth(alias, pass, (ack: any) => {
       if (!ack.err) {
+        console.log('Login successful, username saved:', alias);
         resolve();
         return;
       }
@@ -59,6 +64,8 @@ export const authenticate = async (alias: string, pass: string): Promise<void> =
           reject(new Error(createAck.err));
           return;
         }
+        
+        console.log('User created, username saved:', alias);
         
         // After creation, authenticate
         user.auth(alias, pass, (authAck: any) => {

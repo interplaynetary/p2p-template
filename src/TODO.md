@@ -4,3 +4,6 @@
 For Today:
 - Get tags working on type-map
 - Get mutual-recognition working!
+
+- The names in the tags and of the root user seem to not be resolving to the names, and instead keep using IDs.
+- Is mutual-recognition calculating properly?

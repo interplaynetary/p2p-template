@@ -24,19 +24,37 @@ export class App {
     private _resizeThrottleTimeout: any = null
     private _lastResizeTime: number = 0
     private _resizeCooldown: number = 100; // ms
-    private _initPhaseComplete: boolean = false
     
     constructor() {
         console.log('[App] Constructor started');
         
         // More robust authentication check
-        if (!user.is || !user.is.pub || !user.is.alias) {
+        if (!user.is || !user.is.pub) {
             console.error('[App] User not properly authenticated!', user.is);
             throw new Error('Must be properly authenticated before initializing App');
         }
         
-        this.name = user.is.alias as string || 'Unknown User';
+        // Get user's public key for ID
         this.rootId = user.is.pub as string;
+        
+        // Try to get the real username, not just the pub key
+        const storedUsername = localStorage.getItem('gundb-username');
+        
+        if (storedUsername) {
+            // If we have a stored username, use that
+            this.name = storedUsername;
+            console.log('[App] Using stored username:', this.name);
+        } else if (user.is.alias && user.is.alias !== this.rootId) {
+            // If alias exists and is not the same as the pub key, it might be the real username
+            this.name = user.is.alias as string;
+            console.log('[App] Using alias from auth:', this.name);
+            // Store it for future use
+            localStorage.setItem('gundb-username', this.name);
+        } else {
+            // Default
+            this.name = 'User-' + this.rootId.substring(0, 5);
+            console.log('[App] Using default name:', this.name);
+        }
         
         // Ensure we have valid data
         if (!this.rootId) {
@@ -46,6 +64,10 @@ export class App {
         
         this.gunRef = gun.get('nodes').get(this.rootId);
         console.log('[App] User information:', { name: this.name, rootId: this.rootId });
+
+        // IMPORTANT: Store the user name in the global users map immediately
+        // This ensures the name is available for UI components even before Gun data loads
+        updateUserProfile(this.rootId, this.name);
 
         (window as any).app = this;
         console.log('[App] App instance attached to window.app');
@@ -73,7 +95,6 @@ export class App {
             await this._initPhase3_SetupVisualization();
             
             this.initializing = false;
-            this._initPhaseComplete = true;
             console.log('[App] Initialization completed successfully');
         } catch (error) {
             console.error('[App] Initialization failed with error:', error);
@@ -141,8 +162,9 @@ export class App {
                 childrenCount: this.rootNode.children.size
             });
             
-            // If the root node name is empty/Unnamed but we have a user name, update it
-            if ((this.rootNode.name === '' || this.rootNode.name === 'Unnamed') && this.name) {
+            // Always update root node name from authentication data
+            // This ensures it's always correct even if Gun data is stale
+            if (this.name) {
                 console.log('[App] Updating root node name to match user name:', this.name);
                 this.rootNode.name = this.name;
             }
@@ -322,6 +344,25 @@ export class App {
                         typeIndex[typeId] = true;
                     });
                     return typeIndex;
+                }
+                
+                // Special handling for name property
+                if (prop === 'name') {
+                    // If this is the root node (our user) and the name is the ID, use the app's name
+                    if (target.id === this.rootId && 
+                        (target.name === target.id || !target.name || target.name === '')) {
+                        return this.name;
+                    }
+                    // Otherwise use the node's name or look up in the users map
+                    const name = Reflect.get(target, prop, receiver);
+                    if (target.isContributor && name === target.id) {
+                        // Try to get a better name from the usersMap for contributor nodes
+                        const usersMap = (window as any).usersMap;
+                        if (usersMap && usersMap.has(target.id)) {
+                            return usersMap.get(target.id);
+                        }
+                    }
+                    return name;
                 }
                 
                 // Get the property from the target

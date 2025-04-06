@@ -4,8 +4,15 @@ import './style.css';
 import $ from 'jquery';
 import encodeQR from '@paulmillr/qr';
 import decodeQR from '@paulmillr/qr/decode.js';
+import { usersMap } from './utils/userUtils';
 
 let app: App | undefined;
+
+// Make usersMap accessible globally
+(window as any).usersMap = usersMap;
+
+// Add logging to track username on startup
+console.log('Stored username:', localStorage.getItem('gundb-username'));
 
 // Initialize function that handles recall and app initialization
 async function initializeApp() {
@@ -15,6 +22,7 @@ async function initializeApp() {
     // Check if the user is authenticated after recall
     if (user.is && user.is.pub) {
         console.log('User session recalled successfully', user.is.pub);
+        console.log('Stored username after recall:', localStorage.getItem('gundb-username'));
         const authContainer = document.getElementById('auth-container');
         if (authContainer) {
             authContainer.classList.add('hidden');

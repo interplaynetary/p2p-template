@@ -23,6 +23,12 @@ You can interact with an interface implementing this logic at [interplaynetary.g
 4. Your Share of Anyone's **Surplus-Distribution** equals *your mutual recognition with them, divided by the sum of all mutual recognition values between them and everyone they recognize.*
     - For example: If we have 10% of mutual-recognition, and you are my only mutual-relationship, you would have 100% of my **total-mutual-recognition** (100% of my **surplus-distribution**). If I have two mutual-relationships each with 10% mutual-recognition, each would have 50% of my **total-mutual-recognition** (50% of my **surplus-distribution**).
 
+
+Your Recognition is your acknowledgment of those who contribute to your self-actualization.
+Your Total Recognition is always 100%.
+Your Mutual Recognition with another is the minimum of your recognition of each other.
+Your share in another's surplus equals your mutual recognition divided by their total mutual recognition.
+
 **Mathematically defined:**
 
 ```
