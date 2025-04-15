@@ -5,11 +5,11 @@ import { calculateFontSize, name } from '../utils/fontUtils';
 import { getUserName, loadUsers, onUserNameResolved, usersMap } from '../utils/userUtils';
 
 // TODO:
-// when we navigate into a type, the backbutton no longer works
-// we can no longer navigate to a type
+// when we navigate into a contributor, the backbutton no longer works
+// we can no longer navigate to a contributor
 // when adding children we no longer automatically zoom-in (commons has working functionality for this)
 
-// Create a type for the treemap return value
+// Create a contributorfor the treemap return value
 type TreemapInstance = {
     element: HTMLElement;
     update: (width: number, height: number) => void;
@@ -141,8 +141,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 return d === root ? 50 : y(d.y1) - y(d.y0);
             });
 
-        // Update type tags container position
-        group.selectAll(".type-tags-container")
+        // Update contributortags container position
+        group.selectAll(".contributor-tags-container")
             .style("opacity", () => (window as any).app.isGrowingActive ? 0 : 1) // Hide during growing
             .style("transition", "opacity 0.15s ease") // Add smooth transition
             .attr("transform", d => {
@@ -162,6 +162,13 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 const verticalOffset = (textLines * 1.2 * fontSizeNumber / 2) + 10;
                 
                 return `translate(${rectWidth / 2}, ${rectHeight / 2 + verticalOffset})`;
+            });
+
+        // Update inventory button position
+        group.selectAll(".inventory-button")
+            .attr("transform", d => {
+                const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                return `translate(${rectWidth - 100}, 25)`;
             });
     }
   
@@ -247,9 +254,9 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
   
       group.call(position, root);
 
-    // Replace type circles container with tag pills container and add tag button
-    const typeContainer = node.append("g")
-        .attr("class", "type-tags-container")
+    // Replace contributorcircles container with tag pills container and add tag button
+    const contributorContainer = node.append("g")
+        .attr("class", "contributor-tags-container")
         .style("opacity", () => (window as any).app.isGrowingActive ? 0 : 1) // Hide during growing
         .style("transition", "opacity 0.15s ease") // Add smooth transition
         .attr("transform", d => {
@@ -270,8 +277,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             return `translate(${rectWidth / 2}, ${rectHeight / 2 + verticalOffset})`;
         });
 
-    // Add tag pills for each type
-    typeContainer.each(function(d: d3.HierarchyRectangularNode<TreeNode>) {
+    // Add tag pills for each contributor
+    contributorContainer.each(function(d: d3.HierarchyRectangularNode<TreeNode>) {
         if (!d || d === root) return; // Skip for root node
         
         const container = d3.select(this);
@@ -283,8 +290,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
         // Skip all additions if rect is too small
         if (rectWidth < 60 || rectHeight < 60) return;
         
-        // Get type array safely using public getter
-        const typesArray = d.data.types ? Array.from(d.data.types) : [];
+        // Get contributorarray safely using public getter
+        const contributorsArray = d.data.contributors ? Array.from(d.data.contributors) : [];
         
         // Create a tag wrapper to hold all pills in a flex layout
         const tagWrapper = container.append("foreignObject")
@@ -319,15 +326,15 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             .style("color", "#333")
             .text("+");
         
-        // Add existing type pills
-        typesArray.forEach((type: string) => {
+        // Add existing contributorpills
+        contributorsArray.forEach((contributor: string) => {
             const tagPill = tagWrapper.append("div")
                 .attr("class", "tag-pill")
-                .attr("data-type-id", type)
+                .attr("data-contributor-id", contributor)
                 .style("display", "flex")
                 .style("align-items", "center")
                 .style("border-radius", "10px")
-                .style("background", getColorForUserId(type))
+                .style("background", getColorForUserId(contributor))
                 .style("padding", "2px 8px")
                 .style("margin", "2px")
                 .style("height", "20px")
@@ -341,11 +348,11 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 .style("text-shadow", "0 1px 1px rgba(0,0,0,0.3)");
                 
             // Set initial text 
-            const initialName = getUserName(type);
+            const initialName = getUserName(contributor);
             updateNameSpan(nameSpan, initialName);
             
             // Set up subscription to name changes
-            const cleanupNameSub = onUserNameResolved(type, (userId, resolvedName) => {
+            const cleanupNameSub = onUserNameResolved(contributor, (userId, resolvedName) => {
                 // Update the name when it resolves
                 updateNameSpan(nameSpan, resolvedName);
                 
@@ -372,14 +379,14 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     event.stopPropagation();
                     
                     // Get current resolved name for logging
-                    const currentName = usersMap.has(type) ? usersMap.get(type)! : type;
-                    console.log('Removing type:', currentName, 'from node:', d.data.name);
+                    const currentName = usersMap.has(contributor) ? usersMap.get(contributor)! : contributor;
+                    console.log('Removing contributor:', currentName, 'from node:', d.data.name);
                     
                     // Clean up name subscription
                     cleanupNameSub();
                     
-                    // Remove the type from the node
-                    d.data.removeType(type);
+                    // Remove the contributorfrom the node
+                    d.data.removeContributor(contributor);
                     
                     // Remove tag pill with animation
                     d3.select(event.target.parentNode)
@@ -389,22 +396,22 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                         .remove();
                 });
             
-            // Click handler for navigating to type's tree
+            // Click handler for navigating to contributor's tree
             tagPill.on("click", (event) => {
                 // Don't handle if clicking on X button
                 if (event.target.classList.contains("remove-tag")) return;
                 
                 // Get the current resolved name for logging
-                const currentName = usersMap.has(type) ? usersMap.get(type)! : type;
-                console.log('Tag clicked, navigating to type:', currentName);
+                const currentName = usersMap.has(contributor) ? usersMap.get(contributor)! : contributor;
+                console.log('Tag clicked, navigating to contributor:', currentName);
                 event.stopPropagation();
                 
-                // Get the type node from the hierarchy
-                const typeNode = hierarchy.descendants().find(d => d.data.id === type);
-                if (!typeNode) return;
+                // Get the contributornode from the hierarchy
+                const contributorNode = hierarchy.descendants().find(d => d.data.id === contributor);
+                if (!contributorNode) return;
                 
                 // Update current view
-                currentView = typeNode as d3.HierarchyRectangularNode<TreeNode>;
+                currentView = contributorNode as d3.HierarchyRectangularNode<TreeNode>;
                 
                 // Clear existing content and recreate group
                 group.selectAll("*").remove();
@@ -430,11 +437,11 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             event.stopPropagation();
             
             // Remove any existing dropdown
-            d3.selectAll(".type-search-dropdown").remove();
+            d3.selectAll(".contributor-search-dropdown").remove();
             
             // Create dropdown container - attach to body instead of container to ensure it's on top
             const dropdownContainer = d3.select("body").append("div")
-                .attr("class", "type-search-dropdown")
+                .attr("class", "contributor-search-dropdown")
                 .style("position", "fixed") // Use fixed instead of absolute for better positioning
                 .style("top", `${event.clientY + 20}px`) // Use clientY instead of pageY for fixed positioning
                 .style("left", `${event.clientX - 100}px`)
@@ -509,7 +516,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
             
             // Add search input
             const searchInput = headerContainer.append("input")
-                .attr("type", "text")
+                .attr("contributor", "text")
                 .attr("placeholder", "Search users...")
                 .style("padding", "8px")
                 .style("border", "none")
@@ -617,10 +624,10 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                 d3.select(this).style("background", "white");
                             });
                         
-                        // Click to add as type
+                        // Click to add as contributor
                         userItem.on("click", () => {
-                            // Add as type
-                            d.data.addType(user.id);
+                            // Add as contributor
+                            d.data.addContributor(user.id);
                             
                             // Close dropdown
                             closeDropdown();
@@ -640,7 +647,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     adjustDropdownPosition();
                 }, {
                     filterText: filterText,
-                    excludeIds: d.data.types ? Array.from(d.data.types) : [],
+                    excludeIds: d.data.contributors ? Array.from(d.data.contributors) : [],
                     rootId: d.data && (d.data as any).app ? (d.data as any).app.rootId : null
                 });
                 
@@ -718,7 +725,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                     // Determine if this is a right-click or two-finger touch
                     const isShrinking = event.type === 'mousedown' ? 
                         event.button === 2 : // right click
-                        event.touches.length === 2; // two finger touch
+                        event.touches && event.touches.length === 2; // two finger touch
 
                     growthTimeout = setTimeout(() => {
                         // Only start growing/shrinking if still touching the same node
@@ -727,8 +734,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                             // Set the app's growing active flag
                             (window as any).app.isGrowingActive = true;
                             
-                            // Hide type tags immediately when growing starts
-                            group.selectAll(".type-tags-container")
+                            // Hide contributortags immediately when growing starts
+                            group.selectAll(".contributor-tags-container")
                                 .style("opacity", 0);
                             
                             growthInterval = setInterval(() => {
@@ -740,8 +747,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                     // Clear the app's growing active flag
                                     (window as any).app.isGrowingActive = false;
                                     
-                                    // Ensure type tags are shown when click finishes
-                                    group.selectAll(".type-tags-container")
+                                    // Ensure contributortags are shown when click finishes
+                                    group.selectAll(".contributor-tags-container")
                                         .style("opacity", 1);
                                     
                                     return;
@@ -764,7 +771,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                 const treemap = d3.treemap().tile(tile);
                                 treemap(hierarchy);
                                 
-                                // Update visualization including type indicators
+                                // Update visualization including contributorindicators
                                 const nodes = group.selectAll("g")
                                     .filter(node => node !== root);
                                 
@@ -813,7 +820,7 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                     });
                                 
                                 // Update tag container positions
-                                nodes.select(".type-tags-container")
+                                nodes.select(".contributor-tags-container")
                                     .transition()
                                     .duration(GROWTH_TICK)
                                     .attr("transform", d => {
@@ -860,6 +867,16 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                                         return `translate(${rectWidth - 60}, 25)`;
                                     });
 
+                                // Update inventory button position during growth
+                                group.select(".inventory-button")
+                                    .transition()
+                                    .duration(GROWTH_TICK)
+                                    .attr("transform", d => {
+                                        const nd = d as d3.HierarchyRectangularNode<TreeNode>;
+                                        const rectWidth = nd === root ? width : x(nd.x1) - x(nd.x0);
+                                        return `translate(${rectWidth - 100}, 25)`;
+                                    });
+
                                 // Update add button position during growth
                                 group.select(".add-button")
                                     .transition()
@@ -896,8 +913,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 // Clear the app's growing active flag
                 (window as any).app.isGrowingActive = false;
                 
-                // Ensure type tags are shown when click finishes
-                group.selectAll(".type-tags-container")
+                // Ensure contributortags are shown when click finishes
+                group.selectAll(".contributor-tags-container")
                     .style("opacity", 1);
             }
         }, { passive: true })
@@ -934,8 +951,8 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 // Ensure app's growing active flag is cleared
                 (window as any).app.isGrowingActive = false;
                 
-                // Ensure type tags are shown when click finishes
-                group.selectAll(".type-tags-container")
+                // Ensure contributortags are shown when click finishes
+                group.selectAll(".contributor-tags-container")
                     .style("opacity", 1);
             }
         }, { passive: false });
@@ -1012,6 +1029,43 @@ export function createTreemap(data: TreeNode, width: number, height: number): Tr
                 // Only add navigation buttons on our user's tree views (not contributor trees)
                 if (!isContributorTree) {
                     const rectWidth = d === root ? width : x(d.x1) - x(d.x0);
+                    
+                    // Add inventory button (between home and peer buttons)
+                    d3.select(this)
+                        .append("g")
+                        .attr("class", "inventory-button")
+                        .attr("transform", `translate(${rectWidth - 100}, 25)`)  // Position it to the left of peer button
+                        .style("cursor", "pointer")
+                        .on("click", (event) => {
+                            event.stopPropagation();
+                            
+                            // Show the inventory form
+                            const popup = document.querySelector('.node-popup');
+                            const inventoryForm = document.getElementById('inventoryForm');
+                            
+                            if (popup && inventoryForm) {
+                                // Hide all forms and show the inventory form
+                                document.querySelectorAll('.popup-form').forEach(form => {
+                                    (form as HTMLElement).style.display = 'none';
+                                });
+                                (inventoryForm as HTMLElement).style.display = 'block';
+                                
+                                // Show the popup
+                                popup.classList.add('active');
+                                
+                                // Populate inventory form if we have an inventory manager
+                                const app = window as any;
+                                if (app.coordinator && app.coordinator.inventoryManager) {
+                                    app.coordinator.inventoryManager.populateInventoryForm();
+                                }
+                            }
+                        })
+                        .append("text")
+                        .attr("fill", "#000")
+                        .attr("font-size", "20px")
+                        .attr("text-anchor", "middle")  // Center the text horizontally
+                        .attr("dominant-baseline", "middle")  // Center the text vertically
+                        .text("🎒");  // Unicode backpack emoji for inventory
                     
                     // Add peer button (on the left of the plus button)
                     d3.select(this)

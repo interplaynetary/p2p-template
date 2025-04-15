@@ -94,7 +94,6 @@ body {
   align-items: center;
   justify-content: center;
   user-select: none;
-  cursor: pointer;
   margin: auto; /* Add margin: auto to help with centering */
 }
 
@@ -104,6 +103,55 @@ body {
 
 #pie-container svg text {
   user-select: none;     /* Prevent text selection specifically */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Social chart container styling */
+#social-chart-container {
+  width: 100%;
+  height: 300px;
+  min-height: 300px;
+  aspect-ratio: 1;
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  user-select: none;
+  margin: auto;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: visible;
+}
+
+#social-chart-container .social-chart {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+#social-chart-container .depth-control-container {
+  width: 100%;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+#social-chart-container svg {
+  pointer-events: none;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#social-chart-container svg text {
+  user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -174,6 +222,8 @@ svg {
   align-items: center;
   justify-content: center;
   z-index: 1001;
+  overflow-y: auto; /* Allow scrolling for very tall popups */
+  padding: 20px; /* Add padding for mobile */
 }
 
 .node-popup.active {
@@ -183,10 +233,15 @@ svg {
 .node-popup-content {
   background: white;
   padding: 24px;
-  border-radius: 8px;
-  min-width: 300px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border-radius: 12px; /* Increased radius for more modern look */
+  width: 90%;
+  max-width: 500px; /* Increased max-width */
+  max-height: 85vh; /* Limit height */
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
   font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Hide overflow */
 }
 
 .node-popup-content h2 {
@@ -196,8 +251,9 @@ svg {
   font-weight: 500;
   text-align: center;
   width: 100%;
-  padding: 0 0 5px;
-  user-select: none;  /* Prevent text selection */
+  padding: 0 0 10px;
+  user-select: none;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .form-group {
@@ -226,27 +282,48 @@ svg {
 
 .form-buttons {
   display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap; /* Allow wrapping on small screens */
 }
 
 .form-buttons button {
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 12px 20px;
+  border-radius: 6px;
   border: none;
   cursor: pointer;
   font-family: inherit;
   font-size: 14px;
   font-weight: 500;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-width: 120px;
+  max-width: 200px;
 }
 
-.form-buttons button[type="submit"] {
+.form-buttons button[type="submit"],
+.form-buttons .update-inventory {
   background: #2196F3;
   color: white;
 }
 
+.form-buttons button[type="submit"]:hover,
+.form-buttons .update-inventory:hover {
+  background: #1976D2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
 .form-buttons button.cancel {
-  background: #ddd;
+  background: #f0f0f0;
+  color: #333;
+}
+
+.form-buttons button.cancel:hover {
+  background: #e0e0e0;
 }
 
 .qr-display {
@@ -259,6 +336,11 @@ svg {
 
 .popup-form {
   padding: 0 16px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(85vh - 100px); /* Account for header and buttons */
 }
 
 .drop-zone {
@@ -695,4 +777,396 @@ svg {
     padding: 10px;
     border-bottom: 1px solid #eee;
     user-select: none;  /* Prevent text selection */
+}
+
+/* Inventory management form styles */
+.form-description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.capacity-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+  overflow-y: auto;
+  padding-right: 8px;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  flex: 1; /* Take available space */
+  scrollbar-width: thin; /* Firefox */
+}
+
+.section-header {
+  font-size: 16px;
+  color: #444;
+  margin-top: 16px;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 2;
+}
+
+.capacity-input-row {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  transition: all 0.2s ease;
+}
+
+.capacity-input-row:hover {
+  background-color: #f0f0f0;
+}
+
+.name-container {
+  grid-column: 1 / -1;
+  text-align: left;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+.inputs-container {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.input-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.depth-indicator {
+  font-size: 13px;
+  color: #555;
+  text-align: center;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  font-weight: 500;
+  background-color: #f0f0f0;
+  border-radius: 12px;
+  padding: 2px 8px;
+  display: inline-block;
+}
+
+.capacity-input-row input:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* New styles for depth controls */
+.capacity-input-row .depth-label {
+  margin-left: 5px;
+  white-space: nowrap;
+  font-size: 0.9em;
+  color: #555;
+}
+
+.capacity-input-row .depth-select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: #f8f8f8;
+  transition: border-color 0.2s ease;
+}
+
+.capacity-input-row .depth-select:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.capacity-input-row .depth-select option {
+  padding: 3px;
+}
+
+.new-capacity-row {
+  background-color: rgba(0, 123, 255, 0.05);
+  border-left: 3px solid #007bff;
+}
+
+.add-capacity-button {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-capacity-button:hover {
+  background-color: #e0e0e0;
+  color: #000;
+}
+
+.inventory-list {
+  margin-top: 20px;
+  overflow-y: auto;
+  border-top: 1px solid #eee;
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  scrollbar-width: thin; /* Firefox */
+}
+
+.inventory-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.inventory-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.inventory-list::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.inventory-header {
+  margin-bottom: 12px;
+  padding-bottom: 5px;
+  font-size: 16px;
+  color: #444;
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 2;
+}
+
+.inventory-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventory-item .item-name {
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventory-item .item-details-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.inventory-item .item-details {
+  color: #666;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.no-inventory, .no-types {
+  color: #999;
+  text-align: center;
+  font-style: italic;
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+/* Improve layout for distribution chart */
+.distribution-chart-container {
+  grid-column: 1 / -1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.capacity-distribution-chart {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  margin: 0 auto;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.capacity-distribution-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.distribution-tooltip {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .node-popup-content {
+    padding: 20px 16px;
+    width: 95%;
+  }
+  
+  .inputs-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .capacity-input-row {
+    padding: 12px;
+  }
+  
+  .name-container {
+    margin-bottom: 6px;
+  }
+  
+  .form-buttons button {
+    padding: 12px 16px;
+    min-width: 100px;
+  }
+}
+
+/* Extra responsiveness for very small screens */
+@media (max-width: 480px) {
+  .node-popup {
+    padding: 10px;
+    align-items: flex-start; /* Start from top on small screens */
+    padding-top: 30px; /* Add space at the top */
+  }
+  
+  .node-popup-content {
+    padding: 16px 12px;
+    max-height: 92vh;
+  }
+
+  .node-popup-content h2 {
+    font-size: 20px;
+    margin-bottom: 16px;
+  }
+  
+  .form-description {
+    font-size: 13px;
+  }
+  
+  .capacity-input-row {
+    padding: 8px;
+  }
+  
+  .inventory-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .inventory-item .item-details-container {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .form-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .form-buttons button {
+    max-width: none;
+  }
+}
+
+/* Stylize scrollbars for capacity inputs in webkit browsers */
+.capacity-inputs::-webkit-scrollbar {
+  width: 6px;
+}
+
+.capacity-inputs::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.capacity-inputs::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.capacity-inputs::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+.capacity-input-row .capacity-name {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.capacity-input-row .capacity-name-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.capacity-input-row input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s ease;
 }

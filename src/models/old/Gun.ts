@@ -9,7 +9,7 @@ import SEA from 'gun/sea.js'
 
 // Initialize Gun with peer and storage
 export const gun = Gun({
-  peers: ['http://127.0.0.1:5500/gun'],
+  peers: ['http://127.0.0.1:5500/gun', 'https://gun-manhattan.herokuapp.com/gun'],
   localStorage: true
 });
 

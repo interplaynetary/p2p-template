@@ -47,6 +47,39 @@ export class GunSubscription<T = any> {
   }
 
   /**
+   * Create a subscription with a static value that never changes
+   * @param value The static value
+   * @returns A GunSubscription that emits only the provided value
+   */
+  public static of<T>(value: T): GunSubscription<T> {
+    const sub = new GunSubscription<T>([]);
+    sub.lastValue = value;
+    sub.hasValue = true;
+    
+    // Override subscribe to just emit the value once
+    const originalSubscribe = sub.subscribe;
+    sub.subscribe = function(): ReadableStream<T> {
+      if (this.stream) {
+        return this.stream;
+      }
+      
+      this.active = true;
+      this.stream = new ReadableStream<T>({
+        start: (controller) => {
+          controller.enqueue(value);
+        },
+        cancel: () => {
+          this.unsubscribe();
+        }
+      });
+      
+      return this.stream;
+    };
+    
+    return sub;
+  }
+
+  /**
    * Start the subscription and get a stream that can be read
    * @returns A ReadableStream of data from the Gun node
    */
@@ -251,6 +284,361 @@ export class GunSubscription<T = any> {
     });
 
     return mappedSub;
+  }
+  
+  /**
+   * Combine values from this stream with another stream
+   * Emits values whenever either stream emits, using the latest value from each
+   * @param other The other stream to combine with
+   * @param combineFn Function that combines values from both streams
+   * @returns A new GunSubscription with combined values
+   */
+  public combine<U, R>(other: GunSubscription<U>, combineFn: (a: T, b: U) => R): GunSubscription<R> {
+    const combinedSub = new GunSubscription<R>([]);
+    combinedSub.active = true;
+    
+    let lastValueA: T | undefined = this.lastValue;
+    let lastValueB: U | undefined = other.lastValue;
+    let hasValueA = this.hasValue;
+    let hasValueB = other.hasValue;
+    
+    // Set up subscription to this stream
+    const subA = this.on((valueA) => {
+      lastValueA = valueA;
+      hasValueA = true;
+      
+      // Only emit if we have values from both streams
+      if (hasValueB && lastValueB !== undefined) {
+        const combined = combineFn(valueA, lastValueB);
+        combinedSub.lastValue = combined;
+        combinedSub.hasValue = true;
+        
+        // Notify all handlers
+        combinedSub.handlers.forEach(handler => {
+          try {
+            handler(combined);
+          } catch (err) {
+            console.error('Error in combined subscription handler:', err);
+          }
+        });
+      }
+    });
+    
+    // Set up subscription to the other stream
+    const subB = other.on((valueB) => {
+      lastValueB = valueB;
+      hasValueB = true;
+      
+      // Only emit if we have values from both streams
+      if (hasValueA && lastValueA !== undefined) {
+        const combined = combineFn(lastValueA, valueB);
+        combinedSub.lastValue = combined;
+        combinedSub.hasValue = true;
+        
+        // Notify all handlers
+        combinedSub.handlers.forEach(handler => {
+          try {
+            handler(combined);
+          } catch (err) {
+            console.error('Error in combined subscription handler:', err);
+          }
+        });
+      }
+    });
+    
+    // Override the on method to handle proper cleanup
+    const originalOn = combinedSub.on.bind(combinedSub);
+    combinedSub.on = (handler: SubscriptionHandler<R>) => {
+      const cleanup = originalOn(handler);
+      
+      return () => {
+        cleanup();
+        
+        // If no more handlers, clean up source subscriptions
+        if (combinedSub.handlers.size === 0) {
+          subA();
+          subB();
+          combinedSub.active = false;
+        }
+      };
+    };
+    
+    return combinedSub;
+  }
+  
+  /**
+   * Combine with another stream, but only emit when this stream emits
+   * using the latest value from the other stream
+   * @param other The other stream to get latest values from
+   * @param combineFn Function that combines values from both streams
+   * @returns A new GunSubscription with combined values
+   */
+  public withLatestFrom<U, R>(other: GunSubscription<U>, combineFn: (a: T, b: U) => R): GunSubscription<R> {
+    const resultSub = new GunSubscription<R>([]);
+    resultSub.active = true;
+    
+    let latestB: U | undefined = other.lastValue;
+    let hasLatestB = other.hasValue;
+    
+    // Listen for values from the other stream
+    const subB = other.on((valueB) => {
+      latestB = valueB;
+      hasLatestB = true;
+    });
+    
+    // Listen for values from this stream and combine with latest from other
+    const subA = this.on((valueA) => {
+      if (hasLatestB && latestB !== undefined) {
+        const result = combineFn(valueA, latestB);
+        resultSub.lastValue = result;
+        resultSub.hasValue = true;
+        
+        // Notify all handlers
+        resultSub.handlers.forEach(handler => {
+          try {
+            handler(result);
+          } catch (err) {
+            console.error('Error in withLatestFrom subscription handler:', err);
+          }
+        });
+      }
+    });
+    
+    // Override the on method to handle proper cleanup
+    const originalOn = resultSub.on.bind(resultSub);
+    resultSub.on = (handler: SubscriptionHandler<R>) => {
+      const cleanup = originalOn(handler);
+      
+      return () => {
+        cleanup();
+        
+        // If no more handlers, clean up source subscriptions
+        if (resultSub.handlers.size === 0) {
+          subA();
+          subB();
+          resultSub.active = false;
+        }
+      };
+    };
+    
+    return resultSub;
+  }
+  
+  /**
+   * Merge multiple streams into one, emitting values from all of them
+   * @param others Other streams to merge with
+   * @returns A new GunSubscription that emits values from all input streams
+   */
+  public merge(...others: GunSubscription<T>[]): GunSubscription<T> {
+    const mergedSub = new GunSubscription<T>([]);
+    mergedSub.active = true;
+    
+    // Set up all the subscriptions including this one
+    const allStreams = [this, ...others];
+    const cleanups: SubscriptionCleanup[] = [];
+    
+    allStreams.forEach(stream => {
+      const cleanup = stream.on((value) => {
+        mergedSub.lastValue = value;
+        mergedSub.hasValue = true;
+        
+        // Notify all handlers
+        mergedSub.handlers.forEach(handler => {
+          try {
+            handler(value);
+          } catch (err) {
+            console.error('Error in merged subscription handler:', err);
+          }
+        });
+      });
+      
+      cleanups.push(cleanup);
+    });
+    
+    // Override the on method to handle proper cleanup
+    const originalOn = mergedSub.on.bind(mergedSub);
+    mergedSub.on = (handler: SubscriptionHandler<T>) => {
+      const cleanup = originalOn(handler);
+      
+      return () => {
+        cleanup();
+        
+        // If no more handlers, clean up all source subscriptions
+        if (mergedSub.handlers.size === 0) {
+          cleanups.forEach(fn => fn());
+          mergedSub.active = false;
+        }
+      };
+    };
+    
+    return mergedSub;
+  }
+  
+  /**
+   * Debounce emissions from this stream by a specified time
+   * @param ms Time in milliseconds to debounce
+   * @returns A new GunSubscription that emits debounced values
+   */
+  public debounce(ms: number): GunSubscription<T> {
+    const debouncedSub = new GunSubscription<T>([]);
+    debouncedSub.active = true;
+    
+    let timeout: any = null;
+    
+    // Set up subscription to this stream
+    const sub = this.on((value) => {
+      // Clear any existing timeout
+      if (timeout !== null) {
+        clearTimeout(timeout);
+      }
+      
+      // Create a new timeout
+      timeout = setTimeout(() => {
+        debouncedSub.lastValue = value;
+        debouncedSub.hasValue = true;
+        
+        // Notify all handlers
+        debouncedSub.handlers.forEach(handler => {
+          try {
+            handler(value);
+          } catch (err) {
+            console.error('Error in debounced subscription handler:', err);
+          }
+        });
+      }, ms);
+    });
+    
+    // Override the on method to handle proper cleanup
+    const originalOn = debouncedSub.on.bind(debouncedSub);
+    debouncedSub.on = (handler: SubscriptionHandler<T>) => {
+      const cleanup = originalOn(handler);
+      
+      return () => {
+        cleanup();
+        
+        // If no more handlers, clean up source subscription and timeout
+        if (debouncedSub.handlers.size === 0) {
+          sub();
+          if (timeout !== null) {
+            clearTimeout(timeout);
+          }
+          debouncedSub.active = false;
+        }
+      };
+    };
+    
+    return debouncedSub;
+  }
+  
+  /**
+   * Start this subscription with a specified value
+   * @param value The initial value to emit
+   * @returns A new GunSubscription that first emits the specified value
+   */
+  public startWith(value: T): GunSubscription<T> {
+    const startWithSub = new GunSubscription<T>([]);
+    startWithSub.active = true;
+    startWithSub.lastValue = value;
+    startWithSub.hasValue = true;
+    
+    // Set up subscription to this stream
+    const sub = this.on((nextValue) => {
+      startWithSub.lastValue = nextValue;
+      
+      // Notify all handlers
+      startWithSub.handlers.forEach(handler => {
+        try {
+          handler(nextValue);
+        } catch (err) {
+          console.error('Error in startWith subscription handler:', err);
+        }
+      });
+    });
+    
+    // Override the on method to handle proper cleanup and initial value
+    const originalOn = startWithSub.on.bind(startWithSub);
+    startWithSub.on = (handler: SubscriptionHandler<T>) => {
+      // Immediately emit the initial value
+      try {
+        handler(value);
+      } catch (err) {
+        console.error('Error in startWith initial value handler:', err);
+      }
+      
+      const cleanup = originalOn(handler);
+      
+      return () => {
+        cleanup();
+        
+        // If no more handlers, clean up source subscription
+        if (startWithSub.handlers.size === 0) {
+          sub();
+          startWithSub.active = false;
+        }
+      };
+    };
+    
+    return startWithSub;
+  }
+  
+  /**
+   * Map each value to a new stream and flatten the results
+   * Cancels previous inner subscriptions when a new value arrives
+   * @param project Function that maps each value to a new GunSubscription
+   * @returns A GunSubscription that emits values from the inner streams
+   */
+  public switchMap<R>(project: (value: T) => GunSubscription<R>): GunSubscription<R> {
+    const resultSub = new GunSubscription<R>([]);
+    resultSub.active = true;
+    
+    let currentInnerSub: SubscriptionCleanup | null = null;
+    
+    // Set up subscription to this stream
+    const mainSub = this.on((outerValue) => {
+      // Cancel previous inner subscription
+      if (currentInnerSub !== null) {
+        currentInnerSub();
+        currentInnerSub = null;
+      }
+      
+      // Create new inner subscription
+      const innerStream = project(outerValue);
+      currentInnerSub = innerStream.on((innerValue) => {
+        resultSub.lastValue = innerValue;
+        resultSub.hasValue = true;
+        
+        // Notify all handlers
+        resultSub.handlers.forEach(handler => {
+          try {
+            handler(innerValue);
+          } catch (err) {
+            console.error('Error in switchMap subscription handler:', err);
+          }
+        });
+      });
+    });
+    
+    // Override the on method to handle proper cleanup
+    const originalOn = resultSub.on.bind(resultSub);
+    resultSub.on = (handler: SubscriptionHandler<R>) => {
+      const cleanup = originalOn(handler);
+      
+      return () => {
+        cleanup();
+        
+        // If no more handlers, clean up all subscriptions
+        if (resultSub.handlers.size === 0) {
+          mainSub();
+          if (currentInnerSub !== null) {
+            currentInnerSub();
+            currentInnerSub = null;
+          }
+          resultSub.active = false;
+        }
+      };
+    };
+    
+    return resultSub;
   }
 
   /**

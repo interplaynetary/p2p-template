@@ -1,15 +1,16 @@
-import { gun, user } from './models/Gun';
+import { gun, user } from './gun/gunSetup';
 import { TreeNode } from './models/TreeNode';
 import { createTreemap } from './components/TreeMap';
 import { createPieChart } from './components/PieChart';
 import { updateUserProfile, getUserName } from './utils/userUtils';
 import { initializeExampleData } from './example';
 import * as d3 from 'd3';
-import { GunSubscription } from './models/GunSubscription';
+import { GunSubscription } from './gun/GunSubscription';
+import { InventoryManager } from './models/InventoryManager';
 
 // could we simply store
 
-export class App {
+export class Coordinator {
     name: string = ''
     rootId: string = ''
     rootNode: TreeNode | null = null
@@ -17,6 +18,7 @@ export class App {
     treemap!: ReturnType<typeof createTreemap>
     _updateNeeded: boolean = true
     _pieUpdateNeeded: boolean = true
+    _socialUpdateNeeded: boolean = true
     isGrowingActive: boolean = false;
     updateInterval: any = null
     saveInterval: any = null
@@ -26,71 +28,72 @@ export class App {
     private _resizeThrottleTimeout: any = null
     private _lastResizeTime: number = 0
     private _resizeCooldown: number = 100; // ms
+    inventoryManager: InventoryManager | null = null
+    
+    // Social distribution depth setting
+    private _socialDistributionDepth: number = 5;
     
     constructor() {
-        console.log('[App] Constructor started');
+        console.log('[Coordinator] Constructor started');
         
         // More robust authentication check
         if (!user.is || !user.is.pub || !user.is.alias) {
-            console.error('[App] User not properly authenticated!', user.is);
-            throw new Error('Must be properly authenticated before initializing App');
+            console.error('[Coordinator] User not properly authenticated!', user.is);
+            throw new Error('Must be properly authenticated before initializing Coordinator');
         }
         
         this.name = user.is.alias as string || 'Unknown User';
-        console.log('[App] User name:', this.name);
+        console.log('[Coordinator] User name:', this.name);
         this.rootId = user.is.pub as string;
         
         // Ensure we have valid data
         if (!this.rootId) {
-            console.error('[App] Missing user public key!');
+            console.error('[Coordinator] Missing user public key!');
             throw new Error('User public key is missing or invalid');
         }
         
         this.gunRef = gun.get('nodes').get(this.rootId);
-        console.log('[App] User information:', { name: this.name, rootId: this.rootId });
+        console.log('[Coordinator] User information:', { name: this.name, rootId: this.rootId });
         // I dont understand how this.aname could possiblly equal user.is.pub?
-        // [App] User information: {name: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU', rootId: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU'}        
+        // [Coordinator] User information: {name: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU', rootId: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU'}        
 
-        (window as any).app = this;
-        console.log('[App] App instance attached to window.app');
+        (window as any).coordinator = this;
+        console.log('[Coordinator] Coordinator instance attached to window.coordinator');
     }
 
     get root() {
         return this.rootNode;
     }
 
-    // New method to properly initialize app
+    // New method to properly initialize coordinator
     async initialize() {
-        console.log('[App] Starting initialization');
+        console.log('[Coordinator] Starting initialization');
 
         try {
             // Phase 1: Critical path - load root node
-            console.log('[App] Phase 1: Loading root node');
+            console.log('[Coordinator] Phase 1: Loading root node');
             await this._initPhase1_LoadRootNode();
             
             // Phase 2: Set up UI container and initial structure
-            console.log('[App] Phase 2: Setting up UI container');
+            console.log('[Coordinator] Phase 2: Setting up UI container');
             await this._initPhase2_SetupUIContainer();
             
             // Phase 3: Set up data subscriptions and visualization
-            console.log('[App] Phase 3: Setting up visualization');
+            console.log('[Coordinator] Phase 3: Setting up visualization');
             await this._initPhase3_SetupVisualization();
             
             this.initializing = false;
-            console.log('[App] Initialization completed successfully');
+            console.log('[Coordinator] Initialization completed successfully');
         } catch (error) {
-            console.error('[App] Initialization failed with error:', error);
+            console.error('[Coordinator] Initialization failed with error:', error);
             throw error;
         }
     }
 
-    // Or how after initialize:
-    // App initialized after session recall: App {name: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU', rootId: 'j8w6BjrMckSUa8P-TSkWk7yo5ZwQCUzq8BwHdtwRL28.7KOKIjirdBtFgAUyzRdvjgDe2_EppIzhYGqpPxqyfhU', rootNode: TreeNode, initializing: false, treemap: {…}, …}
-
     // Phase 1: Load the root node 
     private async _initPhase1_LoadRootNode() {
         // Try to load existing root node first - using user public key as the node ID
-        console.log('[App] Attempting to load existing root node with ID:', this.rootId);
+        console.log('[Coordinator] Attempting to load existing root node with ID:', this.rootId);
         
         // Get the node using the static getNode method
         const existingNode = TreeNode.getNode(this.rootId, this);
@@ -102,28 +105,28 @@ export class App {
                 existingNode.once()
                     .then(data => {
                         if (data && (data.name || data.id)) {
-                            console.log('[App] Found existing node data:', data);
+                            console.log('[Coordinator] Found existing node data:', data);
                             resolve(existingNode);
                         } else {
-                            console.log('[App] Node exists but has insufficient data:', data);
+                            console.log('[Coordinator] Node exists but has insufficient data:', data);
                             resolve(null as any);
                         }
                     })
                     .catch(err => {
-                        console.log('[App] Error checking node data:', err);
+                        console.log('[Coordinator] Error checking node data:', err);
                         resolve(null as any);
                     });
             }),
             // Add a 5-second timeout
             new Promise<null>(resolve => setTimeout(() => {
-                console.log('[App] Timeout waiting for root node, will create a new one');
+                console.log('[Coordinator] Timeout waiting for root node, will create a new one');
                 resolve(null);
             }, 5000))
         ]);
 
         // If root node doesn't exist, create it
         if (!this.rootNode) {
-            console.log('[App] Root node not found, creating new root node with name:', this.name);
+            console.log('[Coordinator] Root node not found, creating new root node with name:', this.name);
             
             // Create a new node with our ID
             this.rootNode = TreeNode.getNode(this.rootId, this);
@@ -139,9 +142,9 @@ export class App {
             // Save the data to Gun
             this.rootNode.put(nodeData);
             
-            console.log('[App] New root node created with ID:', this.rootNode.id);
+            console.log('[Coordinator] New root node created with ID:', this.rootNode.id);
         } else {
-            console.log('[App] Existing root node loaded successfully:', {
+            console.log('[Coordinator] Existing root node loaded successfully:', {
                 id: this.rootNode.id,
                 name: this.rootNode.name,
                 childrenCount: this.rootNode.children.size
@@ -149,7 +152,7 @@ export class App {
         }
 
         // Create a reference to this node in the users path and update our profile
-        console.log('[App] Creating user reference in users path:', this.rootId);
+        console.log('[Coordinator] Creating user reference in users path:', this.rootId);
         // Using simpler updateUserProfile function
         updateUserProfile(this.rootId, this.name);
         
@@ -164,32 +167,32 @@ export class App {
 
     // Phase 2: Set up UI container
     private async _initPhase2_SetupUIContainer() {
-        console.log('[App] Root node setup complete, initializing UI');
+        console.log('[Coordinator] Root node setup complete, initializing UI');
         const container = document.getElementById('treemap-container');
         
         if (!container) {
-            console.error('[App] Treemap container element not found in DOM');
+            console.error('[Coordinator] Treemap container element not found in DOM');
             throw new Error('Treemap container element not found');
         }
         
         const width = container.clientWidth;
         const height = container.clientHeight;
-        console.log('[App] Container dimensions:', { width, height });
+        console.log('[Coordinator] Container dimensions:', { width, height });
         
         // Set up resize observer for the container
         this.setupResizeHandling(container);
         
-        console.log('[App] Root node ready:', this.rootNode.name, 'ID:', this.rootNode.id);
+        console.log('[Coordinator] Root node ready:', this.rootNode.name, 'ID:', this.rootNode.id);
     }
 
     // Phase 3: Set up visualization
     private async _initPhase3_SetupVisualization() {
         // Wait for children to load from Gun subscriptions
-        console.log('[App] Waiting for children to load from Gun...');
+        console.log('[Coordinator] Waiting for children to load from Gun...');
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Check children path directly in Gun to verify data exists
-        console.log('[App] Checking for children in Gun...');
+        console.log('[Coordinator] Checking for children in Gun...');
         const childrenCheck = await Promise.race([
             new Promise<boolean>(resolve => {
                 // Use GunSubscription instead of direct Gun query
@@ -197,7 +200,7 @@ export class App {
                 const childrenSub = new GunSubscription(['nodes', this.rootId, 'children']);
                 
                 // Use .map() with a limit to avoid processing too many children
-                const mappedSub = childrenSub.map(data => {
+                const mcoordinatoredSub = childrenSub.map(data => {
                     // Filter out Gun metadata
                     if (!data || typeof data !== 'object') return null;
                     
@@ -208,7 +211,7 @@ export class App {
                 
                 // Just get the value once and then unsubscribe
                 let cleanup: (() => void) | null = null;
-                cleanup = mappedSub.on(hasChildren => {
+                cleanup = mcoordinatoredSub.on(hasChildren => {
                     if (hasChildren === null) return; // Skip null results
                     
                     if (cleanup) cleanup(); // Unsubscribe immediately after we get a result
@@ -217,50 +220,88 @@ export class App {
             }),
             // Add a 3-second timeout
             new Promise<boolean>(resolve => setTimeout(() => {
-                console.log('[App] Timeout checking for children, assuming none exist');
+                console.log('[Coordinator] Timeout checking for children, assuming none exist');
                 resolve(false);
             }, 3000))
         ]);
         
-        console.log('[App] Children check result:', { childrenCheck, localChildrenCount: this.rootNode.children.size });
+        console.log('[Coordinator] Children check result:', { childrenCheck, localChildrenCount: this.rootNode.children.size });
         
         // Initialize example data if needed - wrap the root node in compatibility layer if needed
         if (!childrenCheck && this.rootNode.children.size === 0) {
-            console.log('[App] No children found, initializing example data');
+            console.log('[Coordinator] No children found, initializing example data');
             // Adapt the TreeNode to the interface expected by initializeExampleData if needed
             const compatibleNode = this.createCompatibleNode(this.rootNode);
             await initializeExampleData(compatibleNode);
-            console.log('[App] Example data initialization complete');
+            console.log('[Coordinator] Example data initialization complete');
         } else {
-            console.log('[App] Root node already has children, skipping example data');
+            console.log('[Coordinator] Root node already has children, skipping example data');
         }
         
         // Add a delay to ensure all data is loaded before visualization
-        console.log('[App] Waiting for data to stabilize before creating visualization');
+        console.log('[Coordinator] Waiting for data to stabilize before creating visualization');
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        console.log('[App] Creating treemap visualization');
+        console.log('[Coordinator] Creating treemap visualization');
         // Create visualization with the loaded root - adapt if needed
         const compatibleNode = this.createCompatibleNode(this.rootNode);
         
         // Get the container element
         const container = document.getElementById('treemap-container');
         if (!container) {
-            console.error('[App] Treemap container element not found for visualization');
+            console.error('[Coordinator] Treemap container element not found for visualization');
             throw new Error('Treemap container element not found');
         }
         
         this.treemap = createTreemap(compatibleNode, container.clientWidth, container.clientHeight);
         if (!this.treemap?.element) {
-            console.error('[App] Treemap element creation failed');
+            console.error('[Coordinator] Treemap element creation failed');
             throw new Error('Treemap element is null'); 
         }
-        console.log('[App] Treemap created successfully');
+        console.log('[Coordinator] Treemap created successfully');
         container.appendChild(this.treemap.element);
-        console.log('[App] Treemap added to container');
+        console.log('[Coordinator] Treemap added to container');
 
+        // Initialize Inventory Manager with proper error handling
+        console.log('[Coordinator] Initializing Inventory Manager');
+        try {
+            this.inventoryManager = new InventoryManager(this.rootNode);
+            
+            // Wait for initialization with a timeout to prevent blocking
+            const initPromise = this.inventoryManager.waitForInitialization();
+            const timeoutPromise = new Promise<void>((_, reject) => {
+                setTimeout(() => reject(new Error('Inventory Manager initialization timed out')), 5000);
+            });
+            
+            // Race the initialization against a timeout
+            await Promise.race([initPromise, timeoutPromise])
+                .catch(err => {
+                    console.warn(`[Coordinator] Inventory Manager initialization incomplete but continuing: ${err.message}`);
+                    // Allow the app to continue even if inventory manager fails to initialize
+                });
+                
+            console.log('[Coordinator] Inventory Manager initialized successfully');
+        } catch (error) {
+            console.error(`[Coordinator] Error initializing Inventory Manager: ${error.message}`);
+            console.log('[Coordinator] Continuing without inventory management functionality');
+        }
+        
         // Set up a reactive update system that will respond to changes
-        console.log('[App] Setting up reactive update system');
+        console.log('[Coordinator] Setting up reactive update system');
+        
+        // Trigger initial updates for all visualizations
+        this._updateNeeded = true;
+        this._pieUpdateNeeded = true;
+        // Social chart has been removed, don't trigger updates
+        this._socialUpdateNeeded = false;
+        
+        // Trigger an immediate visualization update
+        this.updateVisualizations();
+        
+        // Add debounce variables to prevent frequent updates
+        let treemapUpdateDebounceTimer: any = null;
+        const DEBOUNCE_DELAY = 500; // ms
+        
         this.updateInterval = setInterval(() => {
             // Skip updates during active growth operations
             if (this.isGrowingActive) {
@@ -268,26 +309,42 @@ export class App {
             }
             
             if (this._updateNeeded) {
-                console.log('[App] Update needed, refreshing treemap');
-                this.updateTreeMap();
-                this._updateNeeded = false;
+                console.log('[Coordinator] Update needed, debouncing treemap refresh');
+                // Clear any existing timer to implement debouncing
+                if (treemapUpdateDebounceTimer) {
+                    clearTimeout(treemapUpdateDebounceTimer);
+                }
+                
+                // Set a new timer to update after delay
+                treemapUpdateDebounceTimer = setTimeout(() => {
+                    console.log('[Coordinator] Executing debounced treemap update');
+                    this.updateTreeMap();
+                    this._updateNeeded = false;
+                    treemapUpdateDebounceTimer = null;
+                }, DEBOUNCE_DELAY);
             }
+            
             if (this._pieUpdateNeeded) {
-                console.log('[App] Pie chart update needed, refreshing');
+                console.log('[Coordinator] Pie chart update needed, refreshing');
                 // Use an async IIFE to handle the async updatePieChart
                 (async () => {
                     await this.updatePieChart();
                     this._pieUpdateNeeded = false;
                 })().catch(err => {
-                    console.error('[App] Error updating pie chart:', err);
+                    console.error('[Coordinator] Error updating pie chart:', err);
                     this._pieUpdateNeeded = false; // Reset the flag even on error
                 });
             }
+            // Social chart has been removed, don't attempt to update it
+            if (this._socialUpdateNeeded) {
+                console.log('[Coordinator] Social chart update skipped - chart has been removed');
+                this._socialUpdateNeeded = false;
+            }
         }, 1000);
-        console.log('[App] Update interval set up');
+        console.log('[Coordinator] Update interval set up');
     }
 
-    // Helper method to create a compatibility wrapper for components expecting old TreeNode interface
+    // Helper method to create a compatibility wrcoordinatorer for components expecting old TreeNode interface
     private createCompatibleNode(node: TreeNode | null): any {
         if (!node) return null;
         
@@ -304,40 +361,40 @@ export class App {
                     return Array.from(target.children.values());
                 }
                 
-                if (prop === 'app') {
-                    // Return a proxy for the app instance that ensures rootId and other needed properties
+                if (prop === 'coordinator') {
+                    // Return a proxy for the coordinator instance that ensures rootId and other needed properties
                     // are always accessible, even through nested property access patterns
                     return new Proxy(this, {
-                        get: (appTarget, appProp) => {
+                        get: (coordinatorTarget, coordinatorProp) => {
                             // Ensure rootId is available
-                            if (appProp === 'rootId') {
+                            if (coordinatorProp === 'rootId') {
                                 return this.rootId;
                             }
-                            return Reflect.get(appTarget, appProp);
+                            return Reflect.get(coordinatorTarget, coordinatorProp);
                         }
                     });
                 }
                 
-                if (prop === 'types') {
-                    // Get the types set from the target
-                    const typesSet = target.types;
+                if (prop === 'contributors') {
+                    // Get the contributors set from the target
+                    const contributorsSet = target.contributors;
                     
                     // Pre-trigger name resolution for all type IDs to populate the cache
-                    if (typesSet instanceof Set) {
-                        typesSet.forEach(typeId => {
-                            if (typeof typeId === 'string') {
+                    if (contributorsSet instanceof Set) {
+                        contributorsSet.forEach(contributorId => {
+                            if (typeof contributorId === 'string') {
                                 // This will subscribe to name updates
-                                getUserName(typeId);
+                                getUserName(contributorId);
                             }
                         });
                     }
                     
-                    return typesSet;
+                    return contributorsSet;
                 }
                 
-                // Special handling for (d.data as any).app.rootId pattern used in the TreeMap component
+                // Special handling for (d.data as any).coordinator.rootId pattern used in the TreeMap component
                 if (prop === 'rootId' && !('rootId' in target)) {
-                    // Return rootId from app if target doesn't have it directly
+                    // Return rootId from coordinator if target doesn't have it directly
                     return this.rootId;
                 }
                 
@@ -346,13 +403,13 @@ export class App {
                     return target.children.size > 0;
                 }
                 
-                if (prop === 'typeIndex') {
+                if (prop === 'contributorIndex') {
                     // Create a compatible type index
-                    const typeIndex: Record<string, boolean> = {};
-                    target.types.forEach(typeId => {
-                        typeIndex[typeId] = true;
+                    const contributorIndex: Record<string, boolean> = {};
+                    target.contributors.forEach(contributorId => {
+                        contributorIndex[contributorId] = true;
                     });
-                    return typeIndex;
+                    return contributorIndex;
                 }
                 
                 // D3 compatibility - value is used by d3.hierarchy.sum()
@@ -372,25 +429,25 @@ export class App {
                 }
                 
                 // Handle specific methods that might need adaptations
-                if (prop === 'addType' && typeof target.addType === 'function') {
-                    return (typeId: string) => {
-                        const result = target.addType(typeId);
-                        this._updateNeeded = true; // Mark tree for update when types change
+                if (prop === 'addContributor' && typeof target.addContributor === 'function') {
+                    return (contributorId: string) => {
+                        const result = target.addContributor(contributorId);
+                        this._updateNeeded = true; // Mark tree for update when contributors change
                         return this.createCompatibleNode(result);
                     };
                 }
                 
-                if (prop === 'removeType' && typeof target.removeType === 'function') {
-                    return (typeId: string) => {
-                        const result = target.removeType(typeId);
-                        this._updateNeeded = true; // Mark tree for update when types change
+                if (prop === 'removeContributor' && typeof target.removeContributor === 'function') {
+                    return (contributorId: string) => {
+                        const result = target.removeContributor(contributorId);
+                        this._updateNeeded = true; // Mark tree for update when contributors change
                         return this.createCompatibleNode(result);
                     };
                 }
                 
                 if (prop === 'addChild' && typeof target.addChild === 'function') {
-                    return async (name: string, points?: number, typeIds?: string[], manualFulfillment?: number | null, id?: string) => {
-                        const result = await target.addChild(name, points, typeIds, manualFulfillment, id);
+                    return async (name: string, points?: number, contributorIds?: string[], manualFulfillment?: number | null, id?: string) => {
+                        const result = await target.addChild(name, points, contributorIds, manualFulfillment, id);
                         this._updateNeeded = true; // Mark tree for update
                         return this.createCompatibleNode(result);
                     };
@@ -407,7 +464,7 @@ export class App {
                 // Get the property from the target
                 const value = Reflect.get(target, prop, receiver);
                 
-                // Automatically wrap returned TreeNode instances in compatibility wrapper
+                // Automatically wrap returned TreeNode instances in compatibility wrcoordinatorer
                 if (value instanceof TreeNode && prop !== 'parent') {
                     return this.createCompatibleNode(value);
                 }
@@ -419,7 +476,7 @@ export class App {
                             // Call the method on the target
                             const result = value.apply(target, args);
                             
-                            // Wrap returned TreeNode in compatibility wrapper
+                            // Wrap returned TreeNode in compatibility wrcoordinatorer
                             if (result instanceof TreeNode) {
                                 return this.createCompatibleNode(result);
                             }
@@ -445,28 +502,28 @@ export class App {
                             
                             // Handle Maps or Sets containing TreeNodes
                             if (result instanceof Map) {
-                                const wrappedMap = new Map();
+                                const wrcoordinatoredMap = new Map();
                                 result.forEach((val, key) => {
-                                    wrappedMap.set(
+                                    wrcoordinatoredMap.set(
                                         key, 
                                         val instanceof TreeNode ? 
                                         this.createCompatibleNode(val) : 
                                         val
                                     );
                                 });
-                                return wrappedMap;
+                                return wrcoordinatoredMap;
                             }
                             
                             if (result instanceof Set) {
-                                const wrappedSet = new Set();
+                                const wrcoordinatoredSet = new Set();
                                 result.forEach(val => {
-                                    wrappedSet.add(
+                                    wrcoordinatoredSet.add(
                                         val instanceof TreeNode ? 
                                         this.createCompatibleNode(val) : 
                                         val
                                     );
                                 });
-                                return wrappedSet;
+                                return wrcoordinatoredSet;
                             }
                             
                             return result;
@@ -477,23 +534,23 @@ export class App {
                     };
                 }
                 
-                // Handle specific collection types containing TreeNodes
+                // Handle specific collection contributors containing TreeNodes
                 if (value instanceof Map) {
                     // Only wrap values if they are TreeNodes (like in the children map)
-                    const wrappedMap = new Map();
+                    const wrcoordinatoredMap = new Map();
                     value.forEach((val, key) => {
-                        wrappedMap.set(
+                        wrcoordinatoredMap.set(
                             key, 
                             val instanceof TreeNode ? 
                             this.createCompatibleNode(val) : 
                             val
                         );
                     });
-                    return wrappedMap;
+                    return wrcoordinatoredMap;
                 }
                 
-                if (value instanceof Set && prop === 'types') {
-                    // Already handled by explicit types property handling above
+                if (value instanceof Set && prop === 'contributors') {
+                    // Already handled by explicit contributors property handling above
                     return value;
                 }
                 
@@ -538,9 +595,16 @@ export class App {
         this._pieUpdateNeeded = value;
     }
 
+    get socialUpdateNeeded() {
+        return this._socialUpdateNeeded;
+    }
+
+    set socialUpdateNeeded(value) {
+        this._socialUpdateNeeded = value;
+    }
 
     async updateVisualizations() {
-        console.log('App.updateVisualizations called');
+        console.log('Coordinator.updateVisualizations called');
         if (!this.treemap) {
             console.log('Treemap not initialized yet');
             return;
@@ -565,6 +629,10 @@ export class App {
             if (this.pieUpdateNeeded) {
                 await this.updatePieChart();
                 this.pieUpdateNeeded = false;
+            }
+            // Social chart has been removed, skip update
+            if (this.socialUpdateNeeded) {
+                this.socialUpdateNeeded = false;
             }
             
         } finally {
@@ -608,10 +676,10 @@ export class App {
             console.log('Creating pie chart with root node:', 
                        { id: this.rootNode.id, 
                          name: this.rootNode.name, 
-                         typesCount: this.rootNode.types.size, 
+                         contributorsCount: this.rootNode.contributors.size, 
                          sharesOfOthersRecognition: this.rootNode.sharesOfOthersRecognition });
             
-            // Create a compatible node wrapper
+            // Create a compatible node wrcoordinatorer
             const compatibleNode = this.createCompatibleNode(this.rootNode);
             
             // Get the mutual fulfillment distribution directly to check it
@@ -639,6 +707,67 @@ export class App {
             pieContainer.innerHTML = '<div style="text-align:center;padding:20px;">Error loading pie chart: ' + 
                                     (error instanceof Error ? error.message : String(error)) + '</div>';
         }
+    }
+
+    async updateSocialChart() {
+        console.log('updateSocialChart started');
+        // The social chart container has been removed, skip updating
+        /*
+        const socialContainer = document.getElementById('social-chart-container');
+        if (!socialContainer || !this.rootNode) {
+            console.error('Social chart container element not found or root node not available');
+            return;
+        }
+        
+        try {
+            console.log(`Creating social chart with root node (depth: ${this._socialDistributionDepth}):`, 
+                       { id: this.rootNode.id, 
+                         name: this.rootNode.name, 
+                         contributorsCount: this.rootNode.contributors.size });
+            
+            // Create a compatible node wrcoordinatorer
+            const compatibleNode = this.createCompatibleNode(this.rootNode);
+            
+            // Remove existing event listener before recreating the chart
+            socialContainer.removeEventListener(DEPTH_CHANGE_EVENT, this.handleSocialDepthChange);
+            
+            // Create the social chart with the current depth setting
+            // The chart modifies the container directly, so we don't need to append anything
+            createSocialChart(compatibleNode, this._socialDistributionDepth);
+            
+            // Set up depth change event listener after chart creation
+            socialContainer.addEventListener(DEPTH_CHANGE_EVENT, this.handleSocialDepthChange.bind(this));
+            
+            console.log('Social chart successfully created');
+        } catch (error) {
+            console.error('Error creating social chart:', error);
+            // Add a simple message to the container
+            socialContainer.innerHTML = '<div style="text-align:center;padding:20px;">Error loading social chart: ' + 
+                                    (error instanceof Error ? error.message : String(error)) + '</div>';
+        }
+        */
+        this._socialUpdateNeeded = false;
+    }
+    
+    /**
+     * Handle depth change events from the social chart slider
+     */
+    private handleSocialDepthChange(event: Event): void {
+        // The social chart container has been removed, this handler is no longer needed
+        /*
+        const customEvent = event as CustomEvent;
+        if (customEvent.detail && typeof customEvent.detail.depth === 'number') {
+            const newDepth = customEvent.detail.depth;
+            console.log(`Social distribution depth changed to: ${newDepth}`);
+            
+            // Update the depth setting
+            this._socialDistributionDepth = newDepth;
+            
+            // Trigger chart update
+            this._socialUpdateNeeded = true;
+            this.updateVisualizations();
+        }
+        */
     }
 
     handleResize() {
@@ -722,20 +851,20 @@ export class App {
             }
             
             // Update type tags container position if needed
-            const typeTagsContainer = d3.select('#treemap-container .type-tags-container');
-            if (!typeTagsContainer.empty()) {
-                typeTagsContainer.attr("transform", `translate(${width / 2}, 49.4)`);
+            const contributorTagsContainer = d3.select('#treemap-container .contributor-tags-container');
+            if (!contributorTagsContainer.empty()) {
+                contributorTagsContainer.attr("transform", `translate(${width / 2}, 49.4)`);
             }
             
-            console.log('[App] Header elements positions updated');
+            console.log('[Coordinator] Header elements positions updated');
         } catch (error) {
-            console.error('[App] Error updating header elements:', error);
+            console.error('[Coordinator] Error updating header elements:', error);
         }
     }
 
     // New method to set up resize handling with throttling
     private setupResizeHandling(container: HTMLElement) {
-        console.log('[App] Setting up resize handling');
+        console.log('[Coordinator] Setting up resize handling');
         
         // Clean up any existing observer
         if (this.resizeObserver) {
@@ -749,7 +878,7 @@ export class App {
             window.requestAnimationFrame(() => {
                 if (!entries.length) return;
                 
-                console.log('[App] Container resize detected');
+                console.log('[Coordinator] Container resize detected');
                 this.handleResize();
             });
         });
@@ -765,7 +894,7 @@ export class App {
             this.handleResize();
         });
         
-        console.log('[App] Resize handling setup complete');
+        console.log('[Coordinator] Resize handling setup complete');
     }
 
     // Recursively cleanup subscriptions throughout the tree

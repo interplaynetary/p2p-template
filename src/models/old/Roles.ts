@@ -1,6 +1,6 @@
-import { gun } from '../Gun'
-import { GunNode } from '../GunNode'
-import { GunSubscription } from '../GunSubscription'
+import { gun } from './Gun'
+import { GunNode } from './GunNode'
+import { GunSubscription } from './GunSubscription'
 
 /**
  * Simplified Roles Model

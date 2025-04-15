@@ -1,89 +1,78 @@
-import { gun } from '../models/Gun';
-import { GunSubscription } from '../models/GunSubscription';
+import { gun, transientGun } from '../gun/gunSetup';
+import { GunSubscription } from '../gun/GunSubscription';
+import { GunNode } from '../gun/GunNode';
 
-// Global users Map for lightweight caching to avoid repeated lookups
-// This is just a performance optimization, not our source of truth
+// Use a simple type rather than importing from node: modules
+type Timeout = ReturnType<typeof setTimeout>;
+
+// Simple in-memory cache for user names
 export const usersMap = new Map<string, string>();
 
-// Map to track active subscriptions by userId
-const userSubscriptions = new Map<string, () => void>();
+// Create a single global transient users node that can be reused
+// This prevents creating a new one on every loadUsers call
+const transientUsersNode = new GunNode(['users'], undefined, true);
+const transientUsersRef = transientGun.get('users');
 
-// Map to track callbacks for user name resolutions
-const userNameCallbacks = new Map<string, Set<(userId: string, name: string) => void>>();
+// Get a user node reference (as a direct path now)
+function getUserPath(userId: string): string[] {
+  return ['users', userId];
+}
 
 /**
  * Register a callback that will be called when a user name is resolved
- * @param userId The user ID to watch
- * @param callback Function to call when name is resolved
- * @returns Cleanup function to remove callback
  */
 export function onUserNameResolved(
     userId: string, 
     callback: (userId: string, name: string) => void
 ): () => void {
-    if (!userNameCallbacks.has(userId)) {
-        userNameCallbacks.set(userId, new Set());
-    }
-    
-    const callbacks = userNameCallbacks.get(userId)!;
-    callbacks.add(callback);
-    
-    // If we already have the name, call the callback immediately
+    // If we already have the name cached, call the callback immediately
     if (usersMap.has(userId)) {
         const name = usersMap.get(userId)!;
-        callback(userId, name);
+        // Only call back if the name is resolved (different from ID)
+        if (name !== userId) {
+            callback(userId, name);
+        }
     }
     
-    // Return cleanup function
-    return () => {
-        const callbacks = userNameCallbacks.get(userId);
-        if (callbacks) {
-            callbacks.delete(callback);
-            if (callbacks.size === 0) {
-                userNameCallbacks.delete(userId);
-            }
+    // Create a subscription to the user's name
+    const subscription = new GunSubscription(getUserPath(userId));
+    
+    // Subscribe to name changes
+    return subscription.on((userData: any) => {
+        if (userData && userData.name && userData.name !== userId) {
+            // Update the cache
+            updateUserName(userId, userData.name);
+            callback(userId, userData.name);
         }
-    };
+    });
 }
 
-// Function to get user name from Gun (reactive)
+// Function to get user name from Gun
 export function getUserName(userId: string): string {
     // Return from cache if available for immediate UI response
     if (usersMap.has(userId)) {
-        return usersMap.get(userId)!;
+        const name = usersMap.get(userId)!;
+        // Only return the name if it's truly resolved
+        if (name !== userId) {
+            return name;
+        }
     }
     
-    // Only set up subscription if not already subscribed
-    if (!userSubscriptions.has(userId)) {
-        // Set up subscription to user data
-        const cleanupFn = gun.get('users').get(userId).on((userData: any) => {
-            if (userData && userData.name) {
-                // Store in cache for performance
-                updateUserName(userId, userData.name);
-            } else if (userData && userData.node && userData.node['#']) {
-                // Follow reference if user data is stored in a node
-                gun.get(userData.node['#']).on((nodeData: any) => {
-                    if (nodeData && nodeData.name) {
-                        updateUserName(userId, nodeData.name);
-                    }
-                });
-            }
-        });
-        
-        // Store cleanup function
-        userSubscriptions.set(userId, () => {
-            if (cleanupFn && typeof cleanupFn.off === 'function') {
-                cleanupFn.off();
-            }
-        });
-    }
+    // Start subscription to get the name asynchronously
+    const subscription = new GunSubscription(getUserPath(userId));
+    
+    subscription.on((userData: any) => {
+        if (userData && userData.name && userData.name !== userId) {
+            updateUserName(userId, userData.name);
+        }
+    });
     
     // Return ID as a fallback while data loads
     return userId;
 }
 
 /**
- * Helper to update user name and trigger all appropriate callbacks
+ * Helper to update user name in cache
  */
 function updateUserName(userId: string, name: string): void {
     // Skip if no change
@@ -93,28 +82,7 @@ function updateUserName(userId: string, name: string): void {
     usersMap.set(userId, name);
     
     // Notify listeners
-    const callbacks = userNameCallbacks.get(userId);
-    if (callbacks) {
-        callbacks.forEach(callback => {
-            try {
-                callback(userId, name);
-            } catch (err) {
-                console.error('Error in user name resolution callback:', err);
-            }
-        });
-    }
-}
-
-// Clean up a user name subscription
-export function clearUserNameSubscription(userId: string): void {
-    const cleanup = userSubscriptions.get(userId);
-    if (cleanup) {
-        cleanup();
-        userSubscriptions.delete(userId);
-    }
-    
-    // Also clean up any callbacks
-    userNameCallbacks.delete(userId);
+    notifyUserMapChange();
 }
 
 // Update user profile in Gun
@@ -124,8 +92,9 @@ export function updateUserProfile(userId: string, name: string): void {
     // Store name in cache immediately for responsive UI
     updateUserName(userId, name);
     
-    // Gun will automatically merge this data
-    gun.get('users').get(userId).put({
+    // Update in Gun
+    const userRef = gun.get('users').get(userId);
+    userRef.put({
         name: name,
         lastSeen: Date.now()
     });
@@ -153,7 +122,7 @@ usersMap.set = function(key, value) {
     return result;
 };
 
-// Load users from Gun database with pure reactive subscription
+// Load users from Gun database with optimized approach
 export function loadUsers(
     callback: (users: Array<{id: string, name: string}>) => void,
     options?: {
@@ -166,23 +135,91 @@ export function loadUsers(
     const excludeIds = options?.excludeIds || [];
     const rootId = options?.rootId;
     
-    // Make ourselves discoverable if we're loading
+    // Create a throttle mechanism to avoid excessive updates
+    let updateTimeout: Timeout | null = null;
+    let pendingUpdate = false;
+    let lastResultsHash = '';
+    let lastUpdateTime = 0;
+    const MIN_UPDATE_INTERVAL = 500; // Minimum ms between updates
+    const MAX_RESULTS = 50; // Limit number of results to avoid DOM overload
+    
+    // Make ourselves discoverable if we're loading, but only if we're the root
     if (rootId) {
-        gun.get('users').get(rootId).get('lastSeen').put(Date.now());
+        const userRef = gun.get('users').get(rootId);
+        // Use once() instead of put() to avoid writing to storage
+        userRef.once((data) => {
+            if (!data || !data.lastSeen || Date.now() - data.lastSeen > 60000) {
+                // Only update lastSeen if it's been more than a minute
+                userRef.put({ lastSeen: Date.now() });
+            }
+        });
     }
     
-    // Create a subscription to track discovered users
-    const userSub = new GunSubscription(['users']);
+    // Add a filter function to limit the data processed
+    const filterPredicate = (userData: any) => {
+        if (!userData || userData._removed) return false;
+        const userId = userData._key;
+        if (!userId) return false;
+        
+        // Skip excluded users
+        if ((rootId && userId === rootId) || excludeIds.includes(userId)) {
+            return false;
+        }
+        
+        // More aggressive filtering based on lastSeen to reduce data volume
+        // Only include users seen in the last 24 hours if we have no filter
+        if (!filterText && userData.lastSeen) {
+            const oneDayAgo = Date.now() - 86400000; // 24 hours in ms
+            if (userData.lastSeen < oneDayAgo) {
+                return false;
+            }
+        }
+        
+        // If we have a name in the cache, apply text filter
+        if (usersMap.has(userId)) {
+            const name = usersMap.get(userId)!;
+            
+            // Skip users whose name is just their ID (unresolved)
+            if (name === userId) {
+                return false;
+            }
+            
+            return !filterText || name.toLowerCase().includes(filterText);
+        }
+        
+        // For users not yet in our cache, include only if they have a name
+        // different from their ID, to avoid showing unresolved users
+        return userData.name && userData.name !== userId;
+    };
+    
+    // Track discovered users
     const discoveredUsers = new Set<string>();
     
-    // Function to update the user list with current state
-    const updateUserList = () => {
+    // Process all users in the usersMap and emit to callback
+    const processUserResults = () => {
+        // Enforce minimum update interval for UI performance
+        const now = Date.now();
+        if (now - lastUpdateTime < MIN_UPDATE_INTERVAL) {
+            if (!updateTimeout) {
+                updateTimeout = setTimeout(() => {
+                    updateTimeout = null;
+                    processUserResults();
+                }, MIN_UPDATE_INTERVAL - (now - lastUpdateTime));
+            }
+            return;
+        }
+        
         const users: Array<{id: string, name: string}> = [];
         
-        // Process all entries in the usersMap
+        // Process only entries in the usersMap that pass our filter
         for (const [id, name] of usersMap.entries()) {
             // Skip excluded users
             if ((rootId && id === rootId) || excludeIds.includes(id)) {
+                continue;
+            }
+            
+            // Skip users whose name is just their ID (unresolved)
+            if (name === id) {
                 continue;
             }
             
@@ -192,53 +229,115 @@ export function loadUsers(
             }
             
             users.push({ id, name });
+            
+            // Limit results to prevent DOM overload
+            if (users.length >= MAX_RESULTS) break;
         }
         
-        // Process any discovered users not yet in the map
-        for (const userId of discoveredUsers) {
-            if (usersMap.has(userId)) continue; // Skip if already in map
-            
-            // Skip excluded users
-            if ((rootId && userId === rootId) || excludeIds.includes(userId)) {
-                continue;
-            }
-            
-            // Only add if it matches filter
-            if (!filterText || userId.toLowerCase().includes(filterText)) {
-                users.push({ id: userId, name: userId });
-            }
+        // Sort by name
+        const sortedUsers = users.sort((a, b) => a.name.localeCompare(b.name));
+        
+        // Generate a hash of the results to detect changes
+        const resultsHash = sortedUsers.map(u => `${u.id}:${u.name}`).join('|');
+        
+        // Only call the callback if results have changed
+        if (resultsHash !== lastResultsHash) {
+            lastResultsHash = resultsHash;
+            callback(sortedUsers);
+            lastUpdateTime = Date.now();
         }
         
-        // Sort by name and deliver results
-        users.sort((a, b) => a.name.localeCompare(b.name));
-        callback(users);
+        if (updateTimeout) {
+            clearTimeout(updateTimeout);
+            updateTimeout = null;
+        }
+        
+        if (pendingUpdate) {
+            pendingUpdate = false;
+            setTimeout(processUserResults, MIN_UPDATE_INTERVAL);
+        }
     };
     
-    // Subscribe to userMap changes
-    const mapChangeCleanup = onUserMapChange(updateUserList);
-    
-    // Pure reactive subscription to the users graph
-    const subscriptionCleanup = userSub.each().on((userData: any) => {
-        if (!userData || !userData._key) return;
-        
-        const userId = userData._key;
-        discoveredUsers.add(userId);
-        
-        // Set up subscription to get the proper name if not already tracked
-        if (!usersMap.has(userId)) {
-            getUserName(userId);
+    // Setup monitoring of usersMap changes
+    const mapChangeUnsub = onUserMapChange(() => {
+        // Schedule update instead of processing immediately
+        if (!updateTimeout) {
+            updateTimeout = setTimeout(() => {
+                updateTimeout = null;
+                processUserResults();
+            }, 100); // Small delay to batch multiple rapid changes
+        } else {
+            pendingUpdate = true;
         }
-        
-        // Update the list with the new information
-        updateUserList();
     });
     
-    // Return a function to unsubscribe from everything
+    // Limited number of users to process at once
+    const MAX_QUERIES = 30;
+    let queryCounter = 0;
+    
+    // If we have a filter, use a more focused query approach
+    if (filterText) {
+        // Use the GunNode filter for better data control
+        transientUsersNode.filter((userData) => filterPredicate(userData), (userData) => {
+            if (!userData || userData._removed) return;
+            
+            const userId = userData._key;
+            if (!userId) return;
+            
+            // Only update if they have a proper name
+            if (userData.name && userData.name !== userId && !usersMap.has(userId)) {
+                updateUserName(userId, userData.name);
+            }
+            
+            // Don't need to processUserResults here as the onUserMapChange will handle it
+        });
+        
+        // Trigger an initial processing
+        processUserResults();
+    } else {
+        // Use a focused one-time query instead of subscribing
+        // This uses the global transientUsersRef already created
+        transientUsersRef.once((data) => {
+            if (!data) {
+                processUserResults();
+                return;
+            }
+            
+            // Get all user IDs, excluding metadata
+            const userIds = Object.keys(data).filter(key => key !== '_');
+            
+            // Limit to a reasonable number
+            const idsToProcess = userIds.slice(0, MAX_QUERIES);
+            
+            // Process each ID but limit concurrent requests
+            idsToProcess.forEach(userId => {
+                // Skip excluded users
+                if ((rootId && userId === rootId) || excludeIds.includes(userId)) {
+                    return;
+                }
+                
+                // Get user data once
+                transientUsersRef.get(userId).once((userData) => {
+                    if (!userData || typeof userData !== 'object') return;
+                    
+                    // Only process user with proper name
+                    if (userData.name && userData.name !== userId && !usersMap.has(userId)) {
+                        updateUserName(userId, userData.name);
+                    }
+                });
+            });
+            
+            // Process what we have after a short delay
+            setTimeout(processUserResults, 200);
+        });
+    }
+    
+    // Return a function to clean up
     return () => {
-        subscriptionCleanup();
-        mapChangeCleanup();
-        userSub.unsubscribe();
+        mapChangeUnsub();
+        if (updateTimeout) {
+            clearTimeout(updateTimeout);
+            updateTimeout = null;
+        }
     };
 }
-
-// updateUsersList

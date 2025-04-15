@@ -2,7 +2,7 @@
 
 I have been getting into developing applications with gun. It is a really cool decentralized, streaming database. It’s super fun to play around with. For a big project it does require a lot of extra work to get working properly. But all in all, I would recommend trying it out!
 
-If you do start out fiddling with gun beyond the small example code, this article contains what I wish someone would have told me before I got started! So here you go : )
+If you do start out fiddling with gun beyond the small example code, this article contains what I wish someone would have told me before I got started! So here you go :s
 
 Watch values. Dont read too much.
 Gun is a streaming database. It streams in data. You will want to work with this, not against it. Don’t rely too much on reading off values from gun, then doing a bunch of stuff without gun, and trying to put the values back into it…. Maybe better with an example:

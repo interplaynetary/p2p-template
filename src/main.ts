@@ -1,15 +1,15 @@
-import { App } from './App';
-import { user, recallUser, authenticate, logout} from './models/Gun';
+import { Coordinator } from './Coordinator';
+import { user, recallUser, authenticate, logout} from './gun/gunSetup';
 import './style.css';
 import $ from 'jquery';
 import encodeQR from '@paulmillr/qr';
 import decodeQR from '@paulmillr/qr/decode.js';
 
-let app: App | undefined;
+let coordinator: Coordinator | undefined;
 
-// Initialize function that handles recall and app initialization
+// Initialize function that handles recall and coordinator initialization
 async function initializeApp() {
-    console.log('Starting app initialization...');    
+    console.log('Starting coordinator initialization...');    
     console.log('Attempting to recall user session');
     await recallUser();
     // Check if the user is authenticated after recall
@@ -21,16 +21,16 @@ async function initializeApp() {
         }
         
         try {
-            console.log('Initializing app with authenticated user');
-            app = new App();
-            await app.initialize();
-            console.log('App initialized after session recall:', app);
+            console.log('Initializing coordinator with authenticated user');
+            coordinator = new Coordinator();
+            await coordinator.initialize();
+            console.log('Coordinator initialized after session recall:', coordinator);
             
-            // Only enable UI interactions after app is fully initialized
+            // Only enable UI interactions after coordinator is fully initialized
             setupUIHandlers();
         } catch (error) {
-            console.error('Failed to initialize app after session recall:', error);
-            // Show auth container if app initialization fails
+            console.error('Failed to initialize coordinator after session recall:', error);
+            // Show auth container if coordinator initialization fails
             if (authContainer) {
                 authContainer.classList.remove('hidden');
             }
@@ -69,15 +69,15 @@ async function handleAuth(event: Event) {
     console.log('Auth container hidden');
 
     try {
-        // Initialize app with proper await
-        app = new App();
-        await app.initialize();  // Wait for initialization
-        console.log('App initialized:', app);
+        // Initialize coordinator with proper await
+        coordinator = new Coordinator();
+        await coordinator.initialize();  // Wait for initialization
+        console.log('Coordinator initialized:', coordinator);
 
-        // Only enable UI interactions after app is fully initialized
+        // Only enable UI interactions after coordinator is fully initialized
         setupUIHandlers();
     } catch (error) {
-        console.error('Failed to initialize app:', error);
+        console.error('Failed to initialize coordinator:', error);
     }
 }
 
@@ -89,13 +89,13 @@ function setupUIHandlers() {
 
     // Menu button and drop-zone handlers
     $('.menu-button, .drop-zone').on('click', function(e) {
-        if (!app) {
-            console.error('App not initialized yet');
+        if (!coordinator) {
+            console.error('Coordinator not initialized yet');
             return;
         }
         console.log('Menu/drop-zone clicked');
-        console.log('app exists:', app);
-        console.log('app treemap exists:', (app?.treemap));
+        console.log('coordinator exists:', coordinator);
+        console.log('coordinator treemap exists:', (coordinator?.treemap));
         const formId = $(this).data('form');
         if (!formId) return; // Skip if no form ID is set
         
@@ -112,9 +112,9 @@ function setupUIHandlers() {
         $('.node-popup').addClass('active');
 
         if (formId === 'addNode') {
-            const hasChildren = app?.currentView?.hasChildren;
-            console.log('currentViewData:', app?.currentView.data);  // Debug log
-            console.log('currentView:', app?.currentView.data.name);  // Debug log
+            const hasChildren = coordinator?.currentView?.hasChildren;
+            console.log('currentViewData:', coordinator?.currentView.data);  // Debug log
+            console.log('currentView:', coordinator?.currentView.data.name);  // Debug log
         
             $('#percentageGroup').toggle(hasChildren);
         }
@@ -127,15 +127,15 @@ function setupUIHandlers() {
     // Form submission handler
     $('#addNodeForm').on('submit', async function(e) {
         e.preventDefault();
-        if (!app) {
-            console.error('App not initialized yet');
+        if (!coordinator) {
+            console.error('Coordinator not initialized yet');
             return;
         }
         console.log('Form submitted');
-        console.log('app exists:', app);
-        console.log('app treemap exists:', (app?.treemap));
+        console.log('coordinator exists:', coordinator);
+        console.log('coordinator treemap exists:', (coordinator?.treemap));
         const name = $('#nodeName').val();
-        const currentViewData = app?.currentView.data;
+        const currentViewData = coordinator?.currentView.data;
         
         const hasChildren = currentViewData.hasChildren;
         const percentage = hasChildren ? Number($('#nodePercentage').val()) : 100;
@@ -154,23 +154,11 @@ function setupUIHandlers() {
         currentViewData.addChild(name, points);
         
         // Update visualizations
-        await app?.updateVisualizations();
+        await coordinator?.updateVisualizations();
         
         // Close and reset form
         $('.node-popup').removeClass('active');
         ($('#addNodeForm')[0] as HTMLFormElement).reset();
-    });
-
-    // Pie container click handler - moved out of DOMContentLoaded
-    $('#pie-container').on('click', function(e) {
-        console.log('Pie container clicked!'); // Debug log
-        if (!app) {
-            console.error('App not initialized yet');
-            return;
-        }
-        $('.popup-form').hide(); // Hide any other open forms
-        $('#pieMenuForm').show(); // Show the pie menu
-        $('.node-popup').addClass('active'); // Make popup visible
     });
 
     // Menu button handlers - moved out of DOMContentLoaded
@@ -179,7 +167,6 @@ function setupUIHandlers() {
         if (!formId) return;
         
         console.log('Menu button clicked:', formId); // Debug log
-        $('#pieMenuForm').hide();
         $(`#${formId}Form`).show();
     });
 
@@ -222,7 +209,7 @@ function setupUIHandlers() {
     // Add keyboard event listener for Escape key
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
-            const treemap = app?.treemap;  // Get treemap instance from app
+            const treemap = coordinator?.treemap;  // Get treemap instance from coordinator
             if (treemap) {
                 const currentView = treemap.getCurrentView();  // Use treemap's method to get current view
                 
@@ -321,112 +308,75 @@ function setupUIHandlers() {
             scanInterval = null;
         }
     }
-    /*
-    // Connect to peer after scan
-    $('#connect-peer').on('click', async function() {
-        const peerKey = $('#manual-key').val() as string;
-        if (!peerKey) {
-            alert('Please enter or scan a public key');
-            return;
-        }
-        
-        if (!app) {
-            alert('App not initialized yet');
-            return;
-        }
-        
-        const result = await app.connectToPeer(peerKey);
-        if (result) {
-            alert('Connected successfully!');
-            $('.node-popup').removeClass('active');
-        } else {
-            alert('Failed to connect to peer');
-        }
-    });
-
-    // Connect to peer after scan
-    $('#show-connections').on('click', function() {
-        if (!app) {
-            alert('App not initialized yet');
-            return;
-        }
-        
-        const peers = app.listConnectedPeers();
-        const peerList = $('#user-list');
-        
-        if (peers.length === 0) {
-            peerList.html('<li>No connected peers</li>');
-            return;
-        }
-        
-        const peerHtml = peers.map(peer => `
-            <li>
-                <div>${peer.name}</div>
-                <button class="disconnect-peer" data-id="${peer.id}">Disconnect</button>
-            </li>
-        `).join('');
-        
-        peerList.html(peerHtml);
-        
-        // Add disconnect handlers
-        $('.disconnect-peer').on('click', function() {
-            const peerId = $(this).data('id');
-            app?.disconnectPeer(peerId);
-            
-            // Update the list after disconnection
-            $('#show-connections').click();
-        });
-    });
-
-    // Discover users button handler
-    $('#discover-users').on('click', async function() {
-        if (!app) {
-            alert('App not initialized yet');
-            return;
-        }
-        
-        const peerList = $('#user-list');
-        peerList.html('<li>Discovering users...</li>');
-        
-        const users = await app.discoverUsers();
-        
-        if (users.length === 0) {
-            peerList.html('<li>No users found</li>');
-            return;
-        }
-        
-        const userHtml = users.map(user => {
-            const lastSeenDate = user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'Unknown';
-            return `
-                <li>
-                    <div>${user.name}</div>
-                    <div>Last seen: ${lastSeenDate}</div>
-                    <button class="connect-to-user" data-id="${user.id}">Connect</button>
-                </li>
-            `;
-        }).join('');
-        
-        peerList.html(userHtml);
-        
-        // Add connect handlers
-        $('.connect-to-user').on('click', async function() {
-            const userId = $(this).data('id');
-            const success = await app?.connectToPeer(userId);
-            
-            if (success) {
-                alert(`Connected to ${$(this).parent().find('div').first().text()}`);
-                $('.node-popup').removeClass('active');
-            } else {
-                alert('Failed to connect to user');
-            }
-        });
-    });
-    */
 
     // Logout button handler
     $('#logout').on('click', function() {
         logout();
         location.reload(); // Refresh the page to show login screen
+    });
+
+    // Add click handler to close popups when clicking outside the form
+    $('.node-popup').on('click', function(e) {
+        // Only close if clicking the overlay itself, not its children
+        if (e.target === this) {
+            // Check if inventory form is visible and has unsaved changes
+            if ($('#inventoryForm').is(':visible')) {
+                const hasChanges = checkForInventoryChanges();
+                
+                if (hasChanges) {
+                    // Ask for confirmation before closing
+                    if (confirm('You have unsaved changes. Are you sure you want to close?')) {
+                        $('.node-popup').removeClass('active');
+                    }
+                } else {
+                    // No changes, close directly
+                    $('.node-popup').removeClass('active');
+                }
+            } else {
+                // Not inventory form, close directly
+                $('.node-popup').removeClass('active');
+            }
+        }
+    });
+    
+    // Helper function to check for unsaved changes in the inventory form
+    function checkForInventoryChanges(): boolean {
+        // Check if any input fields have been modified
+        const modifiedInputs = $('#inventoryForm input').filter(function() {
+            return ($(this).val() !== '' && $(this).val() !== $(this).prop('defaultValue'));
+        });
+        
+        // Return true if any inputs have been modified
+        return modifiedInputs.length > 0;
+    }
+    
+    // Prevent form clicks from propagating to the overlay
+    $('.node-popup-content').on('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Also update the ESC key handler with the same logic
+    $(document).on('keydown', function(e) {
+        // Check if popup is active and ESC key was pressed
+        if ($('.node-popup').hasClass('active') && e.key === 'Escape') {
+            // Check if inventory form is visible and has unsaved changes
+            if ($('#inventoryForm').is(':visible')) {
+                const hasChanges = checkForInventoryChanges();
+                
+                if (hasChanges) {
+                    // Ask for confirmation before closing
+                    if (confirm('You have unsaved changes. Are you sure you want to close?')) {
+                        $('.node-popup').removeClass('active');
+                    }
+                } else {
+                    // No changes, close directly
+                    $('.node-popup').removeClass('active');
+                }
+            } else {
+                // Not inventory form, close directly
+                $('.node-popup').removeClass('active');
+            }
+        }
     });
 }
 
@@ -434,7 +384,7 @@ function setupUIHandlers() {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM fully loaded');
     
-    // Try to initialize the app with recalled user session
+    // Try to initialize the coordinator with recalled user session
     initializeApp();
     
     // Attach auth form submission event

@@ -1,7 +1,7 @@
-import { App } from '../../App';
-import { GunNode } from '../GunNode';
-import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from '../GunSubscription';
-import { gun } from '../Gun';
+import { App } from '../../Coordinator';
+import { GunNode } from './GunNode';
+import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './GunSubscription';
+import { gun } from './Gun';
 
 // Define the core data structure of a TreeNode
 export interface TreeNodeData {

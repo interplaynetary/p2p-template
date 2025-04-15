@@ -1,8 +1,8 @@
 import { gun } from './Gun';
-import { App } from '../App';
+import { Coordinator } from '../../Coordinator';
 import { GunSubscription } from './GunSubscription';
 import { GunNode } from './GunNode';
-import { Reactive, Computed, ReactiveEntity, ComputationCache } from './experiments/Reactive'
+import { Reactive, Computed, ReactiveEntity, ComputationCache } from '../experiments/Reactive'
 
 /**
  * Interface describing the data structure of a tree node
@@ -29,6 +29,8 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
       return node ? node.calculateShares() : {};
     }
   );
+
+  private _coordinator: Coordinator;
   
   // Instance properties
   private _parent: TreeNode | null = null;
@@ -70,13 +72,13 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
   /**
    * Get or create a TreeNode instance
    */
-  public static getNode(id: string, app: App): TreeNode {
+  public static getNode(id: string, coordinator: Coordinator): TreeNode {
     // Check if we already have this node
     let node = TreeNode._registry.get(id);
     
     // Create a new node if needed
     if (!node) {
-      node = new TreeNode(id, app);
+      node = new TreeNode(id, coordinator);
       TreeNode._registry.set(id, node);
     }
     
@@ -95,7 +97,7 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
       typeIds?: string[],
       id?: string
     } = {},
-    app: App
+    coordinator: Coordinator
   ): Promise<TreeNode> {
     // Generate an ID if none is provided
     const id = options.id || crypto.randomUUID();
@@ -114,7 +116,7 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
     }
     
     // Get or create the node
-    const node = TreeNode.getNode(id, app);
+    const node = TreeNode.getNode(id, coordinator);
     
     // Store the data in Gun
     await node.gunNode.put(data);
@@ -142,8 +144,8 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
   /**
    * Private constructor - use getNode or create instead
    */
-  private constructor(id: string, app: App) {
-    super(id, app);
+  private constructor(id: string, coordinator: Coordinator) {
+    super(id, coordinator);
     this._nodeId = id;
     
     // Set up data properties
@@ -322,7 +324,7 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
       const childId = data._key;
       
       // Get or create the child node
-      const childNode = TreeNode.getNode(childId, this._app);
+      const childNode = TreeNode.getNode(childId, this._coordinator);
       
       // Update the children map
       const childMap = new Map(this._children.value);
@@ -421,8 +423,8 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
             this._sharesOfOthersRecognition.value = currentShares;
             
             // Update UI
-            this._app.updateNeeded = true;
-            this._app.pieUpdateNeeded = true;
+            this._coordinator.updateNeeded = true;
+            this._coordinator.pieUpdateNeeded = true;
           }
         }
       }));
@@ -460,7 +462,7 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
     
     // Set new parent
     if (parentId) {
-      const parentNode = TreeNode.getNode(parentId, this._app);
+      const parentNode = TreeNode.getNode(parentId, this._coordinator);
       this._parent = parentNode;
       
       // Add to new parent's children
@@ -472,8 +474,8 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
     }
     
     // Update UI
-    this._app.updateNeeded = true;
-    this._app.pieUpdateNeeded = true;
+    this._coordinator.updateNeeded = true;
+    this._coordinator.pieUpdateNeeded = true;
   }
 
   get parent(): TreeNode | null {
@@ -655,11 +657,11 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
       manualFulfillment,
       typeIds,
       id
-    }, this._app);
+    }, this._coordinator);
     
     // Update UI
-    this._app.updateNeeded = true;
-    this._app.pieUpdateNeeded = true;
+    this._coordinator.updateNeeded = true;
+    this._coordinator.pieUpdateNeeded = true;
     
     return child;
   }

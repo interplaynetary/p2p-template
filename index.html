@@ -91,6 +91,7 @@
                 </form>
 
                 <!-- Give Surplus Form -->
+                <!--
                 <form id="giveSurplusForm" class="popup-form" style="display: none;">
                     <h2>Give Surplus to Direct/Transitive-Mutual-Self-Fulfillment</h2>
                     <div class="form-buttons">
@@ -98,20 +99,25 @@
                         <button type="button" class="cancel">Close</button>
                     </div>
                 </form>
+                -->
     
                 <!-- Inventory Form -->
                 <form id="inventoryForm" class="popup-form" style="display: none;">
-                    <h2>Inventory Management</h2>
+                    <h2>Surplus Capacity Declarations</h2>
+                    <p class="form-description">Declare what surplus capacities you have available. You can either update existing capacities or add new capacities below.</p>
+                    <div class="capacity-inputs">
+                        <!-- Will be dynamically populated with capacity inputs -->
+                    </div>
                     <div class="inventory-list">
                         <!-- Inventory items will be dynamically populated here -->
                     </div>
                     <div class="form-buttons">
-                        <button type="button" class="update-inventory">Update</button>
+                        <button type="button" class="update-inventory">Save Changes</button>
                         <button type="button" class="cancel">Close</button>
                     </div>
                 </form>
     
-                <!-- Create Relation Form -->
+                <!-- Create Relation Form
                 <form id="createRelationForm" class="popup-form" style="display: none;">
                     <h2>New Relation</h2>
                     <div class="form-group">
@@ -129,26 +135,8 @@
                         <button type="button" class="cancel">Close</button>
                     </div>
                 </form>
+            -->
     
-                <!-- Add pie menu popup form -->
-                <form id="pieMenuForm" class="popup-form" style="display: none;">
-                    <h2>Actions</h2>
-                    <div class="menu-buttons">
-                        <button type="button" class="menu-button" data-form="inventory">
-                            <span class="emoji">🎒</span>
-                        </button>
-                        <button type="button" class="menu-button" data-form="createRelation">
-                            <span>Relation</span>
-                        </button>
-                        <button type="button" class="menu-button" data-form="giveSurplus">
-                            <span>Give Surplus</span>
-                        </button>
-                    </div>
-                    <div class="form-buttons">
-                        <button type="button" class="cancel">Close</button>
-                    </div>
-                </form>
-
                 <!-- Peer Options Form -->
                 <form id="peerOptionsForm" class="popup-form" style="display: none;">
                     <h2>Peer Options</h2>

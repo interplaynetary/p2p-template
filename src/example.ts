@@ -69,9 +69,9 @@ export async function initializeExampleData(root: TreeNode) {
     const development = await freeAssociation.addChild("Development", 10)
     const communications = await freeAssociation.addChild("Communications", 10)
 /*
-    // Now using IDs instead of objects for addType
-    communications.addType(money.id);
-    communications.addType(development.id);
+    // Now using IDs instead of objects for addContributor
+    communications.addContributor(money.id);
+    communications.addContributor(development.id);
 */
     /*
     // Underground Networks contributions

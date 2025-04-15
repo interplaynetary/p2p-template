@@ -1,7 +1,7 @@
-import { App } from '../App';
-import { GunNode } from './GunNode';
-import { GunSubscription, SubscriptionCleanup, SubscriptionHandler } from './GunSubscription';
-import { gun } from './Gun';
+import { Coordinator } from '../Coordinator';
+import { GunNode } from '../gun/GunNode';
+import { GunSubscription } from '../gun/GunSubscription';
+import { gun, SubscriptionCleanup, SubscriptionHandler } from '../gun/gunSetup';
 
 // Define the core data structure of a TreeNode
 export interface TreeNodeData {
@@ -10,6 +10,7 @@ export interface TreeNodeData {
   points: number;
   manualFulfillment: number;
   parent?: string;
+  contributors?: string[];
 }
 
 // calculateSharesOfGeneralFulfillment is called on time-interval
@@ -19,6 +20,7 @@ export interface TreeNodeData {
  * Embraces the reactive nature of Gun by treating all data as streams
 */
 
+
 export class TreeNode extends GunNode<TreeNodeData> {
   // Local state derived from Gun data
   private _id: string;
@@ -27,17 +29,17 @@ export class TreeNode extends GunNode<TreeNodeData> {
   private _parent: TreeNode | null = null;
   private _manualFulfillment: number = 1; // for testing, will be default 0?
   private _children: Map<string, TreeNode> = new Map();
-  private _types: Set<string> = new Set();
+  private _contributors: Set<string> = new Set();
   private _recognitionSubscriptions: Map<string, () => void> = new Map();
   private _sharesOfOthersRecognition: {[key: string]: number} = {};
   
   // Subscriptions for cleanup
   private _parentSubscription: SubscriptionCleanup | null = null;
   private _childrenSubscription: SubscriptionCleanup | null = null;
-  private _typesSubscription: SubscriptionCleanup | null = null;
+  private _contributorsSubscription: SubscriptionCleanup | null = null;
   
-  // Reference to App
-  private _app: App;
+    // Reference to Coordinator
+  private _coordinator: Coordinator;
   
   // Static registry for nodes to avoid duplicates
   private static _registry: Map<string, TreeNode> = new Map();
@@ -59,6 +61,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
   private static _startupModeTimeout: any = null;
   private static _loggingEnabled: boolean = false; // Add logging control flag
   
+  // Track social distribution 
+  private _socialDistributionInstance: any = null;
+  
   // Helper method to log only when enabled
   private static log(message: string, ...args: any[]) {
     if (TreeNode._loggingEnabled) {
@@ -69,17 +74,17 @@ export class TreeNode extends GunNode<TreeNodeData> {
   /**
    * Create a new TreeNode or get an existing one from registry
    * @param id Node ID
-   * @param app App instance
+   * @param coordinator Coordinator instance
    * @returns TreeNode instance
    */
-  public static getNode(id: string, app: App): TreeNode {
+  public static getNode(id: string, coordinator: Coordinator): TreeNode {
     // Check if node already exists in registry
     if (TreeNode._registry.has(id)) {
       return TreeNode._registry.get(id)!;
     }
     
     // Create a new node
-    const node = new TreeNode(id, app);
+    const node = new TreeNode(id, coordinator);
     TreeNode._registry.set(id, node);
     return node;
   }
@@ -89,7 +94,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Create a new node with the given name and options
    * @param name Node name
    * @param options Creation options
-   * @param app App instance
+   * @param coordinator Coordinator instance
    * @returns The new node
    */
   public static async create(
@@ -98,10 +103,10 @@ export class TreeNode extends GunNode<TreeNodeData> {
       parent?: TreeNode,
       points?: number,
       manualFulfillment?: number,
-      typeIds?: string[],
+      contributorIds?: string[],
       id?: string
     } = {},
-    app: App
+    coordinator: Coordinator
   ): Promise<TreeNode> {
     // Generate an ID if not provided
     const id = options.id || Math.random().toString(36).substring(2, 15);
@@ -124,12 +129,12 @@ export class TreeNode extends GunNode<TreeNodeData> {
       nodeRef.put(nodeData, () => resolve());
     });
     
-    // Add types if provided
-    if (options.typeIds && options.typeIds.length > 0) {
-      const typesRef = nodeRef.get('types');
-      for (const typeId of options.typeIds) {
+    // Add contributors if provided
+    if (options.contributorIds && options.contributorIds.length > 0) {
+      const contributorsRef = nodeRef.get('contributors');
+      for (const contributorId of options.contributorIds) {
         await new Promise<void>((resolve) => {
-          typesRef.get(typeId).put({ value: true }, () => resolve());
+          contributorsRef.get(contributorId).put({ value: true }, () => resolve());
         });
       }
     }
@@ -142,18 +147,18 @@ export class TreeNode extends GunNode<TreeNodeData> {
     }
     
     // Get the node from registry
-    return TreeNode.getNode(id, app);
+    return TreeNode.getNode(id, coordinator);
   }
   
   /**
    * Private constructor - use static methods to get instances
    * @param id Node ID
-   * @param app App instance 
+   * @param coordinator Coordinator instance 
    */
-  private constructor(id: string, app: App) {
+  private constructor(id: string, coordinator: Coordinator) {
     super(['nodes', id]);
     this._id = id;
-    this._app = app;
+    this._coordinator = coordinator;
     
     console.log(`[TreeNode] Constructor for ${id}, initial name=${this._name}`);
     
@@ -212,7 +217,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
 
     // Helper property
-    private get isRoot(): boolean {
+    public get isRoot(): boolean {
       return !this._parent;
     }
   
@@ -222,6 +227,23 @@ export class TreeNode extends GunNode<TreeNodeData> {
    */
   private setupSubscriptions(): void {
     // console.log(`[TreeNode ${this._id}] Setting up subscriptions`);
+    
+    // Add debouncing for UI updates
+    let uiUpdateDebounceTimer: any = null;
+    const UI_UPDATE_DEBOUNCE = 350; // ms
+    
+    // Helper to debounce UI updates
+    const debounceUIUpdate = () => {
+      if (uiUpdateDebounceTimer) {
+        clearTimeout(uiUpdateDebounceTimer);
+      }
+      
+      uiUpdateDebounceTimer = setTimeout(() => {
+        this._coordinator.updateNeeded = true;
+        this._coordinator.pieUpdateNeeded = true;
+        uiUpdateDebounceTimer = null;
+      }, UI_UPDATE_DEBOUNCE);
+    };
     
     // Subscribe to node data changes
     this.on((data) => {
@@ -263,23 +285,23 @@ export class TreeNode extends GunNode<TreeNodeData> {
       }
       
       if (updated) {
-        this._app.updateNeeded = true;
-        this._app.pieUpdateNeeded = true;
+        // Debounce UI updates to prevent frequent treemap rebuilds
+        debounceUIUpdate();
       }
     });
     
     // Subscribe to children
     this.subscribeToChildren();
     
-    // Subscribe to types
-    this.subscribeToTypes();
+    // Subscribe to contributors
+    this.subscribeToContributors();
     
     // Only set up recognition subscriptions if we're the root node
     if (!this._parent) {
       this.setupRecognitionSubscriptions();
 
-      // Re-setup recognition when types change anywhere in the tree
-      this.get('types').on(() => {
+      // Re-setup recognition when contributors change anywhere in the tree
+      this.get('contributors').on(() => {
         if (this.isRoot) {
           this.scheduleSharesCalculation();
         }
@@ -338,7 +360,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
           );
           
           // Still trigger UI update
-          this._app.pieUpdateNeeded = true;
+          this._coordinator.pieUpdateNeeded = true;
         }
       }, 2500); // Longer timeout during startup, nearly at the end of startup mode
       return;
@@ -365,7 +387,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
         );
         
         // Trigger UI update only after actual changes
-        this._app.pieUpdateNeeded = true;
+        this._coordinator.pieUpdateNeeded = true;
       } else {
         TreeNode.log(`[${this._name}] Shares unchanged, skipping update`);
       }
@@ -406,7 +428,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     // Load new parent if provided
     if (parentId) {
-      const parent = TreeNode.getNode(parentId, this._app);
+      const parent = TreeNode.getNode(parentId, this._coordinator);
       this._parent = parent;
       
       // Add this node to parent's children
@@ -451,8 +473,8 @@ export class TreeNode extends GunNode<TreeNodeData> {
             // Remove from local collection
             if (this._children.has(childId)) {
               this._children.delete(childId);
-              this._app.updateNeeded = true;
-              this._app.pieUpdateNeeded = true;
+              this._coordinator.updateNeeded = true;
+              this._coordinator.pieUpdateNeeded = true;
             }
             processedChildren.delete(childId);
             return;
@@ -467,7 +489,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
           
           // Load the child node
           // console.log(`[TreeNode ${this._id}] Creating child node:`, childId);
-          const childNode = TreeNode.getNode(childId, this._app);
+          const childNode = TreeNode.getNode(childId, this._coordinator);
           this._children.set(childId, childNode);
           
           // Ensure parent reference is correct
@@ -478,8 +500,8 @@ export class TreeNode extends GunNode<TreeNodeData> {
           
           // Request UI updates
           // console.log(`[TreeNode ${this._id}] Child added, requesting UI update`);
-          this._app.updateNeeded = true;
-          this._app.pieUpdateNeeded = true;
+          this._coordinator.updateNeeded = true;
+          this._coordinator.pieUpdateNeeded = true;
           
           // Emit to stream
           controller.enqueue(childNode);
@@ -514,69 +536,69 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
   
   /**
-   * Subscribe to types collection
+   * Subscribe to contributors collection
    */
-  private subscribeToTypes(): void {
+  private subscribeToContributors(): void {
     // Clean up existing subscription
-    if (this._typesSubscription) {
-      this._typesSubscription();
-      this._typesSubscription = null;
+    if (this._contributorsSubscription) {
+      this._contributorsSubscription();
+      this._contributorsSubscription = null;
     }
     
     // Set up new subscription using path abstraction
-    const typesNode = this.get('types');
+    const contributorsNode = this.get('contributors');
     
-    // Track processed types to avoid duplicates
-    const processedTypes = new Set<string>();
+    // Track processed contributors to avoid duplicates
+    const processedContributors = new Set<string>();
     
-    // Create a stream for types
+    // Create a stream for contributors
     const stream = new ReadableStream({
       start: (controller) => {
-        this._typesSubscription = typesNode.each((typeData) => {
-          const typeId = typeData._key;
+        this._contributorsSubscription = contributorsNode.each((contributorData) => {
+          const contributorId = contributorData._key;
           
-          // Skip Gun metadata and already processed types
-          if (typeId === '_' || processedTypes.has(typeId)) return;
+          // Skip Gun metadata and already processed contributors
+          if (contributorId === '_' || processedContributors.has(contributorId)) return;
           
-          // If data is falsy, it means type was removed
-          if (!typeData) {
+          // If data is falsy, it means contributor was removed
+          if (!contributorData) {
             // Remove from local collection
-            if (this._types.has(typeId)) {
-              this._types.delete(typeId);
+            if (this._contributors.has(contributorId)) {
+              this._contributors.delete(contributorId);
               
-              // Update type index
+              // Update contributor index
               const root = this.root;
-              root.removeFromTypeIndex(typeId, this._id);
+              root.removeFromContributorIndex(contributorId, this._id);
               
-              this._app.updateNeeded = true;
-              this._app.pieUpdateNeeded = true;
+              this._coordinator.updateNeeded = true;
+              this._coordinator.pieUpdateNeeded = true;
               
               // Schedule shares recalculation on the root node
               if (root) {
                 root.scheduleSharesCalculation();
               }
             }
-            processedTypes.delete(typeId);
+            processedContributors.delete(contributorId);
             return;
           }
           
-          // Skip if we already have this type
-          if (this._types.has(typeId)) {
-            processedTypes.add(typeId);
+          // Skip if we already have this contributor
+          if (this._contributors.has(contributorId)) {
+            processedContributors.add(contributorId);
             return;
           }
           
           // Add to local collection
-          this._types.add(typeId);
-          processedTypes.add(typeId);
+          this._contributors.add(contributorId);
+          processedContributors.add(contributorId);
           
-          // Update type index
+          // Update contributor index
           const root = this.root;
-          root.addToTypeIndex(typeId, this._id);
+          root.addToContributorIndex(contributorId, this._id);
           
           // Request UI updates
-          this._app.updateNeeded = true;
-          this._app.pieUpdateNeeded = true;
+          this._coordinator.updateNeeded = true;
+          this._coordinator.pieUpdateNeeded = true;
           
           // Schedule shares recalculation on the root node
           if (root) {
@@ -584,14 +606,14 @@ export class TreeNode extends GunNode<TreeNodeData> {
           }
           
           // Emit to stream
-          controller.enqueue(typeId);
+          controller.enqueue(contributorId);
         });
       },
       cancel: () => {
         // Clean up subscription when stream is cancelled
-        if (this._typesSubscription) {
-          this._typesSubscription();
-          this._typesSubscription = null;
+        if (this._contributorsSubscription) {
+          this._contributorsSubscription();
+          this._contributorsSubscription = null;
         }
       }
     });
@@ -605,16 +627,16 @@ export class TreeNode extends GunNode<TreeNodeData> {
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
-          // Process type if needed
+          // Process contributor if needed
           if (this.isRoot) {
           this.setupRecognitionSubscriptions();
           } else {
-            // If not root, notify the root that types have changed
+            // If not root, notify the root that contributors have changed
             this.root.setupRecognitionSubscriptions();
           }
         }
       } catch (err) {
-        console.error(`Error processing types stream for node ${this._id}:`, err);
+        console.error(`Error processing contributors stream for node ${this._id}:`, err);
       }
     };
     
@@ -661,102 +683,116 @@ export class TreeNode extends GunNode<TreeNodeData> {
 
   // Actual implementation separated for clarity
   private _actualSetupRecognitionSubscriptions(): void {
-    // Get all types that appear in our tree
-    const relevantTypes = new Set<string>();
+    // Get all contributors that appear in our tree
+    const relevantContributors = new Set<string>();
     
-    // Helper to collect types from a node and its children
-    const collectTypes = (node: TreeNode) => {
-      node.types.forEach(typeId => relevantTypes.add(typeId));
-      node.children.forEach(child => collectTypes(child));
+    // Helper to collect contributors from a node and its children
+    const collectContributors = (node: TreeNode) => {
+      node.contributors.forEach(contributorId => relevantContributors.add(contributorId));
+      node.children.forEach(child => collectContributors(child));
     };
     
     // Start from our root (this node)
-    collectTypes(this);
+    collectContributors(this);
 
-    // Skip if no types have changed
-    const currentTypeIds = Array.from(this._recognitionSubscriptions.keys());
-    const newTypeIds = Array.from(relevantTypes);
+    // Skip if no contributors have changed
+    const currentContributorIds = Array.from(this._recognitionSubscriptions.keys());
+    const newContributorIds = Array.from(relevantContributors);
     
-    if (currentTypeIds.length === newTypeIds.length && 
-        currentTypeIds.every(id => relevantTypes.has(id))) {
+    if (currentContributorIds.length === newContributorIds.length && 
+        currentContributorIds.every(id => relevantContributors.has(id))) {
       TreeNode.log(`[${this._name}] Recognition subscriptions unchanged, skipping setup`);
       return; // No changes to subscriptions needed
     }
 
-    TreeNode.log(`[${this._name}] Setting up recognition subscriptions for ${relevantTypes.size} types:`, newTypeIds);
+    TreeNode.log(`[${this._name}] Setting up recognition subscriptions for ${relevantContributors.size} contributors:`, newContributorIds);
 
-    // Find types to remove (in current subscriptions but not in relevantTypes)
-    const typesToRemove = currentTypeIds.filter(typeId => !relevantTypes.has(typeId));
+    // Find contributors to remove (in current subscriptions but not in relevantContributors)
+    const contributorsToRemove = currentContributorIds.filter(contributorId => !relevantContributors.has(contributorId));
     
-    // Find types to add (in relevantTypes but not in current subscriptions)
-    const typesToAdd = newTypeIds.filter(typeId => !this._recognitionSubscriptions.has(typeId));
+    // Find contributors to add (in relevantContributors but not in current subscriptions)
+    const contributorsToAdd = newContributorIds.filter(contributorId => !this._recognitionSubscriptions.has(contributorId));
     
     // Remove subscriptions no longer needed
-    typesToRemove.forEach(typeId => {
-      TreeNode.log(`[${this._name}] Removing subscription to ${typeId}`);
-      const cleanup = this._recognitionSubscriptions.get(typeId);
+    contributorsToRemove.forEach(contributorId => {
+      TreeNode.log(`[${this._name}] Removing subscription to ${contributorId}`);
+      const cleanup = this._recognitionSubscriptions.get(contributorId);
       if (cleanup) {
         cleanup();
-        this._recognitionSubscriptions.delete(typeId);
-        delete this._sharesOfOthersRecognition[typeId];
+        this._recognitionSubscriptions.delete(contributorId);
+        delete this._sharesOfOthersRecognition[contributorId];
       }
     });
     
-    // Add new subscriptions using GunSubscription's map/filter capabilities
-    typesToAdd.forEach(typeId => {
-      TreeNode.log(`[${this._name}] Adding subscription to ${typeId}`);
+    // Create a debounced update function for the pie chart to avoid excessive updates
+    const debouncedPieUpdate = (() => {
+      let timeout: any = null;
+      return () => {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          this._coordinator.pieUpdateNeeded = true;
+          TreeNode.log(`[${this._name}] Multiple recognition updates detected, triggering pie chart update`);
+          timeout = null;
+        }, 200); // 200ms debounce time
+      };
+    })();
+    
+    // Add new subscriptions using a more reactive approach
+    contributorsToAdd.forEach(contributorId => {
+      TreeNode.log(`[${this._name}] Adding subscription to ${contributorId}`);
       
-      // Create a subscription with built-in filtering and mapping
-      const sub = new GunSubscription<any>(['nodes', typeId, 'sharesOfGeneralFulfillment']);
+      // Create a subscription that will watch the entire sharesOfGeneralFulfillment object
+      const sub = new GunSubscription<Record<string, number>>(['nodes', contributorId, 'sharesOfGeneralFulfillment']);
       
-      // Transform the raw data stream to extract only what we need
-      const transformedSub = sub.map(shares => {
-        if (!shares) return null;
+      // Use asObject to get a reactive object representation instead of individual updates
+      const objSub = sub.asObject({});
+      
+      // Transform the object to extract just our share
+      const transformedSub = objSub.map(shares => {
+        if (!shares || typeof shares !== 'object') return null;
         
-        // Extract shares without normalizing
-        const validShares = Object.entries(shares)
-          .filter(([key, value]) => typeof value === 'number' && key !== '_')
-          .map(([key, value]) => [key, value as number] as const);
+        // Extract our share if it exists
+        const ourShare = shares[this._id];
+        if (typeof ourShare !== 'number') return null;
         
-        // Skip further processing if no valid shares
-        if (validShares.length === 0) return null;
-        
-        // Find our share in the data
-        const ourShare = validShares.find(([key, _]) => key === this._id);
-        if (!ourShare) return null;
-        
-        // Return a simplified object with just what we need - WITHOUT normalization
         return {
-          typeId,
-          share: ourShare[1],     // Use the absolute value directly
-          raw: ourShare[1]        // Keep raw value for reference
+          contributorId,
+          share: ourShare
         };
       });
       
-      // Subscribe only to the transformed data
-      const cleanup = transformedSub.on(result => {
+      // Add debouncing to avoid too many updates
+      const debouncedSub = transformedSub.debounce(300);
+      
+      // Subscribe to the debounced transformed data
+      const cleanup = debouncedSub.on(result => {
         if (!result) return;
         
-        const oldShare = this._sharesOfOthersRecognition[typeId] || 0;
+        const oldShare = this._sharesOfOthersRecognition[contributorId] || 0;
         
         // Only update if the share changed significantly
         if (Math.abs(result.share - oldShare) > 0.0001) {
           TreeNode.log(`[${this._name}] Share changed from ${oldShare} to ${result.share}, updating UI`);
           
-          // Store the new value (absolute, not normalized)
-          this._sharesOfOthersRecognition[typeId] = result.share;
-              
-              // Request UI updates
-              this._app.updateNeeded = true;
-              this._app.pieUpdateNeeded = true;
+          // Store the new value
+          this._sharesOfOthersRecognition[contributorId] = result.share;
+          
+          // Request UI updates - debounced for pie chart
+          this._coordinator.updateNeeded = true;
+          debouncedPieUpdate();
         } else {
           TreeNode.log(`[${this._name}] Share unchanged (${oldShare}), skipping update`);
         }
       });
       
       // Store the cleanup function
-      this._recognitionSubscriptions.set(typeId, cleanup);
+      this._recognitionSubscriptions.set(contributorId, cleanup);
     });
+    
+    // If we have at least one recognition subscription, force an update of the pie chart
+    if (this._recognitionSubscriptions.size > 0) {
+      this._coordinator.pieUpdateNeeded = true;
+    }
   }
   
   // PROPERTIES
@@ -804,7 +840,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
       // Update Gun data with new parent reference - local update will happen through subscription
       this.put({ parent: value ? value.id : null });
       
-      // Note: updateParent and updateTypeIndices will be triggered by the subscription
+      // Note: updateParent will be triggered by the subscription
     }
   }
   
@@ -863,10 +899,10 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
   
   /**
-   * Get all types
+   * Get all contributors
    */
-  get types(): Set<string> {
-    return new Set(this._types);
+  get contributors(): Set<string> {
+    return new Set(this._contributors);
   }
   
   /**
@@ -876,20 +912,20 @@ export class TreeNode extends GunNode<TreeNodeData> {
     return { ...this._sharesOfOthersRecognition };
   }
   
-  // TYPE METHODS
+  // contributor METHODS
   
   /**
-   * Add a type to this node
-   * @param typeId Type ID to add
+   * Add a contributor to this node
+   * @param contributorId Contributor ID to add
    * @returns This node for chaining
    */
-  public addType(typeId: string): TreeNode {
-    // Skip if already has type
-    if (this._types.has(typeId)) return this;
+  public addContributor(contributorId: string): TreeNode {
+    // Skip if already has contributor
+    if (this._contributors.has(contributorId)) return this;
     
-    // Skip invalid type IDs
-    if (!typeId || typeId === '#' || typeof typeId !== 'string') {
-      console.warn(`[TreeNode] Ignoring invalid type ID: ${typeId}`);
+    // Skip invalid contributor IDs
+    if (!contributorId || contributorId === '#' || typeof contributorId !== 'string') {
+      console.warn(`[TreeNode] Ignoring invalid contributor ID: ${contributorId}`);
       return this;
     }
     
@@ -914,19 +950,19 @@ export class TreeNode extends GunNode<TreeNodeData> {
     }
     
     // Add to Gun using path abstraction
-    const typesNode = this.get('types');
-    typesNode.get(typeId).put({ value: true } as any);
+    const contributorsNode = this.get('contributors');
+    contributorsNode.get(contributorId).put({ value: true } as any);
     
-    // Immediately add to local types collection
-    this._types.add(typeId);
+    // Immediately add to local contributors collection
+    this._contributors.add(contributorId);
     
-    // Update type index in root
+    // Update contributor index in root
     const root = this.root;
-    root.addToTypeIndex(typeId, this._id);
+    root.addToContributorIndex(contributorId, this._id);
     
     // Request UI updates
-    this._app.updateNeeded = true;
-    this._app.pieUpdateNeeded = true;
+    this._coordinator.updateNeeded = true;
+    this._coordinator.pieUpdateNeeded = true;
     
     // Schedule shares calculation
     if (root) {
@@ -938,27 +974,27 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
   
   /**
-   * Remove a type from this node
-   * @param typeId Type ID to remove
+   * Remove a contributor from this node
+   * @param contributorId Contributor ID to remove
    * @returns This node for chaining
    */
-  public removeType(typeId: string): TreeNode {
-    // Skip if doesn't have type
-    if (!this._types.has(typeId)) return this;
+  public removeContributor(contributorId: string): TreeNode {
+    // Skip if doesn't have contributor
+    if (!this._contributors.has(contributorId)) return this;
     
     // Remove from Gun using path abstraction
-    const typesNode = this.get('types');
-    typesNode.get(typeId).put(null);
+    const contributorsNode = this.get('contributors');
+    contributorsNode.get(contributorId).put(null);
     
     // Remove locally (subscription will handle the rest)
-    this._types.delete(typeId);
+    this._contributors.delete(contributorId);
     
-    // Update type index
-    this.root.removeFromTypeIndex(typeId, this._id);
+    // Update contributor index
+    this.root.removeFromContributorIndex(contributorId, this._id);
     
     // Request UI updates
-    this._app.updateNeeded = true;
-    this._app.pieUpdateNeeded = true;
+    this._coordinator.updateNeeded = true;
+    this._coordinator.pieUpdateNeeded = true;
     
     return this;
   }
@@ -969,7 +1005,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
    * Add a child node
    * @param name Child name
    * @param points Points value
-   * @param typeIds Optional array of type IDs
+   * @param contributorIds Optional array of contributor IDs
    * @param manualFulfillment Optional manual fulfillment value
    * @param id Optional child ID (generated if not provided)
    * @returns Promise that resolves with the new child node
@@ -977,7 +1013,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
   public async addChild(
     name: string,
     points: number = 0,
-    typeIds: string[] = [],
+    contributorIds: string[] = [],
     manualFulfillment: number = null,
     id?: string
   ): Promise<TreeNode> {
@@ -993,13 +1029,13 @@ export class TreeNode extends GunNode<TreeNodeData> {
       parent: this,
       points: points,
       manualFulfillment: manualFulfillment,
-      typeIds: typeIds,
+      contributorIds: contributorIds,
       id: id
-    }, this._app);
+    }, this._coordinator);
     
     // Request UI updates
-    this._app.updateNeeded = true;
-    this._app.pieUpdateNeeded = true;
+    this._coordinator.updateNeeded = true;
+    this._coordinator.pieUpdateNeeded = true;
     
     return child;
   }
@@ -1032,10 +1068,10 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
   
   /**
-   * Check if this node is a contribution (has a parent and types)
+   * Check if this node is a contribution (has a parent and contributors)
    */
   get isContribution(): boolean {
-    return Boolean(this._parent && this._types.size > 0);
+    return Boolean(this._parent && this._contributors.size > 0);
   }
   
   /**
@@ -1049,11 +1085,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
   /**
    * Get this node's weight relative to siblings and ancestors
    */
-  get weight(): number {
+  get shareOfRoot(): number {
     if (!this._parent) return 1;
     return this._parent.totalChildPoints === 0
       ? 0
-      : (this._points / this._parent.totalChildPoints) * this._parent.weight;
+      : (this._points / this._parent.totalChildPoints) * this._parent.shareOfRoot;
   }
   
   /**
@@ -1128,7 +1164,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
     console.log(`  - Manual fulfillment value: ${this._manualFulfillment}`);
 
     // IMPORTANT: If this is a contribution, it should have fulfillment=1.0
-    // regardless of children (to handle race conditions during type assignment)
+    // regardless of children (to handle race conditions during contributor assignment)
     if (this.isContribution) {
       console.log(`  - Node is a contribution, fulfillment = 1.0 (regardless of children)`);
       return 1.0;
@@ -1184,79 +1220,47 @@ export class TreeNode extends GunNode<TreeNodeData> {
     return 1 - this.fulfilled;
   }
   
-  /**
-   * Get this node's fulfillment weight
-   */
-  get fulfillmentWeight(): number {
-    return this.fulfilled * this.weight;
-  }
+  // contributor INDEX METHODS
   
-  // TYPE INDEX METHODS
-  
-  private _typeIndex: Map<string, Set<string>> = new Map();
+  private _contributorIndex: Map<string, Set<string>> = new Map();
   
   /**
-   * Update type indices when node changes parents
-   * @param oldRoot Old root node
-   * @param newRoot New root node
-   */
-  private updateTypeIndices(oldRoot: TreeNode, newRoot: TreeNode): void {
-    // Helper to process a node and its descendants
-    const processNode = (node: TreeNode) => {
-      // Move each type from old to new root
-      node._types.forEach(typeId => {
-        // Remove from old root
-        oldRoot.removeFromTypeIndex(typeId, node.id);
-        
-        // Add to new root
-        newRoot.addToTypeIndex(typeId, node.id);
-      });
-      
-      // Process children recursively
-      node._children.forEach(child => processNode(child));
-    };
-    
-    // Start with this node
-    processNode(this);
-  }
-  
-  /**
-   * Add a node to the type index
-   * @param typeId Type ID
+   * Add a node to the contributor index
+   * @param contributorId Contributor ID
    * @param nodeId Node ID
    */
-  public addToTypeIndex(typeId: string, nodeId: string): void {
-    if (!this._typeIndex.has(typeId)) {
-      this._typeIndex.set(typeId, new Set<string>());
+  public addToContributorIndex(contributorId: string, nodeId: string): void {
+    if (!this._contributorIndex.has(contributorId)) {
+      this._contributorIndex.set(contributorId, new Set<string>());
     }
-    this._typeIndex.get(typeId)?.add(nodeId);
+    this._contributorIndex.get(contributorId)?.add(nodeId);
   }
   
   /**
-   * Remove a node from the type index
-   * @param typeId Type ID
+   * Remove a node from the contributor index
+   * @param contributorId Contributor ID
    * @param nodeId Node ID
    */
-  public removeFromTypeIndex(typeId: string, nodeId: string): void {
-    if (this._typeIndex.has(typeId)) {
-      this._typeIndex.get(typeId)?.delete(nodeId);
+  public removeFromContributorIndex(contributorId: string, nodeId: string): void {
+    if (this._contributorIndex.has(contributorId)) {
+      this._contributorIndex.get(contributorId)?.delete(nodeId);
     }
   }
   
   /**
-   * Get all instances of a given type
-   * @param typeId Type ID
-   * @returns Set of node IDs that are instances of the type
+   * Get all instances of a given contributor
+   * @param contributorId Contributor ID
+   * @returns Set of node IDs that are instances of the contributor
    */
-  public getInstances(typeId: string): Set<string> {
-    return this.root._typeIndex.get(typeId) || new Set();
+  public getInstances(contributorId: string): Set<string> {
+    return this.root._contributorIndex.get(contributorId) || new Set();
   }
   
   /**
-   * Get all types in the system
+   * Get all contributors in the system
    */
-  get rootTypes(): string[] {
-    return Array.from(this.root._typeIndex.keys());
+  get rootContributors(): string[] {
+    return Array.from(this.root._contributorIndex.keys());
   }
   
   // RECOGNITION METHODS
@@ -1266,9 +1270,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
    */
   private recognitionOf(instance: TreeNode): number {
     const fulfilled = instance.fulfilled;
-    const weight = instance.weight;
+    const weight = instance.shareOfRoot;
     const fulfillmentWeight = fulfilled * weight;
-    const contributorCount = instance._types.size;
+    const contributorCount = instance._contributors.size;
     
     console.log(`[${this._name}] Recognition details for ${instance._name}:`);
     console.log(`  - Fulfilled: ${fulfilled}`);
@@ -1286,11 +1290,11 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
 
   /**
-   * Calculate total recognition for a type
+   * Calculate total recognition for a contributor
    */
-  public shareOfGeneralFulfillment(typeId: string): number {
+  public shareOfGeneralFulfillment(contributorId: string): number {
     // Create a cache key for this calculation
-    const cacheKey = `share_${typeId}`;
+    const cacheKey = `share_${contributorId}`;
     
     // Check if we have a recent cached value
     const cached = this._calculationCache.get(cacheKey);
@@ -1301,9 +1305,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
       return cached.value;
     }
     
-    // Get all instances of this type
-    const instances = this.getInstances(typeId);
-    console.log(`[${this._name}] Calculating share for type ${typeId}, found ${instances.size} instances`);
+    // Get all instances of this contributor
+    const instances = this.getInstances(contributorId);
+    console.log(`[${this._name}] Calculating share for contributor ${contributorId}, found ${instances.size} instances`);
     
     if (instances.size === 0) {
       this._calculationCache.set(cacheKey, {
@@ -1331,7 +1335,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
       })
       .reduce((sum, val) => sum + val, 0);
     
-    console.log(`[${this._name}] Total recognition for type ${typeId}: ${totalRecognition}`);
+    console.log(`[${this._name}] Total recognition for contributor ${contributorId}: ${totalRecognition}`);
     
     // Cache the result
     this._calculationCache.set(cacheKey, {
@@ -1343,20 +1347,20 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
 
   public calculateShares(): {[key: string]: number} {
-    // we need to calculate the shares for all types, but also we need to store the weights of all nodes (even those without types?)
-      return Array.from(this.root._typeIndex.keys())
-        .reduce((obj, typeId) => ({
+    // we need to calculate the shares for all contributors, but also we need to store the weights of all nodes (even those without contributors?)
+      return Array.from(this.root._contributorIndex.keys())
+        .reduce((obj, contributorId) => ({
           ...obj,
-          [typeId]: this.shareOfGeneralFulfillment(typeId)
+          [contributorId]: this.shareOfGeneralFulfillment(contributorId)
         }), {});
   }
   
   /**
-   * Calculate mutual fulfillment with a type
+   * Calculate mutual fulfillment with a contributor
    */
-  public mutualFulfillment(typeId: string): number {
+  public mutualFulfillment(contributorId: string): number {
     // Create a cache key for this calculation
-    const cacheKey = `mutual_${typeId}`;
+    const cacheKey = `mutual_${contributorId}`;
     
     // Check if we have a recent cached value
     const cached = this._calculationCache.get(cacheKey);
@@ -1368,10 +1372,10 @@ export class TreeNode extends GunNode<TreeNodeData> {
     }
     
     // Calculate fresh value
-    const recognitionFromHere = this.shareOfGeneralFulfillment(typeId);
-    const recognitionFromThere = this.sharesOfOthersRecognition[typeId] || 0;
+    const recognitionFromHere = this.shareOfGeneralFulfillment(contributorId);
+    const recognitionFromThere = this.sharesOfOthersRecognition[contributorId] || 0;
     
-    console.log(`[${this._name}] Mutual fulfillment with ${typeId}:`);
+    console.log(`[${this._name}] Mutual fulfillment with ${contributorId}:`);
     console.log(`  - Recognition from here: ${recognitionFromHere}`);
     console.log(`  - Recognition from there: ${recognitionFromThere}`);
     
@@ -1386,10 +1390,10 @@ export class TreeNode extends GunNode<TreeNodeData> {
     
     return result;
   }
-
+  
   
   /**
-   * Get the distribution of mutual fulfillment across types
+   * Get the distribution of mutual fulfillment across contributors
    */
   get mutualFulfillmentDistribution(): Map<string, number> {
     // Create a cache key
@@ -1404,22 +1408,22 @@ export class TreeNode extends GunNode<TreeNodeData> {
       return cached.value;
     }
     
-    // Get all types from the root's type index
-    const types = this.rootTypes;
+    // Get all contributors from the root's contributor index
+    const contributors = this.rootContributors;
     
     // Add debugging but limit frequency
-    console.log(`[${this._name}] Getting mutual fulfillment distribution, found ${types.length} types:`, types);
+    console.log(`[${this._name}] Getting mutual fulfillment distribution, found ${contributors.length} contributors:`, contributors);
     console.log(`[${this._name}] Current sharesOfOthersRecognition:`, this.sharesOfOthersRecognition);
     
     // Calculate raw distribution values
-    const rawDistribution = types
-      .map(typeId => {
-        const instanceCount = this.getInstances(typeId).size;
-        const mutualValue = this.mutualFulfillment(typeId);
-        console.log(`[${this._name}] Type ${typeId} has ${instanceCount} instances, mutual value: ${mutualValue}`);
+    const rawDistribution = contributors
+      .map(contributorId => {
+        const instanceCount = this.getInstances(contributorId).size;
+        const mutualValue = this.mutualFulfillment(contributorId);
+        console.log(`[${this._name}] Contributor ${contributorId} has ${instanceCount} instances, mutual value: ${mutualValue}`);
         
         return {
-        typeId,
+        contributorId,
           value: mutualValue,
           hasInstances: instanceCount > 0
         };
@@ -1427,7 +1431,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
       .filter(entry => entry.value > 0 && entry.hasInstances);
     
     console.log(`[${this._name}] Raw distribution after filtering:`, 
-      rawDistribution.map(d => `${d.typeId}: ${d.value}`));
+      rawDistribution.map(d => `${d.contributorId}: ${d.value}`));
     
     // Calculate total for normalization
     const total = rawDistribution.reduce((sum, entry) => sum + entry.value, 0);
@@ -1436,7 +1440,7 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Create the normalized distribution map
     const result = new Map(
       rawDistribution.map(entry => [
-        entry.typeId,
+        entry.contributorId,
         total > 0 ? entry.value / total : 0
       ])
     );
@@ -1455,310 +1459,65 @@ export class TreeNode extends GunNode<TreeNodeData> {
     // Save to Gun database using the path abstraction
     this.get('mutualFulfillmentDistribution').put(distributionObj as any);
     
+    
     // Schedule social distribution update if this is a root node
     if (this.isRoot) {
-      this.scheduleSocialDistributionUpdate();
+      // Get social distribution instance
+      const socialDist = this.getSocialDistributionInstance();
+      if (socialDist) {
+        socialDist.scheduleSocialDistributionUpdate();
+      }
     }
     
     return result;
   }
   
-  // Track social distribution subscriptions
-  private _socialDistributionSubscriptions: Map<string, SubscriptionCleanup> = new Map();
-  private _socialDistributionUpdateTimeout: any = null;
-  private _lastSocialDistributionUpdate: number = 0;
-  private _socialDistributionUpdateCooldown: number = 3000; // 3 second cooldown
-  
   /**
-   * Schedule an update to social distribution with debouncing
+   * Get social distribution instance for this node
    */
-  private scheduleSocialDistributionUpdate(): void {
-    // Skip if already scheduled
-    if (this._socialDistributionUpdateTimeout) return;
-    
-    // Skip if in cooldown period
-    const now = Date.now();
-    if (now - this._lastSocialDistributionUpdate < this._socialDistributionUpdateCooldown) {
-      TreeNode.log(`[${this._name}] Skipping social distribution update - in cooldown period`);
-      return;
+  public getSocialDistributionInstance(): any {
+    if (!this._socialDistributionInstance) {
+      // We need to use a dynamic import here to avoid circular reference
+      // Schedule creation for the next tick to ensure it's initialized
+      setTimeout(() => {
+        if (!this._socialDistributionInstance) {
+          import('./SocialDistribution').then(({ SocialDistribution }) => {
+            this._socialDistributionInstance = new SocialDistribution(this);
+          });
+        }
+      }, 0);
     }
-    
-    TreeNode.log(`[${this._name}] Scheduling social distribution update`);
-    
-    // Set up debounce timeout
-    this._socialDistributionUpdateTimeout = setTimeout(() => {
-      this._socialDistributionUpdateTimeout = null;
-      this._lastSocialDistributionUpdate = Date.now();
-      
-      // Update social distribution
-      const distribution = this.calculateSocialDistribution();
-      
-      // Save to Gun
-      const distributionObj = Object.fromEntries(distribution);
-      this.get('socialDistribution').put(distributionObj as any);
-      
-      // Update UI
-      this._app.pieUpdateNeeded = true;
-    }, 1000);
+    return this._socialDistributionInstance;
   }
   
   /**
-   * Set up subscriptions to mutual fulfillment distributions
-   * from nodes in our network
-   */
-  public setupSocialDistributionSubscriptions(): void {
-    // Only run on root nodes
-    if (!this.isRoot) return;
-    
-    // First get our own mutual distribution
-    const myDistribution = this.mutualFulfillmentDistribution;
-    
-    // Clean up existing subscriptions
-    this._socialDistributionSubscriptions.forEach(cleanup => cleanup());
-    this._socialDistributionSubscriptions.clear();
-    
-    // Subscribe to our own mutual distribution changes
-    const selfSub = new GunSubscription<any>([
-      ...this.getPath(), 
-      'mutualFulfillmentDistribution'
-    ]);
-    
-    const selfCleanup = selfSub.on(() => {
-      // When our own distribution changes, update social distribution
-      this.scheduleSocialDistributionUpdate();
-    });
-    
-    this._socialDistributionSubscriptions.set(this.id, selfCleanup);
-    
-    // Subscribe to first-level connections' mutual distributions
-    for (const [nodeId, proportion] of myDistribution.entries()) {
-      // Skip if proportion is too small
-      if (proportion < 0.001) continue;
-      
-      // Get the node
-      const node = TreeNode._registry.get(nodeId);
-      if (!node) continue;
-      
-      // Subscribe to this node's mutual distribution
-      const sub = new GunSubscription<any>([
-        ...node.getPath(), 
-        'mutualFulfillmentDistribution'
-      ]);
-      
-      const cleanup = sub.on(() => {
-        // When a connection's distribution changes, update our social distribution
-        this.scheduleSocialDistributionUpdate();
-      });
-      
-      this._socialDistributionSubscriptions.set(nodeId, cleanup);
-    }
-    
-    TreeNode.log(`[${this._name}] Set up ${this._socialDistributionSubscriptions.size} social distribution subscriptions`);
-  }
-  
-  /**
-   * Calculate the distribution of social shares (direct and transitive) across all nodes
+   * Get the distribution of social shares (direct and transitive) across all nodes
+   * @param depth Maximum traversal depth (default: 5)
    * @returns Map of node IDs to their normalized social share values
    */
   public get socialDistribution(): Map<string, number> {
-    // Create a cache key for this calculation
-    const cacheKey = `socialDist_${this.id}`;
-    
-    // Check if we have a recent cached value
-    const cached = this._calculationCache.get(cacheKey);
-    const now = Date.now();
-    
-    if (cached && now - cached.timestamp < 3000) {
-      // Use cached value if less than 3 seconds old
-      return cached.value;
-    }
-    
-    // Calculate new social distribution
-    return this.calculateSocialDistribution();
+    return this.getSocialDistribution();
   }
   
   /**
-   * Calculate social distribution and update cache
+   * Get social distribution with optional custom depth
+   * @param depth Maximum traversal depth (default: 5)
    * @returns Map of node IDs to their normalized social share values
    */
-  private calculateSocialDistribution(): Map<string, number> {
-    const resultDistribution = new Map<string, number>();
-    const now = Date.now();
-    
-    // Run network traversal to build distribution
-    this.traverseDistributionNetwork(resultDistribution);
-    
-    // If no results, use local calculation
-    if (resultDistribution.size === 0) {
-      TreeNode.log(`[${this._name}] No p2p distribution data found, calculating locally`);
-      
-      // Direct connections from mutual fulfillment
-      const myDistribution = this.mutualFulfillmentDistribution;
-      for (const [nodeId, proportion] of myDistribution.entries()) {
-        if (proportion < 0.0001) continue;
-        resultDistribution.set(nodeId, proportion);
-      }
+  public getSocialDistribution(depth: number = 5): Map<string, number> {
+    if (this._socialDistributionInstance) {
+      return this._socialDistributionInstance.getSocialDistribution(depth);
     }
     
-    // Normalize
-    const total = Array.from(resultDistribution.values()).reduce((sum, val) => sum + val, 0);
-    if (total > 0) {
-      for (const [key, value] of resultDistribution.entries()) {
-        resultDistribution.set(key, value / total);
-      }
-    }
+    // Create instance if not exists
+    this.getSocialDistributionInstance();
     
-    // Cache the result
-    this._calculationCache.set(`socialDist_${this.id}`, {
-      timestamp: now,
-      value: resultDistribution
-    });
-    
-    // Set up subscriptions if root node
-    if (this.isRoot && this._socialDistributionSubscriptions.size === 0) {
-      this.setupSocialDistributionSubscriptions();
-    }
-    
-    return resultDistribution;
+    // Return empty map while instance is being created
+    return new Map<string, number>();
   }
   
   /**
-   * Traverse the p2p network to build the social distribution
-   * Uses a BFS approach to explore mutual fulfillment distributions
-   * @param result Map to accumulate social distribution
-   */
-  private traverseDistributionNetwork(result: Map<string, number>): void {
-    // Track visited nodes to prevent cycles
-    const visited = new Set<string>([this.id]);
-    
-    // Queue for BFS traversal
-    const queue: Array<{node: TreeNode, pathMultiplier: number}> = [];
-    
-    // Start with this node's mutual distribution
-    const myDistribution = this.mutualFulfillmentDistribution;
-    
-    // Initialize with direct connections
-    for (const [nodeId, proportion] of myDistribution.entries()) {
-      // Skip if proportion is effectively zero
-      if (proportion < 0.0001) continue;
-      
-      // Add the direct contribution to result
-      result.set(nodeId, proportion);
-      
-      // Get the node instance
-      const nextNode = TreeNode._registry.get(nodeId);
-      if (!nextNode) continue;
-      
-      // Add to queue for further traversal
-      queue.push({
-        node: nextNode,
-        pathMultiplier: proportion
-      });
-      
-      // Mark as visited
-      visited.add(nodeId);
-    }
-    
-    // Use BFS to explore the network (up to 5 levels deep)
-    let currentLevel = 0;
-    const MAX_DEPTH = 5;
-    
-    while (queue.length > 0 && currentLevel < MAX_DEPTH) {
-      const levelSize = queue.length;
-      
-      // Process all nodes at current level
-      for (let i = 0; i < levelSize; i++) {
-        const { node, pathMultiplier } = queue.shift()!;
-        
-        // Use cached mutual distribution if available
-        const nextDistribution = node._calculationCache.get('mutualDist')?.value;
-        if (!nextDistribution) {
-          // Try to get from gun, but we'll skip this node for now
-          // This will be picked up when subscriptions are established
-          this.getMutualDistributionFromGun(node.id);
-          continue;
-        }
-        
-        // Process each entry in the next distribution
-        for (const [nextNodeId, nextProportion] of nextDistribution.entries()) {
-          // Skip if already visited or proportion is too small
-          if (visited.has(nextNodeId) || nextProportion < 0.0001) continue;
-          
-          // Calculate transitive value
-          const transitiveValue = pathMultiplier * nextProportion;
-          
-          // Add to result (accumulate if already exists)
-          const currentValue = result.get(nextNodeId) || 0;
-          result.set(nextNodeId, currentValue + transitiveValue);
-          
-          // Get the next node
-          const nextNextNode = TreeNode._registry.get(nextNodeId);
-          if (!nextNextNode) continue;
-          
-          // Add to queue for next level
-          queue.push({
-            node: nextNextNode,
-            pathMultiplier: transitiveValue
-          });
-          
-          // Mark as visited
-          visited.add(nextNodeId);
-        }
-      }
-      
-      // Move to next level
-      currentLevel++;
-    }
-    
-    TreeNode.log(`[${this._name}] P2P traversal found ${result.size} connections across ${currentLevel} levels`);
-  }
-  
-  /**
-   * Get mutual fulfillment distribution from Gun and cache it locally
-   * Reuses Gun subscription mechanisms
-   */
-  private getMutualDistributionFromGun(nodeId: string): void {
-    // Get the node from registry
-    const node = TreeNode._registry.get(nodeId);
-    if (!node) return;
-    
-    // Create path to the mutual fulfillment distribution
-    const path = [...node.getPath(), 'mutualFulfillmentDistribution'];
-    
-    // Use existing GunSubscription pattern
-    const sub = new GunSubscription<any>(path);
-    
-    // Only get the value once to avoid memory leaks
-    sub.once()
-      .then(data => {
-        if (!data) return;
-        
-        // Convert object to Map
-        const distMap = new Map<string, number>();
-        Object.entries(data).forEach(([key, value]) => {
-          if (key !== '_' && typeof value === 'number') {
-            distMap.set(key, value as number);
-          }
-        });
-        
-        // Cache the result
-        node._calculationCache.set('mutualDist', {
-          timestamp: Date.now(),
-          value: distMap
-        });
-        
-        // If this is the root node, update social distribution
-        if (this.isRoot) {
-          this.scheduleSocialDistributionUpdate();
-        }
-      })
-      .catch(err => {
-        console.error(`[TreeNode] Error getting mutual distribution for ${nodeId}:`, err);
-      });
-  }
-  
-  /**
-   * Clean up all subscriptions including social distribution subscriptions
+   * Clean up all subscriptions
    */
   public unsubscribe(): void {
     if (this._parentSubscription) {
@@ -1771,9 +1530,9 @@ export class TreeNode extends GunNode<TreeNodeData> {
       this._childrenSubscription = null;
     }
     
-    if (this._typesSubscription) {
-      this._typesSubscription();
-      this._typesSubscription = null;
+    if (this._contributorsSubscription) {
+      this._contributorsSubscription();
+      this._contributorsSubscription = null;
     }
     
     // Only clean up recognition subscriptions if we're the root
@@ -1782,14 +1541,10 @@ export class TreeNode extends GunNode<TreeNodeData> {
       this._recognitionSubscriptions.clear();
       this._sharesOfOthersRecognition = {};
       
-      // Also clean up social distribution subscriptions
-      this._socialDistributionSubscriptions.forEach(cleanup => cleanup());
-      this._socialDistributionSubscriptions.clear();
-      
-      // Clear any pending timeouts
-      if (this._socialDistributionUpdateTimeout) {
-        clearTimeout(this._socialDistributionUpdateTimeout);
-        this._socialDistributionUpdateTimeout = null;
+      // Clean up social distribution instance
+      if (this._socialDistributionInstance) {
+        this._socialDistributionInstance.cleanup();
+        this._socialDistributionInstance = null;
       }
     }
     
@@ -1909,13 +1664,13 @@ export class TreeNode extends GunNode<TreeNodeData> {
   }
 
   /**
-   * Get types as a stream
-   * @returns A subscription that emits the types collection
+   * Get contributors as a stream
+   * @returns A subscription that emits the contributors collection
    */
-  public typesStream() {
-    const typesNode = this.get('types');
-    return typesNode.each((typeData) => {
-      return typeData._key;
+  public contributorsStream() {
+    const contributorsNode = this.get('contributors');
+    return contributorsNode.each((contributorData) => {
+      return contributorData._key;
     });
   }
 
@@ -1958,96 +1713,78 @@ export class TreeNode extends GunNode<TreeNodeData> {
     };
   }
 
-  // Add new static methods for batched updates
-  private static scheduleBatchUpdate(path: string[], data: any) {
-    // Store update in pending batch
-    const pathKey = path.join('/');
-    TreeNode._pendingUpdates.set(pathKey, { path, data });
+  /**
+   * Schedule a batch update to Gun
+   * @param path Path to update
+   * @param value Value to set
+   */
+  public static scheduleBatchUpdate(path: string[], value: any): void {
+    // Create a path string for the map key
+    const pathStr = path.join('/');
     
-    // Don't schedule processing during startup mode
-    if (TreeNode._startupMode) {
-      return;
-    }
+    // Add to pending updates map
+    TreeNode._pendingUpdates.set(pathStr, value);
     
-    // Schedule batch processing if not already scheduled
+    // Schedule processing if not already scheduled
     if (!TreeNode._updateBatchTimeout) {
       TreeNode._updateBatchTimeout = setTimeout(() => {
         TreeNode.processBatchUpdates();
       }, 500);
     }
   }
-
-  private static processBatchUpdates() {
-    if (TreeNode._pendingUpdates.size === 0) {
+  
+  /**
+   * Process all pending batch updates
+   */
+  public static processBatchUpdates(): void {
+    // Clear the timeout
+    if (TreeNode._updateBatchTimeout) {
+      clearTimeout(TreeNode._updateBatchTimeout);
       TreeNode._updateBatchTimeout = null;
-      return;
     }
     
-    console.log(`[TreeNode] Processing batch of ${TreeNode._pendingUpdates.size} Gun updates`);
+    // Skip if no updates
+    if (TreeNode._pendingUpdates.size === 0) return;
     
-    // Process all pending updates in a single batch
-    TreeNode._pendingUpdates.forEach(({ path, data }) => {
-      // Start with the root Gun instance
+    TreeNode.log(`Processing ${TreeNode._pendingUpdates.size} batch updates`);
+    
+    // Process all updates
+    TreeNode._pendingUpdates.forEach((value, pathStr) => {
+      // Convert path string back to array
+      const path = pathStr.split('/');
+      
+      // Apply the update to Gun
       let ref: any = gun;
-      // Navigate to the target path
       for (const segment of path) {
         ref = ref.get(segment);
       }
-      // Update the data
-      ref.put(data);
+      
+      // Put the value
+      ref.put(value);
     });
     
-    // Clear the batch
+    // Clear the pending updates
     TreeNode._pendingUpdates.clear();
-    TreeNode._updateBatchTimeout = null;
+  }
+
+  public static getNodeById(id: string): TreeNode | null {
+    return TreeNode._registry.get(id) || null;
   }
 
   /**
-   * Override once method to also update internal state
-   * @returns Promise resolving with node data
+   * Save social distribution to Gun database
    */
-  public once(): Promise<TreeNodeData> {
-    console.log(`[TreeNode] once() called for ${this._id}, current name="${this._name}"`);
+  public saveSocialDistribution(distributionObj: any): void {
+    this.get('socialDistribution').put(distributionObj as any);
     
-    return new Promise<TreeNodeData>((resolve, reject) => {
-      super.once()
-        .then(data => {
-          console.log(`[TreeNode] once() received data for ${this._id}:`, 
-                     data ? { name: data.name, points: data.points } : 'No data');
-          
-          // Update internal state with the fetched data
-          if (data) {
-            // Only update if this is the expected data type
-            if (typeof data === 'object' && !Array.isArray(data)) {
-              const nodeData = data as any;
-              
-              // Process basic fields
-              if (nodeData.name !== undefined && nodeData.name !== this._name) {
-                const oldName = this._name;
-                this._name = nodeData.name || '';
-                console.log(`[TreeNode] once() updated name from "${oldName}" to "${this._name}" for ${this._id}`);
-              }
-              
-              if (nodeData.points !== undefined && nodeData.points !== this._points) {
-                this._points = nodeData.points || 0;
-              }
-              
-              if (nodeData.manualFulfillment !== undefined && nodeData.manualFulfillment !== this._manualFulfillment) {
-                this._manualFulfillment = nodeData.manualFulfillment;
-              }
-              
-              // Don't handle parent here - too complex for this context
-              TreeNode.log(`[TreeNode] Data updated in once() for ${this._id}, name=${this._name}`);
-            }
-          }
-          
-          console.log(`[TreeNode] once() resolving with name="${this._name}" for ${this._id}`);
-          resolve(data as TreeNodeData);
-        })
-        .catch(error => {
-          console.error(`[TreeNode] once() error for ${this._id}:`, error);
-          reject(error);
-        });
-    });
+    // Update UI
+    this._coordinator.pieUpdateNeeded = true;
+  }
+
+  /**
+   * Get path for this node in Gun
+   */
+  public getGunPath(): string[] {
+    return this.getPath();
   }
 } 

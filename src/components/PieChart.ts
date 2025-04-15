@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { getUserName } from '../utils/userUtils';
 import { getColorForUserId } from '../utils/colorUtils';
-import { TreeNode } from '../models/experiments/ReactTreeNode';
+import { TreeNode } from '../models/TreeNode';
 
 
 export function createPieChart(data: TreeNode) {
@@ -35,7 +35,7 @@ export function createPieChart(data: TreeNode) {
             console.log('No mutual fulfillment data found, creating placeholder');
             console.log('Data root node ID:', data.id);
             console.log('Data root node name:', data.name);
-            console.log('Data root types:', Array.from(data.types));
+            console.log('Data root contributors:', Array.from(data.contributors));
             console.log('Data root sharesOfOthersRecognition:', data.sharesOfOthersRecognition);
             return createPlaceholderPieChart(width, height, radius);
         }

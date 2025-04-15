@@ -1,7 +1,7 @@
-import { gun } from '../Gun';
-import { App } from '../../App';
-import { GunSubscription } from '../GunSubscription';
-import { GunNode } from '../GunNode';
+import { gun } from '../old/Gun';
+import { App } from '../../Coordinator';
+import { GunSubscription } from '../old/GunSubscription';
+import { GunNode } from '../old/GunNode';
 import { Reactive, Computed, ReactiveEntity, ComputationCache } from './Reactive'
 
 /**
@@ -33,10 +33,10 @@ export class TreeNode extends ReactiveEntity<TreeNodeData> {
   // Instance properties
   private _parent: TreeNode | null = null;
   private _children = new Reactive<Map<string, TreeNode>>(new Map());
-  private _types = new Reactive<Set<string>>(new Set());
+  private _contributors = new Reactive<Set<string>>(new Set());
   
   // Type index to find nodes by type
-  private _typeIndex = new Map<string, Set<string>>();
+  private _contributorIndex = new Map<string, Set<string>>();
   
   // Track recognition from other nodes
   private _sharesOfOthersRecognition = new Reactive<{[key: string]: number}>({});
