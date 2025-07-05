@@ -10,7 +10,7 @@ import GroupList from "./GroupList"
 import ItemList from "./ItemList"
 import SearchAppBar from "./SearchAppBar"
 
-const Display = ({host, user, code, mode, setMode, feeds}) => {
+const Display = ({user, host, code, mode, setMode, feeds}) => {
   const sortByLatest = (a, b) => b.latest - a.latest
   const [groups, updateGroup] = useReducer(reducer(sortByLatest), init)
   const day = key => {
@@ -31,9 +31,11 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
   const [currentKeys, setCurrentKeys] = useState([])
   const [newKeys, setNewKeys] = useState([])
   const [itemsCheck, setItemsCheck] = useState(false)
+  const [updateStart, setUpdateStart] = useState(false)
   const lastCheck = useRef(Date.now())
   const getDay = useRef(day())
   const daysLoaded = useRef([])
+  const updateStats = useRef(false)
 
   const createGroup = () => {
     setGroupList(false)
@@ -63,18 +65,16 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
   }
 
   const showGroupList = reset => {
+    if (reset) {
+      window.location = "/"
+      return
+    }
+
     setGroupList(true)
     setCurrentGroup("")
     setFeedList(false)
     setAddFeed(false)
     setGroup(null)
-    if (reset) {
-      setGroupItems(new Map())
-      setGroupCount(0)
-      setGroupsLoaded([])
-      getDay.current = day()
-      daysLoaded.current = []
-    }
   }
 
   // The above functions are all display modes of this component and avoid
@@ -87,11 +87,11 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
 
       user
         .get("public")
-        .get("groups")
-        .get(key)
-        .get("count")
-        .put(0, ack => {
-          if (ack.err) console.error(ack.err)
+        .next("groups")
+        .next(key)
+        .next("count")
+        .put(0, err => {
+          if (err) console.error(err)
         })
     },
     [user, group],
@@ -103,16 +103,13 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
     groupStats => {
       if (!user) return
 
-      groupStats.forEach((stats, key) => {
+      groupStats.forEach(async (stats, key) => {
         if (!key || !stats || stats.latest === 0) return
 
-        user
-          .get("public")
-          .get("groups")
-          .get(key)
-          .put(stats, ack => {
-            if (ack.err) console.error(ack.err)
-          })
+        const err = await new Promise(res => {
+          user.get("public").next("groups").next(key).put(stats, res)
+        })
+        if (err) console.error(err)
       })
     },
     [user],
@@ -122,36 +119,38 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
   // a more recent day, or when viewing a particular group and scrollback in the
   // item list triggers a call to this function.
   const loadMoreItems = useCallback(() => {
-    if (!host || !groups || getDay.current < twoWeeks) return
+    if (!user || !host || !groups || getDay.current < twoWeeks) return
 
     getDay.current -= 86400000
     // Make sure loadItems is only called once per day loaded.
     if (daysLoaded.current.includes(getDay.current)) return
 
     daysLoaded.current.push(getDay.current)
-    setLoading(true)
-    const mapDay = day => {
-      const seen = new Set()
-      host
-        .get("items" + day)
-        .map()
-        .once((item, key) => {
-          if (!item || !item.url || !key || seen.has(key)) return
+    const seen = new Set()
+    user.get([host, "items" + getDay.current], items => {
+      if (!items) {
+        setItemsCheck(true)
+        setUpdateStart(true)
+        return
+      }
 
-          seen.add(key)
-          groups.all.forEach(g => {
-            if (!g.feeds.includes(item.url)) return
+      for (const [key, item] of Object.entries(items)) {
+        if (!item || !item.url || !key || seen.has(key)) continue
 
-            setGroupItems(gi => {
-              const itemKeys = new Set(gi.get(g.key))
-              return new Map(gi.set(g.key, itemKeys.add(key)))
-            })
+        seen.add(key)
+        groups.all.forEach(g => {
+          if (!g.feeds.includes(item.url)) return
+
+          setGroupItems(gi => {
+            const itemKeys = new Set(gi.get(g.key))
+            return new Map(gi.set(g.key, itemKeys.add(key)))
           })
         })
-    }
-    mapDay(getDay.current)
-    setTimeout(() => setItemsCheck(true), 3000)
-  }, [host, groups, twoWeeks])
+      }
+      setItemsCheck(true)
+      setUpdateStart(true)
+    })
+  }, [user, host, groups, twoWeeks])
 
   // Effect that sets a message if the user scrolls back two weeks in a group.
   useEffect(() => {
@@ -168,7 +167,7 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
   }, [group, groupItems, twoWeeks])
 
   // Effect that runs on page load, fetches items for the current day and sets
-  // an interval to process new items every 5 seconds.
+  // an interval to process new items every 10 seconds.
   useEffect(() => {
     if (!host || !groups) return
     if (groupCount === 0 || groupCount !== groupsLoaded.length) return
@@ -180,15 +179,15 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
 
     let keys = []
     const seen = new Set()
-    let updateStats = false
     const groupStats = new Map()
     // Don't start new key checks until existing items have been loaded.
     lastCheck.current = Date.now() + 10000
-    host
-      .get("items" + today)
-      .map()
-      .once((item, key) => {
-        if (!item || !item.url || !key || seen.has(key)) return
+
+    const update = items => {
+      if (!items) return
+
+      for (const [key, item] of Object.entries(items)) {
+        if (!item || !item.url || !key || seen.has(key)) continue
 
         seen.add(key)
         const now = Date.now()
@@ -215,31 +214,33 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
               timestamp: item.timestamp,
               text: text.length > 200 ? text.substring(0, 200) : text,
             })
-            updateStats = true
+            updateStats.current = true
           }
         })
-        // map subscribes to new items, so once existing items have been
+        // on subscribes to new items, so once existing items have been
         // loaded push new item keys.
         if (key > lastCheck.current) {
           lastCheck.current = key
           keys.push(key)
         }
-      })
+      }
+    }
+    // Wait for websocket to connect.
+    setTimeout(() => user.get([host, "items" + today]).on(update, true), 1000)
     setInterval(() => {
-      if (updateStats) {
+      if (updateStats.current) {
         setGroupStats(groupStats)
-        updateStats = false
+        updateStats.current = false
       }
       setNewKeys(keys)
       keys = []
     }, 10000)
-  }, [host, groups, groupCount, groupsLoaded, setGroupStats])
+  }, [user, host, groups, groupCount, groupsLoaded, setGroupStats])
 
   // Effect that runs when a group is selected, can flag itemsCheck straight
   // away if above processing is done otherwise waits for it to finish first.
   useEffect(() => {
     setMessage("")
-    setLoading(false)
     setCurrentKeys([])
     setItemsCheck(false)
     // Push history when a group is selected so that back button returns to the
@@ -276,7 +277,7 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
   useEffect(() => {
     if (!user) return
 
-    const update = (g, name) => {
+    const update = (name, g) => {
       if (!name) return
 
       if (!g) {
@@ -292,45 +293,42 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
         return
       }
 
-      const userFeeds = user.get("public").get("groups").get(name).get("feeds")
-      userFeeds.once(async f => {
-        let groupFeeds = []
-        // Convert feeds object to an array, removing data added by gun.
-        // See FeedList createGroup which converts the array to an object.
-        if (f) {
-          delete f._
-          for (const url of Object.keys(f)) {
-            if (!(await userFeeds.get(url).then())) continue
-
-            groupFeeds.push(url)
-          }
+      let groupFeeds = []
+      if (g.feeds) {
+        for (const [url, add] of Object.entries(g.feeds)) {
+          if (add) groupFeeds.push(url)
         }
-        updateGroup({
-          key: name,
-          feeds: groupFeeds,
-          count: g.count ?? 0,
-          latest: g.latest ?? 0,
-          text: g.text,
-          author: g.author,
-          timestamp: g.timestamp,
-        })
-        setGroupsLoaded(gl => (gl.includes(name) ? gl : [...gl, name]))
+      }
+      updateGroup({
+        key: name,
+        feeds: groupFeeds,
+        count: g.count ?? 0,
+        latest: g.latest ?? 0,
+        text: g.text,
+        author: g.author,
+        timestamp: g.timestamp,
       })
+      setGroupsLoaded(gl => (gl.includes(name) ? gl : [...gl, name]))
     }
+    // Wait for websocket to connect.
+    setTimeout(() => {
+      user.get("public").next("groups", async groups => {
+        if (!groups) return
 
-    // Get the number of groups to know when we're done loading.
-    user
-      .get("public")
-      .get("groups")
-      .once(all => {
-        if (!all) return
-
-        delete all._
-        setGroupCount(Object.keys(all).length)
+        // Number of groups is stored to know when we're done loading.
+        setGroupCount(Object.keys(groups).length)
+        // Need to set a listener for each group.
+        for (const name of Object.keys(groups)) {
+          user
+            .get("public")
+            .next("groups")
+            .next(name)
+            .on(g => {
+              update(name, g)
+            }, true)
+        }
       })
-    // Need map().once() on page load and then map().on() to listen for changes.
-    user.get("public").get("groups").map().once(update)
-    user.get("public").get("groups").map().on(update)
+    }, 1000)
   }, [user])
 
   return (
@@ -347,9 +345,7 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
           title={group ? group.key : ""}
         />
       )}
-      {groupList && !group && (
-        <GroupList user={user} groups={groups} setGroup={setGroup} />
-      )}
+      {groupList && !group && <GroupList groups={groups} setGroup={setGroup} />}
       {currentGroup && (
         <EditGroup
           user={user}
@@ -368,7 +364,7 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
         />
       )}
       {feedList && addFeed && (
-        <AddFeed host={host} user={user} code={code} setAddFeed={setAddFeed} />
+        <AddFeed user={user} host={host} code={code} setAddFeed={setAddFeed} />
       )}
       {group && loading && (
         <Box sx={{display: "flex", justifyContent: "center", p: 4}}>
@@ -379,6 +375,7 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
         <Typography>{message}</Typography>
       </Box>
       <ItemList
+        user={user}
         host={host}
         group={group}
         groups={groups}
@@ -386,9 +383,10 @@ const Display = ({host, user, code, mode, setMode, feeds}) => {
         resetGroup={resetGroup}
         currentKeys={currentKeys}
         newKeys={newKeys}
-        loading={loading}
         loadMoreItems={loadMoreItems}
         feeds={feeds}
+        updateStart={updateStart}
+        setUpdateStart={setUpdateStart}
       />
     </>
   )

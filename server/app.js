@@ -4,19 +4,15 @@ import fetch from "node-fetch"
 import nodemailer from "nodemailer"
 import path from "path"
 import {fileURLToPath} from "url"
-import Gun from "gun"
-import "gun/lib/then.js"
-import "gun/sea.js"
+import Holster from "@mblaney/holster/src/holster.js"
 
-const gun = Gun({
-  web: express().listen(8765),
-  multicast: false,
-  axe: false,
+const holster = Holster({
+  server: express().listen(8765),
   secure: true,
 })
-const user = gun.user()
-const alias = process.env.GUN_USER_ALIAS ?? "host"
-const pass = process.env.GUN_USER_PASS ?? "password"
+const user = holster.user()
+const username = process.env.HOLSTER_USER_NAME ?? "host"
+const password = process.env.HOLSTER_USER_PASSWORD ?? "password"
 const host = process.env.APP_HOST ?? "http://localhost:3000"
 const addFeedUrl = process.env.ADD_FEED_URL
 const addFeedID = process.env.ADD_FEED_ID
@@ -24,8 +20,8 @@ const addFeedApiKey = process.env.ADD_FEED_API_KEY
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const basicAuth = (req, res, next) => {
   const auth = (req.headers.authorization || "").split(" ")[1] || ""
-  const [username, password] = Buffer.from(auth, "base64").toString().split(":")
-  if (username === alias && password === pass) {
+  const [u, p] = Buffer.from(auth, "base64").toString().split(":")
+  if (u === username && p === password) {
     next()
   } else {
     res.status(401).end()
@@ -36,19 +32,18 @@ const basicAuth = (req, res, next) => {
 // slowing calls to save so that the timestamp can be used as a unique key.
 var lastSaved = 0
 
-// inviteCodes is a map of invite codes and their gun keys, stored in memory
-// to avoid decrypting them in each of the endpoints they're required in.
+// inviteCodes is a map of invite codes and their (random) holster keys, stored
+// in memory to avoid decrypting them in each of the functions they're required.
 const inviteCodes = new Map()
 
 // removeDays is a set of days where old data has already been removed so that
-// gun doesn't need to be checked every time an item is added.
+// holster doesn't need to be checked every time an item is added.
 const removeDays = new Set()
 
-console.log("Trying auth credentials for " + alias)
-user.auth(alias, pass, auth)
+console.log("Trying auth credentials for " + username)
+user.auth(username, password, auth)
 
 const app = express()
-app.use(Gun.serve)
 app.use(bodyParser.json())
 app.use(express.static(path.join(dirname, "../browser/build")))
 app.use("/private", basicAuth)
@@ -98,7 +93,7 @@ app.get("/update-password", (req, res) => {
 
 // The host public key is requested by the browser so that it knows where to
 // get data from (all data is stored under user accounts when using the
-// secure flag in Gun opts).
+// secure flag in Holster opts).
 app.get("/host-public-key", (req, res) => {
   if (user.is) {
     res.send(user.is.pub)
@@ -147,20 +142,17 @@ app.post("/check-invite-code", (req, res) => {
   }
 
   // This just provides relevant errors.
-  user
-    .get("accounts")
-    .get(code)
-    .once(used => {
-      if (used) {
-        if (code === "admin") {
-          res.status(400).send("Please provide an invite code")
-          return
-        }
-        res.status(400).send("Invite code already used")
+  user.get("accounts").next(code, used => {
+    if (used) {
+      if (code === "admin") {
+        res.status(400).send("Please provide an invite code")
         return
       }
-      res.status(404).send("Invite code not found")
-    })
+      res.status(400).send("Invite code already used")
+      return
+    }
+    res.status(404).send("Invite code not found")
+  })
 })
 
 app.post("/claim-invite-code", async (req, res) => {
@@ -174,11 +166,15 @@ app.post("/claim-invite-code", async (req, res) => {
     res.status(400).send("Public key required")
     return
   }
-  if (!req.body.alias) {
+  if (!req.body.epub) {
+    res.status(400).send("Epub key required")
+    return
+  }
+  if (!req.body.username) {
     res.status(400).send("Username required")
     return
   }
-  if (!/^\w+$/.test(req.body.alias)) {
+  if (!/^\w+$/.test(req.body.username)) {
     res
       .status(400)
       .send("Username must contain only numbers, letters and underscore")
@@ -194,12 +190,13 @@ app.post("/claim-invite-code", async (req, res) => {
   }
 
   const validate = newCode()
-  const encValidate = await Gun.SEA.encrypt(validate, user._.sea)
-  const encEmail = await Gun.SEA.encrypt(req.body.email, user._.sea)
+  const encValidate = await holster.SEA.encrypt(validate, user.is)
+  const encEmail = await holster.SEA.encrypt(req.body.email, user.is)
   const data = {
     pub: req.body.pub,
-    alias: req.body.alias,
-    name: req.body.alias,
+    epub: req.body.epub,
+    username: req.body.username,
+    name: req.body.username,
     email: encEmail,
     validate: encValidate,
     ref: invite.owner,
@@ -207,85 +204,83 @@ app.post("/claim-invite-code", async (req, res) => {
     feeds: 10,
     subscribed: 0,
   }
-  user
-    .get("accounts")
-    .get(code)
-    .put(data, ack => {
-      if (ack.err) console.log(ack.err)
-    })
-  // Also map the code to the user's public key to make login easier.
-  user.get("accountMap" + req.body.pub).put(code, ack => {
-    if (ack.err) console.log(ack.err)
+  let err = await new Promise(res => {
+    user.get("accounts").next(code).put(data, res)
   })
-  validateEmail(req.body.alias, req.body.email, code, validate)
+  if (err) {
+    console.log(err)
+    res.status(500).send("Host error")
+    return
+  }
 
+  // Also map the code to the user's public key to make login easier.
+  err = await new Promise(res => {
+    user.get("accountMap" + req.body.pub).put(code, res)
+  })
+  if (err) {
+    console.log(err)
+    res.status(500).send("Host error")
+    return
+  }
+
+  validateEmail(req.body.username, req.body.email, code, validate)
   // Remove invite code as it's no longer available.
-  user
-    .get("available")
-    .get("invite_codes")
-    .get(invite.key)
-    .put(null, ack => {
-      if (ack.err) console.log(ack.err)
-    })
-  inviteCodes.delete(code)
+  err = await new Promise(res => {
+    user.get("available").next("invite_codes").next(invite.key).put(null, res)
+  })
+  if (err) {
+    console.log(err)
+    res.status(500).send("Host error")
+    return
+  }
 
+  inviteCodes.delete(code)
   if (code === "admin") {
     res.end()
     return
   }
 
   // Also remove from shared codes of the invite owner.
+  const account = await new Promise(res => {
+    user.get("accounts").next(invite.owner, res)
+  })
+  if (!account || !account.epub) {
+    console.log(`Account not found for invite.owner: ${invite.owner}`)
+    res.end()
+    return
+  }
+
   user
-    .get("accounts")
-    .get(invite.owner)
-    .once(account => {
-      if (!account) {
-        console.log("Account not found for invite.owner!")
-        res.end()
-        return
+    .get("shared")
+    .next("invite_codes")
+    .next(invite.owner, async codes => {
+      if (!codes) return
+
+      const secret = await holster.SEA.secret(account, user.is)
+      let found = false
+      for (const [key, encrypted] of Object.entries(codes)) {
+        if (found) break
+
+        if (!key || !encrypted) continue
+
+        let shared = await holster.SEA.decrypt(encrypted, secret)
+        if (code === shared) {
+          found = true
+          user
+            .get("shared")
+            .next("invite_codes")
+            .next(invite.owner)
+            .next(key)
+            .put(null, err => {
+              if (err) console.log(err)
+            })
+        }
       }
-
-      gun
-        .user(account.pub)
-        .get("epub")
-        .once(epub => {
-          if (!epub) {
-            console.log("User not found for public key")
-            res.end()
-            return
-          }
-
-          const owner = user.get("shared").get("invite_codes").get(invite.owner)
-          owner.once(async codes => {
-            if (!codes) return
-
-            const secret = await Gun.SEA.secret(epub, user._.sea)
-            delete codes._
-            let found = false
-            for (const key of Object.keys(codes)) {
-              if (found) break
-
-              if (!key) continue
-
-              owner.get(key).once(async encrypted => {
-                if (!encrypted) return
-
-                let shared = await Gun.SEA.decrypt(encrypted, secret)
-                if (code === shared) {
-                  owner.get(key).put(null, ack => {
-                    if (ack.err) console.log(ack.err)
-                  })
-                  found = true
-                }
-              })
-            }
-          })
-          res.end()
-        })
     })
+  res.end()
 })
 
-app.post("/validate-email", (req, res) => {
+app.post("/validate-email", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("Invite code required")
@@ -300,36 +295,39 @@ app.post("/validate-email", (req, res) => {
     return
   }
 
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account) {
+    res.status(404).send("Account not found")
+    return
+  }
+  if (!account.validate) {
+    res.send("Email already validated")
+    return
+  }
+
+  const validate = await holster.SEA.decrypt(account.validate, user.is)
+  if (validate !== req.body.validate) {
+    res.status(400).send("Validation code does not match")
+    return
+  }
+
   user
     .get("accounts")
-    .get(code)
-    .once(async account => {
-      if (!account) {
-        res.status(404).send("Account not found")
-        return
-      }
-      if (!account.validate) {
-        res.send("Email already validated")
+    .next(code)
+    .put({validate: null}, err => {
+      if (err) {
+        console.log(err)
+        res.status(500).send("Host error")
         return
       }
 
-      const validate = await Gun.SEA.decrypt(account.validate, user._.sea)
-      if (validate !== req.body.validate) {
-        res.status(400).send("Validation code does not match")
-        return
-      }
-
-      user
-        .get("accounts")
-        .get(code)
-        .put({validate: null}, ack => {
-          if (ack.err) console.log(ack.err)
-        })
       res.send("Email validated")
     })
 })
 
-app.post("/reset-password", (req, res) => {
+app.post("/reset-password", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("Invite code required")
@@ -344,54 +342,56 @@ app.post("/reset-password", (req, res) => {
     return
   }
 
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account) {
+    res.status(404).send("Account not found")
+    return
+  }
+
+  let increment = 0
+  const match = account.username.match(/\.(\d)$/)
+  if (match) {
+    increment = Number(match[1])
+  }
+  if (increment === 9) {
+    res.status(400).send("Too many password resets")
+    return
+  }
+
+  const email = await holster.SEA.decrypt(account.email, user.is)
+  if (email !== req.body.email) {
+    res.status(400).send("Email does not match invite code")
+    return
+  }
+  if (account.validate) {
+    res.status(400).send("Please validate your email first")
+    return
+  }
+
+  const reset = newCode()
+  const remaining = 8 - increment
+  const data = {
+    reset: await holster.SEA.encrypt(reset, user.is),
+    expiry: Date.now() + 86400000,
+  }
   user
     .get("accounts")
-    .get(code)
-    .once(async account => {
-      if (!account) {
-        res.status(404).send("Account not found")
+    .next(code)
+    .put(data, err => {
+      if (err) {
+        console.log(err)
+        res.status(500).send("Host error")
         return
       }
-
-      let increment = 0
-      const match = account.alias.match(/\.(\d)$/)
-      if (match) {
-        increment = Number(match[1])
-      }
-      if (increment === 9) {
-        res.status(400).send("Too many password resets")
-        return
-      }
-
-      const email = await Gun.SEA.decrypt(account.email, user._.sea)
-      if (email !== req.body.email) {
-        res.status(400).send("Email does not match invite code")
-        return
-      }
-      if (account.validate) {
-        res.status(400).send("Please validate your email first")
-        return
-      }
-
-      const reset = newCode()
-      const remaining = 8 - increment
-      const data = {
-        reset: await Gun.SEA.encrypt(reset, user._.sea),
-        expiry: Date.now() + 86400000,
-      }
-      user
-        .get("accounts")
-        .get(code)
-        .put(data, ack => {
-          if (ack.err) console.log(ack.err)
-        })
 
       resetPassword(account.name, remaining, email, code, reset)
       res.send("Reset password email sent")
     })
 })
 
-app.post("/update-password", (req, res) => {
+app.post("/update-password", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("Invite code required")
@@ -405,7 +405,11 @@ app.post("/update-password", (req, res) => {
     res.status(400).send("Public key required")
     return
   }
-  if (!req.body.alias) {
+  if (!req.body.epub) {
+    res.status(400).send("Epub key required")
+    return
+  }
+  if (!req.body.username) {
     res.status(400).send("Username required")
     return
   }
@@ -418,46 +422,83 @@ app.post("/update-password", (req, res) => {
     return
   }
 
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account) {
+    res.status(404).send("Account not found")
+    return
+  }
+  if (!account.reset) {
+    res.status(404).send("Reset code not found")
+    return
+  }
+  if (!account.expiry || account.expiry < Date.now()) {
+    res.status(400).send("Reset code has expired")
+    return
+  }
+
+  const reset = await holster.SEA.decrypt(account.reset, user.is)
+  if (reset !== req.body.reset) {
+    res.status(400).send("Reset code does not match")
+    return
+  }
+
+  const data = {
+    pub: req.body.pub,
+    epub: req.body.epub,
+    username: req.body.username,
+    name: req.body.name,
+    prev: account.pub,
+  }
   user
     .get("accounts")
-    .get(code)
-    .once(async account => {
-      if (!account) {
-        res.status(404).send("Account not found")
-        return
-      }
-      if (!account.reset) {
-        res.status(404).send("Reset code not found")
-        return
-      }
-      if (!account.expiry || account.expiry < Date.now()) {
-        res.status(400).send("Reset code has expired")
+    .next(code)
+    .put(data, err => {
+      if (err) {
+        console.log(err)
+        res.status(500).send("Host error")
         return
       }
 
-      const reset = await Gun.SEA.decrypt(account.reset, user._.sea)
-      if (reset !== req.body.reset) {
-        res.status(400).send("Reset code does not match")
-        return
-      }
+      user.get("accountMap" + req.body.pub).put(code, err => {
+        if (err) {
+          console.log(err)
+          res.status(500).send("Host error")
+          return
+        }
 
-      const data = {
-        pub: req.body.pub,
-        alias: req.body.alias,
-        name: req.body.name,
-        prev: account.pub,
-      }
-      user
-        .get("accounts")
-        .get(code)
-        .put(data, ack => {
-          if (ack.err) console.log(ack.err)
-        })
-      res.send(account.pub)
+        // Also update shared invite codes for this account.
+        user
+          .get("shared")
+          .next("invite_codes")
+          .next(code, async codes => {
+            if (codes) {
+              const oldSecret = await holster.SEA.secret(account, user.is)
+              const newSecret = await holster.SEA.secret(data, user.is)
+              for (const [key, encrypted] of Object.entries(codes)) {
+                if (!key || !encrypted) continue
+
+                const dec = await holster.SEA.decrypt(encrypted, oldSecret)
+                const shared = await holster.SEA.encrypt(dec, newSecret)
+                const err = await new Promise(res => {
+                  user
+                    .get("shared")
+                    .next("invite_codes")
+                    .next(code)
+                    .next(key)
+                    .put(shared, res)
+                })
+                if (err) console.log(err)
+              }
+            }
+            res.send(account.pub)
+          })
+      })
     })
 })
 
-app.post("/add-feed", (req, res) => {
+app.post("/add-feed", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send({error: "code required"})
@@ -472,101 +513,99 @@ app.post("/add-feed", (req, res) => {
     return
   }
 
-  user
-    .get("accounts")
-    .get(code)
-    .once(async account => {
-      if (!account) {
-        res.status(404).send({error: "Account not found"})
-        return
-      }
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account) {
+    res.status(404).send({error: "Account not found"})
+    return
+  }
 
-      const url = await Gun.SEA.verify(req.body.url, account.pub)
-      if (!url) {
-        res.status(400).send({error: "Could not verify signed url"})
-        return
-      }
+  const url = await holster.SEA.verify(req.body.url, account)
+  if (!url) {
+    res.status(400).send({error: "Could not verify signed url"})
+    return
+  }
 
-      if (account.subscribed === account.feeds) {
-        res
-          .status(400)
-          .send(`Account currently has a limit of ${account.feeds} feeds`)
-        return
-      }
+  if (account.subscribed === account.feeds) {
+    res
+      .status(400)
+      .send(`Account currently has a limit of ${account.feeds} feeds`)
+    return
+  }
 
-      if (!addFeedUrl || !addFeedID || !addFeedApiKey) {
-        res.status(500).send({error: "Could not add feed, env not set"})
-        return
-      }
+  if (!addFeedUrl || !addFeedID || !addFeedApiKey) {
+    res.status(500).send({error: "Could not add feed, env not set"})
+    return
+  }
 
-      try {
-        const add = await fetch(addFeedUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: `id=${addFeedID}&key=${addFeedApiKey}&action=add-feed&xmlUrl=${encodeURIComponent(url)}`,
-        })
-        if (!add.ok) {
-          console.log("Error from", addFeedUrl, url, add.statusText)
-          res.status(500).send({error: "Error adding feed"})
+  try {
+    const add = await fetch(addFeedUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: `id=${addFeedID}&key=${addFeedApiKey}&action=add-feed&xmlUrl=${encodeURIComponent(url)}`,
+    })
+    if (!add.ok) {
+      console.log("Error from", addFeedUrl, url, add.statusText)
+      res.status(500).send({error: "Error adding feed"})
+      return
+    }
+
+    const feed = await add.json()
+    if (feed.error) {
+      console.log("Error from", addFeedUrl, url)
+      console.log(feed.error)
+      res.status(500).send({error: "Error adding feed"})
+      return
+    }
+
+    if (!feed.add || !feed.add.url || !feed.add.title) {
+      console.log("No feed data from", addFeedUrl, url)
+      console.log(feed)
+      res.status(500).send({error: "Error adding feed"})
+      return
+    }
+
+    const data = {
+      title: feed.add.title,
+      description: feed.add.description ?? "",
+      html_url: feed.add.html_url ?? "",
+      language: feed.add.language ?? "",
+      image: feed.add.image ?? "",
+      subscriber_count: 1,
+    }
+    user
+      .get("feeds")
+      .next(feed.add.url)
+      .put(data, err => {
+        if (err) {
+          console.log(err)
+          res.status(500).send("Error saving feed")
           return
         }
 
-        const feed = await add.json()
-        if (feed.error) {
-          console.log("Error from", addFeedUrl, url)
-          console.log(feed.error)
-          res.status(500).send({error: "Error adding feed"})
-          return
-        }
-
-        if (!feed.add || !feed.add.url || !feed.add.title) {
-          console.log("No feed data from", addFeedUrl, url)
-          console.log(feed)
-          res.status(500).send({error: "Error adding feed"})
-          return
-        }
-
-        const data = {
-          title: feed.add.title,
-          description: feed.add.description,
-          html_url: feed.add.html_url,
-          language: feed.add.language,
-          image: feed.add.image,
-          subscriber_count: 1,
-        }
         user
-          .get("feeds")
-          .get(feed.add.url)
-          .put(data, ack => {
-            if (ack.err) {
-              console.log(ack.err)
-              res.status(500).send("Error saving feed")
+          .get("accounts")
+          .next(code)
+          .put({subscribed: account.subscribed + 1}, err => {
+            if (err) {
+              console.log(err)
+              res.status(500).send("Error adding to account subscribed")
               return
             }
 
-            user
-              .get("accounts")
-              .get(code)
-              .put({subscribed: account.subscribed + 1}, ack => {
-                if (ack.err) {
-                  console.log(ack.err)
-                  res.status(500).send("Error adding to account subscribed")
-                  return
-                }
-
-                res.send(feed)
-              })
+            res.send(feed)
           })
-      } catch (error) {
-        console.log(error)
-        res.status(500).send({error: "Error adding feed"})
-      }
-    })
+      })
+  } catch (error) {
+    console.log(error)
+    res.status(500).send({error: "Error adding feed"})
+  }
 })
 
-app.post("/add-subscriber", (req, res) => {
+app.post("/add-subscriber", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send({error: "code required"})
@@ -578,69 +617,65 @@ app.post("/add-subscriber", (req, res) => {
   }
   if (!user.is) {
     res.status(500).send("Host error")
+    return
+  }
+
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account) {
+    res.status(404).send({error: "Account not found"})
+    return
+  }
+
+  const url = await holster.SEA.verify(req.body.url, account)
+  if (!url) {
+    res.status(400).send({error: "Could not verify signed url"})
+    return
+  }
+
+  if (account.subscribed === account.feeds) {
+    res
+      .status(400)
+      .send(`Account currently has a limit of ${account.feeds} feeds`)
+    return
+  }
+
+  const feed = await new Promise(res => {
+    user.get("feeds").next(url, res)
+  })
+  if (!feed) {
+    console.log("Feed not found for add-subscriber", url)
+    res.end()
     return
   }
 
   user
-    .get("accounts")
-    .get(code)
-    .once(async account => {
-      if (!account) {
-        res.status(404).send({error: "Account not found"})
-        return
-      }
-
-      const url = await Gun.SEA.verify(req.body.url, account.pub)
-      if (!url) {
-        res.status(400).send({error: "Could not verify signed url"})
-        return
-      }
-
-      if (account.subscribed === account.feeds) {
-        res
-          .status(400)
-          .send(`Account currently has a limit of ${account.feeds} feeds`)
+    .get("feeds")
+    .next(url)
+    .put({subscriber_count: feed.subscriber_count + 1}, err => {
+      if (err) {
+        console.log(err)
+        res.status(500).send("Error adding to feed subscriber_count")
         return
       }
 
       user
-        .get("feeds")
-        .get(url)
-        .once(feed => {
-          if (!feed) {
-            console.log("Feed not found for add-subscriber", url)
-            res.end()
+        .get("accounts")
+        .next(code)
+        .put({subscribed: account.subscribed + 1}, err => {
+          if (err) {
+            console.log(err)
+            res.status(500).send("Error adding to account subscribed")
             return
           }
 
-          user
-            .get("feeds")
-            .get(url)
-            .put({subscriber_count: feed.subscriber_count + 1}, ack => {
-              if (ack.err) {
-                console.log(ack.err)
-                res.status(500).send("Error adding to feed subscriber_count")
-                return
-              }
-
-              user
-                .get("accounts")
-                .get(code)
-                .put({subscribed: account.subscribed + 1}, ack => {
-                  if (ack.err) {
-                    console.log(ack.err)
-                    res.status(500).send("Error adding to account subscribed")
-                    return
-                  }
-
-                  res.end()
-                })
-            })
+          res.end()
         })
     })
 })
 
-app.post("/remove-subscriber", (req, res) => {
+app.post("/remove-subscriber", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send({error: "code required"})
@@ -655,7 +690,36 @@ app.post("/remove-subscriber", (req, res) => {
     return
   }
 
-  const removeFeed = async url => {
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account) {
+    res.status(404).send({error: "Account not found"})
+    return
+  }
+
+  const url = await holster.SEA.verify(req.body.url, account)
+  if (!url) {
+    res.status(400).send({error: "Could not verify signed url"})
+    return
+  }
+
+  const feed = await new Promise(res => {
+    user.get("feeds").next(url, res)
+  })
+  if (!feed) {
+    console.log("Feed not found for remove-subscriber", url)
+    res.end()
+    return
+  }
+
+  if (feed.subscriber_count === 0) {
+    console.log("remove-subscriber called but subscriber_count is 0", url)
+    res.end()
+    return
+  }
+
+  if (feed.subscriber_count === 1) {
     if (!addFeedUrl || !addFeedID || !addFeedApiKey) {
       console.log("Could not remove feed, env not set")
       return
@@ -678,62 +742,31 @@ app.post("/remove-subscriber", (req, res) => {
   }
 
   user
-    .get("accounts")
-    .get(code)
-    .once(async account => {
-      if (!account) {
-        res.status(404).send({error: "Account not found"})
+    .get("feeds")
+    .next(url)
+    .put({subscriber_count: feed.subscriber_count - 1}, err => {
+      if (err) {
+        console.log(err)
+        res.status(500).send("Error removing from subscriber_count")
         return
       }
 
-      const url = await Gun.SEA.verify(req.body.url, account.pub)
-      if (!url) {
-        res.status(400).send({error: "Could not verify signed url"})
-        return
-      }
-
-      const userFeed = user.get("feeds").get(url)
-      userFeed.once(feed => {
-        if (!feed) {
-          console.log("Feed not found for remove-subscriber", url)
-          res.end()
-          return
-        }
-
-        if (feed.subscriber_count === 0) {
-          console.log("remove-subscriber called but subscriber_count is 0", url)
-          res.end()
-          return
-        }
-
-        if (feed.subscriber_count === 1) {
-          removeFeed(url)
-        }
-        userFeed.put({subscriber_count: feed.subscriber_count - 1}, ack => {
-          if (ack.err) {
-            console.log(ack.err)
-            res.status(500).send("Error removing from subscriber_count")
+      user
+        .get("accounts")
+        .next(code)
+        .put({subscribed: account.subscribed - 1}, err => {
+          if (err) {
+            console.log(err)
+            res.status(500).send("Error removing from account subscribed")
             return
           }
 
-          user
-            .get("accounts")
-            .get(code)
-            .put({subscribed: account.subscribed - 1}, ack => {
-              if (ack.err) {
-                console.log(ack.err)
-                res.status(500).send("Error removing from account subscribed")
-                return
-              }
-
-              res.end()
-            })
+          res.end()
         })
-      })
     })
 })
 
-app.post("/private/create-invite-codes", (req, res) => {
+app.post("/private/create-invite-codes", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("code required")
@@ -744,40 +777,26 @@ app.post("/private/create-invite-codes", (req, res) => {
     return
   }
 
-  user
-    .get("accounts")
-    .get(code)
-    .once(account => {
-      if (!account) {
-        res.status(404).send("Account not found")
-        return
-      }
-      if (account.validate) {
-        res.status(400).send("Email not validated")
-        return
-      }
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account || !account.epub) {
+    res.status(404).send("Account not found")
+    return
+  }
+  if (account.validate) {
+    res.status(400).send("Email not validated")
+    return
+  }
 
-      gun
-        .user(account.pub)
-        .get("epub")
-        .once(async epub => {
-          if (!epub) {
-            res.status(404).send("User not found for public key")
-            return
-          }
+  if (await createInviteCodes(req.body.count || 1, code, account)) {
+    res.end()
+    return
+  }
 
-          if (await createInviteCodes(req.body.count || 1, code, epub)) {
-            res.end()
-            return
-          }
-
-          res
-            .status(500)
-            .send(
-              "Error creating codes. Please check the logs for errors and try again",
-            )
-        })
-    })
+  res
+    .status(500)
+    .send("Error creating codes. Please check logs for errors and try again")
 })
 
 app.post("/private/send-invite-code", (req, res) => {
@@ -797,7 +816,7 @@ app.post("/private/send-invite-code", (req, res) => {
   res.end()
 })
 
-app.post("/private/update-feed-limit", (req, res) => {
+app.post("/private/update-feed-limit", async (req, res) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("code required")
@@ -813,25 +832,28 @@ app.post("/private/update-feed-limit", (req, res) => {
     return
   }
 
+  const account = await new Promise(res => {
+    user.get("accounts").next(code, res)
+  })
+  if (!account) {
+    res.status(404).send("Account not found")
+    return
+  }
+  if (account.validate) {
+    res.status(400).send("Email not validated")
+    return
+  }
+
   user
     .get("accounts")
-    .get(code)
-    .once(account => {
-      if (!account) {
-        res.status(404).send("Account not found")
-        return
-      }
-      if (account.validate) {
-        res.status(400).send("Email not validated")
+    .next(code)
+    .put({feeds: limit}, err => {
+      if (err) {
+        console.log(err)
+        res.status(500).send("Error updating feed limit")
         return
       }
 
-      user
-        .get("accounts")
-        .get(code)
-        .put({feeds: limit}, ack => {
-          if (ack.err) console.log(ack.err)
-        })
       res.end()
     })
 })
@@ -856,10 +878,10 @@ app.post("/private/remove-feed", (req, res) => {
   }
   user
     .get("feeds")
-    .get(req.body.url)
-    .put(data, ack => {
-      if (ack.err) {
-        console.log(ack.err)
+    .next(req.body.url)
+    .put(data, err => {
+      if (err) {
+        console.log(err)
         res.status(500).send("Error removing feed")
         return
       }
@@ -897,86 +919,83 @@ app.post("/private/add-item", (req, res) => {
   setTimeout(async () => {
     lastSaved = Date.now()
     const twoWeeksAgo = lastSaved - 1209600000
-    const guid = req.body.guid
     const enclosure = mapEnclosure(req.body.enclosure)
     const category = mapCategory(req.body.category)
     // Check if the item already has a key stored for it's guid.
-    let key = await user.get("guids" + guid).then()
+    let key = await new Promise(res => {
+      user.get("guids" + req.body.guid, res)
+    })
     if (!key) {
       // Try and use the item's timestamp as the key if it's not already used.
       const t = req.body.timestamp
-      const used = await user
-        .get("items" + day(t))
-        .get(t)
-        .then()
-      key = used ? lastSaved : t
-      user.get("guids" + guid).put(key, ack => {
-        if (ack.err) console.log(ack.err)
+      const used = await new Promise(res => {
+        user.get("items" + day(t)).next(t, res)
       })
+      key = used ? lastSaved : t
+      const err = await new Promise(res => {
+        user.get("guids" + req.body.guid).put(key, res)
+      })
+      if (err) console.log(err)
     }
     if (key > twoWeeksAgo) {
       const data = {
-        title: req.body.title,
-        content: req.body.content,
-        author: req.body.author,
-        permalink: req.body.permalink,
-        guid: guid,
+        title: req.body.title ?? "",
+        content: req.body.content ?? "",
+        author: req.body.author ?? "",
+        permalink: req.body.permalink ?? "",
+        guid: req.body.guid,
         timestamp: key,
         url: req.body.url,
       }
       if (enclosure) data.enclosure = enclosure
       if (category) data.category = category
-      const item = user.get("items" + day(key)).get(key)
-      let cb = false
-      item.put(data, ack => {
-        cb = true
-        if (ack.err) {
-          console.log(ack.err)
-          res.status(500).send("Error saving item")
-          return
-        }
-
-        res.end()
+      const err = await new Promise(res => {
+        user
+          .get("items" + day(key))
+          .next(key)
+          .put(data, res)
       })
-      setTimeout(() => {
-        if (!cb) {
-          res.status(500).send("No callback - exiting")
-          console.log("No callback - exiting")
-          // This is bad but storing data seems to recover when the process
-          // restarts. Need to work out what the actual problem is.
-          process.exit(1)
-        }
-      }, 3000)
+      if (err) {
+        console.log(err)
+        res.status(500).send("Error saving item")
+        return
+      }
+
+      res.end()
     } else {
       // Ignore items that are older than 2 weeks.
       res.end()
     }
 
-    // Also remove any items older than 2 weeks.
+    // Continue after response to also remove items older than 2 weeks.
     const dayKey = day(twoWeeksAgo)
     if (removeDays.has(dayKey)) return
 
     removeDays.add(dayKey)
-    user.get("removed" + dayKey).once(removed => {
-      if (removed) return
+    const removed = await new Promise(res => {
+      user.get("removed" + dayKey, res)
+    })
+    if (removed) return
 
-      user
-        .get("items" + dayKey)
-        .map()
-        .once((item, key) => {
-          if (!item) return
+    const items = await new Promise(res => {
+      user.get("items" + dayKey, res)
+    })
+    if (!items) return
 
-          user
-            .get("items" + dayKey)
-            .get(key)
-            .put(null, ack => {
-              if (ack.err) console.log(ack.err)
-            })
-        })
-      // Flag this day as removed.
-      user.get("removed" + dayKey).put(true, ack => {
-        if (ack.err) console.log(ack.err)
+    for (const [key, item] of Object.entries(items)) {
+      if (!item) continue
+
+      const err = await new Promise(res => {
+        user
+          .get("items" + dayKey)
+          .next(key)
+          .put(null, res)
       })
+      if (err) console.log(err)
+    }
+    // Flag this day as removed.
+    user.get("removed" + dayKey).put(true, err => {
+      if (err) console.log(err)
     })
   }, wait)
 })
@@ -1042,23 +1061,23 @@ function newCode() {
   return code
 }
 
-function auth(ack) {
-  if (!ack.err) {
-    console.log(alias + " logged in")
+function auth(err) {
+  if (!err) {
+    console.log(username + " logged in")
     mapInviteCodes()
     return
   }
 
-  console.log("No auth - creating an account for " + alias)
-  user.create(alias, pass, ack => {
-    if (ack.err) {
-      console.log(ack.err)
+  console.log("No auth - creating an account for " + username)
+  user.create(username, password, err => {
+    if (err) {
+      console.log(err)
       return
     }
 
-    user.auth(alias, pass, async ack => {
-      if (ack.err) {
-        console.log(ack.err)
+    user.auth(username, password, async err => {
+      if (err) {
+        console.log(err)
         return
       }
 
@@ -1066,14 +1085,14 @@ function auth(ack) {
       // with it, but once it's been claimed all invite codes that get created
       // will have an owner code that get stored as the referring account.
       console.log("Creating admin invite code")
-      const enc = await Gun.SEA.encrypt({code: "admin", owner: ""}, user._.sea)
+      const enc = await holster.SEA.encrypt({code: "admin", owner: ""}, user.is)
       user
         .get("available")
-        .get("invite_codes")
-        .set(enc, ack => {
-          if (ack.err) console.log(ack.err)
+        .next("invite_codes")
+        .put(enc, true, err => {
+          if (err) console.log(err)
+          else mapInviteCodes()
         })
-      mapInviteCodes()
     })
   })
 }
@@ -1084,21 +1103,18 @@ function mapInviteCodes() {
     return
   }
 
-  // map subscribes to invite_codes, so this will also be called when new
-  // invite codes are created.
-  user
-    .get("available")
-    .get("invite_codes")
-    .map()
-    .once(async (enc, key) => {
-      if (!enc || !key) return
+  const mapCodes = async codes => {
+    if (!codes) return
 
-      const invite = await Gun.SEA.decrypt(enc, user._.sea)
-      if (!inviteCodes.has(invite.code)) {
+    for (const [key, enc] of Object.entries(codes)) {
+      const invite = await holster.SEA.decrypt(enc, user.is)
+      if (invite && !inviteCodes.has(invite.code)) {
         invite.key = key
         inviteCodes.set(invite.code, invite)
       }
-    })
+    }
+  }
+  user.get("available").next("invite_codes").on(mapCodes, true)
 }
 
 // day is a helper function that returns the zero timestamp on the day of the
@@ -1110,7 +1126,11 @@ function day(key) {
 }
 
 async function checkCodes(newCodes) {
-  const codes = Object.keys(await user.get("accounts").then())
+  const codes = Object.keys(
+    await new Promise(res => {
+      user.get("accounts", res)
+    }),
+  )
   for (let i = 0; i < newCodes.length; i++) {
     if (codes.includes(newCodes[i])) return false
     if (inviteCodes.has(newCodes[i])) return false
@@ -1154,7 +1174,7 @@ async function checkHosts(newCodes) {
 
   // Notes for further federated updates:
   // Other hosts can decide if they want to allow logins from federated user
-  // accounts by listening to get("accounts").map().on() for each of the known
+  // accounts by listening to get("accounts").on() for each of the known
   // federated hosts and adding them to their own list of accounts. "host" is
   // provided in the account data to point users to their host server, but the
   // user could provide their email to another host to allow password resets
@@ -1164,7 +1184,7 @@ async function checkHosts(newCodes) {
   // store their own validation code.
 }
 
-async function createInviteCodes(count, owner, epub) {
+async function createInviteCodes(count, owner, account) {
   let i = 0
   let newCodes = []
   while (i++ < count) {
@@ -1177,26 +1197,27 @@ async function createInviteCodes(count, owner, epub) {
     return false
   }
 
-  const secret = await Gun.SEA.secret(epub, user._.sea)
+  const secret = await holster.SEA.secret(account, user.is)
   for (let i = 0; i < newCodes.length; i++) {
-    let invite = {code: newCodes[i], owner: owner}
-    let enc = await Gun.SEA.encrypt(invite, user._.sea)
-    user
-      .get("available")
-      .get("invite_codes")
-      .set(enc, ack => {
-        if (ack.err) console.log(ack.err)
-        else console.log("New invite code available", invite)
-      })
-    let shared = await Gun.SEA.encrypt(newCodes[i], secret)
-    user
-      .get("shared")
-      .get("invite_codes")
-      .get(owner)
-      .set(shared, ack => {
-        if (ack.err) console.log(ack.err)
-        else console.log("Shared invite code", invite)
-      })
+    const invite = {code: newCodes[i], owner: owner}
+    const enc = await holster.SEA.encrypt(invite, user.is)
+    let err = await new Promise(res => {
+      user.get("available").next("invite_codes").put(enc, true, res)
+    })
+    if (err) {
+      console.log(err)
+      return false
+    }
+
+    console.log("New invite code available", invite)
+    const shared = await holster.SEA.encrypt(newCodes[i], secret)
+    err = await new Promise(res => {
+      user.get("shared").next("invite_codes").next(owner).put(shared, true, res)
+    })
+    if (err) {
+      console.log(err)
+      return false
+    }
   }
   return true
 }
@@ -1269,6 +1290,6 @@ function mail(email, subject, message, bcc) {
       console.log(err)
       return
     }
-    console.log(info)
+    console.log("mail", info)
   })
 }

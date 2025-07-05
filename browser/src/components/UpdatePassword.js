@@ -15,34 +15,23 @@ import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import SearchAppBar from "./SearchAppBar"
 
-import Gun from "gun"
-require("gun/lib/radix.js")
-require("gun/lib/radisk.js")
-require("gun/lib/store.js")
-require("gun/lib/rindexed.js")
-require("gun/sea")
-
-const gun = Gun({
-  peers: [
-    window.location.hostname === "localhost"
-      ? "http://localhost:8765/gun"
-      : window.location.origin + "/gun",
-  ],
-  axe: false,
-  secure: true,
-  localStorage: false,
-  store: window.RindexedDB(),
-})
-
-const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
-  const [username, setUsername] = useState(current ?? "")
+const UpdatePassword = ({
+  user,
+  loggedIn,
+  current,
+  code,
+  reset,
+  mode,
+  setMode,
+}) => {
+  const [name, setName] = useState(current ?? "")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState(loggedIn ? "Already logged in" : "")
   const [disabledButton, setDisabledButton] = useState(loggedIn)
 
-  const update = alias => {
-    if (!alias) {
+  const update = username => {
+    if (!username) {
       setMessage("Please choose a username")
       return
     }
@@ -50,11 +39,10 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
     setDisabledButton(true)
     setMessage("Updating password...")
 
-    const user = gun.user()
-    user.create(alias, password, ack => {
-      if (ack.err) {
-        if (ack.err === "User already created!") {
-          let match = alias.match(/^(\w+)\.(\d)$/)
+    user.create(username, password, err => {
+      if (err) {
+        if (err === "Username already exists") {
+          let match = username.match(/^(\w+)\.(\d)$/)
           if (match) {
             let increment = Number(match[2]) + 1
             if (increment === 10) {
@@ -65,18 +53,18 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
             update(`${match[1]}.${increment}`)
             return
           }
-          update(`${alias}.1`)
+          update(`${username}.1`)
           return
         }
         setDisabledButton(false)
-        setMessage(ack.err)
+        setMessage(err)
         return
       }
 
-      user.auth(alias, password, ack => {
-        if (ack.err) {
+      user.auth(username, password, err => {
+        if (err) {
           setDisabledButton(false)
-          setMessage(ack.err)
+          setMessage(err)
           return
         }
 
@@ -89,122 +77,26 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
             code: code ?? null,
             reset: reset ?? null,
             pub: user.is.pub,
-            alias: alias,
-            name: username,
+            epub: user.is.epub,
+            username: username,
+            name: name,
           }),
         })
           .then(res => res.text().then(text => ({ok: res.ok, text: text})))
           .then(res => {
             if (!res.ok) {
               setDisabledButton(false)
-              user.delete(alias, password)
+              user.delete(username, password)
               setMessage(res.text)
               return
             }
 
-            // The previous public key is returned to copy over public user
-            // data. Need to go through all items that should be copied and
-            // create new plain objects since the old data references the
-            // previous account.
-            let oldPublic = gun.user(res.text).get("public")
-            oldPublic
-              .get("contacts")
-              .map()
-              .once((contact, contactCode) => {
-                if (!contact || !contactCode) return
-
-                let update = {
-                  pub: contact.pub,
-                  alias: contact.alias,
-                  name: contact.name,
-                  ref: contact.ref,
-                  host: contact.host,
-                }
-                user
-                  .get("public")
-                  .get("contacts")
-                  .get(contactCode)
-                  .put(update, ack => {
-                    if (ack.err) {
-                      console.error(ack.err)
-                    }
-                  })
+            // The previous public key is returned to copy public user data.
+            user.get([res.text, "public"], data => {
+              user.get("public").put(data, err => {
+                if (err) console.error(err)
               })
-
-            // Nested objects (like feeds here) need to be dereferenced and gun
-            // data removed before they can be copied to the new user.
-            oldPublic
-              .get("groups")
-              .map()
-              .once((group, groupName) => {
-                if (!group || !groupName) return
-
-                oldPublic
-                  .get("groups")
-                  .get(groupName)
-                  .get("feeds")
-                  .once(feeds => {
-                    if (!feeds) return
-
-                    delete feeds._
-                    let update = {
-                      feeds: feeds,
-                      updated: group.updated,
-                    }
-                    user
-                      .get("public")
-                      .get("groups")
-                      .get(groupName)
-                      .put(update, ack => {
-                        if (ack.err) {
-                          console.error(ack.err)
-                        }
-                      })
-                  })
-              })
-
-            oldPublic
-              .get("feeds")
-              .map()
-              .once((feed, url) => {
-                if (!feed || !url) return
-
-                let update = {
-                  title: feed.title,
-                  description: feed.description,
-                  html_url: feed.html_url,
-                  language: feed.language,
-                  image: feed.image,
-                }
-                user
-                  .get("public")
-                  .get("feeds")
-                  .get(url)
-                  .put(update, ack => {
-                    if (ack.err) {
-                      console.error(ack.err)
-                    }
-                  })
-              })
-
-            oldPublic
-              .get("settings")
-              .map()
-              .once((value, key) => {
-                if (!value || !key) return
-
-                user
-                  .get("public")
-                  .get("settings")
-                  .get(key)
-                  .put(value, ack => {
-                    if (ack.err) {
-                      console.error(ack.err)
-                    }
-                  })
-              })
-
-            // Note: Any new public data needs to also be copied over here.
+            })
 
             setMessage("Password updated")
             setTimeout(() => {
@@ -231,8 +123,8 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
                   variant="outlined"
                   fullWidth={true}
                   margin="normal"
-                  value={username}
-                  onChange={event => setUsername(event.target.value)}
+                  value={name}
+                  onChange={event => setName(event.target.value)}
                 />
                 <FormControl
                   variant="outlined"
@@ -263,7 +155,7 @@ const UpdatePassword = ({loggedIn, current, code, reset, mode, setMode}) => {
                   sx={{mt: 1}}
                   variant="contained"
                   disabled={disabledButton}
-                  onClick={() => update(username)}
+                  onClick={() => update(name)}
                 >
                   Submit
                 </Button>

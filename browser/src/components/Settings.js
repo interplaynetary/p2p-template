@@ -20,53 +20,57 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import {buildDate} from "../utils/buildDate.js"
 import SearchAppBar from "./SearchAppBar"
 
-import Gun from "gun"
-require("gun/lib/radix.js")
-require("gun/lib/radisk.js")
-require("gun/lib/store.js")
-require("gun/lib/rindexed.js")
-require("gun/sea")
-
-const Settings = ({host, user, code, mode, setMode}) => {
+const Settings = ({user, host, code, mode, setMode}) => {
   const [name] = useState(() => {
     return sessionStorage.getItem("name") || ""
   })
   const [invites, setInvites] = useState([])
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const [message, setMessage] = useState("")
   const [disabledButton, setDisabledButton] = useState(false)
   const interval = useRef(0)
 
   useEffect(() => {
-    if (!host || !user || !code) return
+    if (!user || !host || !code) return
 
     let set = false
     const updated = new Map()
-    host.get("epub").once(async epub => {
-      if (!epub) {
-        console.error("No epub for host!")
-        return
-      }
-
-      const secret = await Gun.SEA.secret(epub, user._.sea)
-      const shared = host.get("shared").get("invite_codes").get(code)
-      const update = async (enc, key) => {
-        if (!key) return
-
-        if (enc) {
-          updated.set(key, {
-            key: key,
-            code: await Gun.SEA.decrypt(enc, secret),
-          })
-        } else {
-          updated.delete(key)
+    // Wait for websocket to connect.
+    setTimeout(() => {
+      user.get([host, "epub"], async epub => {
+        if (!epub) {
+          console.error("No epub for host!")
+          return
         }
-        set = true
-      }
-      shared.map().once(update)
-      shared.map().on(update)
-    })
+
+        const secret = await user.SEA.secret({epub: epub}, user.is)
+        const update = async codes => {
+          if (!codes) return
+
+          for (const [key, enc] of Object.entries(codes)) {
+            if (!key) continue
+
+            if (enc) {
+              updated.set(key, {
+                key: key,
+                code: await user.SEA.decrypt(enc, secret),
+              })
+            } else {
+              updated.delete(key)
+            }
+            set = true
+          }
+        }
+        user
+          .get([host, "shared"])
+          .next("invite_codes")
+          .next(code)
+          .on(update, true)
+      })
+    }, 1000)
     // Batch the update otherwise there are too many calls to setInvites.
     clearInterval(interval.current)
     interval.current = setInterval(() => {
@@ -75,7 +79,7 @@ const Settings = ({host, user, code, mode, setMode}) => {
       setInvites([...updated.values()])
       set = false
     }, 1000)
-  }, [host, user, code])
+  }, [user, host, code])
 
   const select = target => {
     const li = target.closest("li")
@@ -89,24 +93,25 @@ const Settings = ({host, user, code, mode, setMode}) => {
 
   const changePassword = () => {
     if (!password) {
+      setMessage("Please provide your current password")
+      return
+    }
+
+    if (!newPassword) {
       setMessage("Please provide a new password")
       return
     }
 
     setDisabledButton(true)
     setMessage("Updating password...")
-    user.auth(
-      user._.sea,
-      ack => {
-        setDisabledButton(false)
-        if (ack.err) {
-          setMessage(ack.err)
-        } else {
-          setMessage("Password updated")
-        }
-      },
-      {change: password},
-    )
+    user.change(user.is.username, password, newPassword, err => {
+      setDisabledButton(false)
+      if (err) {
+        setMessage(err)
+      } else {
+        setMessage("Password updated")
+      }
+    })
   }
 
   return (
@@ -166,11 +171,11 @@ const Settings = ({host, user, code, mode, setMode}) => {
                   onChange={event => setPassword(event.target.value)}
                 >
                   <InputLabel htmlFor="settings-password">
-                    New Password
+                    Current Password
                   </InputLabel>
                   <OutlinedInput
                     id="settings-password"
-                    autoComplete="new-password"
+                    autoComplete="password"
                     type={showPassword ? "text" : "password"}
                     endAdornment={
                       <InputAdornment position="end">
@@ -183,7 +188,35 @@ const Settings = ({host, user, code, mode, setMode}) => {
                         </IconButton>
                       </InputAdornment>
                     }
-                    label="Password"
+                    label="Current Password"
+                  />
+                </FormControl>
+                <FormControl
+                  variant="outlined"
+                  fullWidth={true}
+                  margin="normal"
+                  value={newPassword}
+                  onChange={event => setNewPassword(event.target.value)}
+                >
+                  <InputLabel htmlFor="settings-password">
+                    New Password
+                  </InputLabel>
+                  <OutlinedInput
+                    id="settings-new-password"
+                    autoComplete="new-password"
+                    type={showNewPassword ? "text" : "password"}
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label="toggle new password visibility"
+                          onClick={() => setShowNewPassword(show => !show)}
+                          edge="end"
+                        >
+                          {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                    label="New Password"
                   />
                 </FormControl>
                 <Button

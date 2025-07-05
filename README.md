@@ -1,6 +1,6 @@
-RSStream is a local first web application that use a distributed database in
-the browser called [GunDB](https://gun.eco). The server runs a
-[Node.js](https://nodejs.org) app that listens for feed updates from
+RSStream is a local first web application that uses a distributed database in
+the browser called [Holster](https://github.com/mblaney/holster). The server
+runs a [Node.js](https://nodejs.org) app that listens for feed updates from
 [Dobrado](https://dobrado.net) and pushes updates to the browser.
 
 ### Server
@@ -23,14 +23,15 @@ This will save your environment in `~/.pm2/dump.pm2` so that it can be used on
 restarts, note that you need to run `pm2 unstartup` followed by the `pm2`
 commands listed above if you modify any required environment variables.
 
-You can export `GUN_USER_ALIAS` and `GUN_USER_PASS` to change the default
-log in credentials for the GunDB host account on the server. All private data
-created in GunDB on the server relies on these credentials, so keep them safe.
+You can export `HOLSTER_USER_NAME` and `HOLSTER_USER_PASSWORD` to change the
+default log in credentials for the Holster host account on the server. All
+private data created in Holster on the server relies on these credentials, so
+keep them safe.
 
 The credentials are also used to access private endpoints, for example to
 allocate invite codes to an account you can run:
 
-`curl -i -H 'Content-Type: application/json' -u <GUN_USER_ALIAS>:<GUN_USER_PASS> -d '{"code": "<code>"}' localhost:3000/private/create-invite-codes`
+`curl -i -H 'Content-Type: application/json' -u <HOLSTER_USER_NAME>:<HOLSTER_USER_PASSWORD> -d '{"code": "<code>"}' localhost:3000/private/create-invite-codes`
 
 The value `<code>` is the account code that you want to allocate the new invite
 codes to. You can set the number of invite codes to create for an account by

@@ -15,7 +15,7 @@ import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import SearchAppBar from "./SearchAppBar"
 
-const Login = ({host, user, mode, setMode}) => {
+const Login = ({user, host, mode, setMode}) => {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -23,65 +23,59 @@ const Login = ({host, user, mode, setMode}) => {
   const [disabledButton, setDisabledButton] = useState(user.is)
   const found = useRef(false)
 
-  const checkAccount = () => {
-    host.get("accountMap" + user.is.pub).once(
-      code => {
-        if (!code) return
+  const checkAccount = async () => {
+    const code = await new Promise(res => {
+      user.get([host, "accountMap" + user.is.pub], res, {wait: 2000})
+    })
+    if (!code) return
 
-        host
-          .get("accounts")
-          .get(code)
-          .once(
-            account => {
-              if (!account || account.pub !== user.is.pub) return
+    const account = await new Promise(res => {
+      user.get([host, "accounts"]).next(code, res, {wait: 2000})
+    })
+    if (!account || account.pub !== user.is.pub) {
+      // Previous account can be returned if user remembers their old password.
+      return "Wrong username or password"
+    }
 
-              found.current = true
-              sessionStorage.setItem("code", code)
-              sessionStorage.setItem("name", account.name)
-            },
-            {wait: 2000},
-          )
-      },
-      {wait: 2000},
-    )
+    found.current = true
+    sessionStorage.setItem("code", code)
+    sessionStorage.setItem("name", account.name)
   }
 
-  const login = alias => {
-    if (!host) {
+  const login = username => {
+    if (!user || !host) {
       setMessage("Host not available")
-      localStorage.removeItem("pub")
+      localStorage.removeItem("host")
       setTimeout(() => window.location.reload(), 1000)
       return
     }
 
     setDisabledButton(true)
     setMessage("Checking account...")
-    user.auth(alias, password, ack => {
-      if (!ack.err) {
+    user.auth(username, password, async err => {
+      if (!err) {
         // auth is ok so look up account details in host data.
-        let retry = 0
-        checkAccount()
-        const interval = setInterval(() => {
-          if (found.current) {
-            clearInterval(interval)
-            window.location = "/"
-          } else if (retry > 5) {
-            setDisabledButton(false)
-            setMessage("Account not found. Please try logging in again")
-            // Remove db and resync in case there's a problem with local data.
-            window.indexedDB.deleteDatabase("radata")
-            clearInterval(interval)
-            user.leave()
-          } else {
-            checkAccount()
-            retry++
-          }
-        }, 3000)
-        return
+        err = await checkAccount()
+        if (found.current) {
+          user.store(false)
+          window.location = "/"
+          return
+        }
+
+        if (!err) {
+          setDisabledButton(false)
+          setMessage("Account not found. Please try logging in again")
+          // Remove db and resync in case there's a problem with local data.
+          window.indexedDB.deleteDatabase("radata")
+          localStorage.removeItem("host")
+          setTimeout(() => window.location.reload(), 2000)
+          user.leave()
+          return
+        }
       }
 
-      if (ack.err === "Wrong user or password.") {
-        let match = alias.match(/(.*)\.(\d)$/)
+      if (err === "Wrong username or password") {
+        let match = username.match(/(.*)\.(\d)$/)
         if (match) {
           let increment = Number(match[2]) + 1
           if (increment === 10) {
@@ -92,7 +86,7 @@ const Login = ({host, user, mode, setMode}) => {
           login(`${match[1]}.${increment}`)
           return
         }
-        login(`${alias}.1`)
+        login(`${username}.1`)
         return
       }
 

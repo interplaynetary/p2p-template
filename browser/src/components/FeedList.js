@@ -84,36 +84,44 @@ const FeedList = ({user, code, groups, showGroupList}) => {
   useEffect(() => {
     if (!user) return
 
-    const update = (f, url) => {
-      if (!url) return
+    const update = feeds => {
+      if (!feeds) return
 
-      updateFeed({
-        key: url,
-        title: f ? f.title : "",
-        description: f ? f.description : "",
-        html_url: f ? f.html_url : "",
-        language: f ? f.language : "",
-        image: f ? f.image : "",
-      })
+      for (const [url, feed] of Object.entries(feeds)) {
+        if (!url) return
+
+        updateFeed({
+          key: url,
+          title: feed ? feed.title : "",
+          description: feed ? feed.description : "",
+          html_url: feed ? feed.html_url : "",
+          language: feed ? feed.language : "",
+          image: feed ? feed.image : "",
+        })
+      }
     }
-    user.get("public").get("feeds").map().once(update)
-    user.get("public").get("feeds").map().on(update)
 
-    user
-      .get("public")
-      .get("settings")
-      .get("hideDefaultFeeds")
-      .once(setHideDefaultFeeds)
+    // Wait for websocket to connect.
+    setTimeout(() => {
+      user
+        .get("public")
+        .next("settings")
+        .next("hideDefaultFeeds", hideDefaultFeeds => {
+          setHideDefaultFeeds(hideDefaultFeeds)
+
+          user.get("public").next("feeds").on(update, true)
+        })
+    }, 1000)
   }, [user])
 
   const dismissDefaults = () => {
     user
       .get("public")
-      .get("settings")
-      .get("hideDefaultFeeds")
-      .put(true, ack => {
-        if (ack.err) {
-          console.error(ack.err)
+      .next("settings")
+      .next("hideDefaultFeeds")
+      .put(true, err => {
+        if (err) {
+          console.error(err)
           return
         }
 
@@ -130,13 +138,19 @@ const FeedList = ({user, code, groups, showGroupList}) => {
   }
 
   const createGroup = () => {
+    if (!groupName) {
+      setDisabledButton(false)
+      setMessage("Group name required")
+      return
+    }
+
     setDisabledButton(true)
     setMessage("Creating group...")
 
     const group = {
       feeds: selected.reduce((acc, f) => {
-        // This function converts selected feeds to an object to store in gun.
-        // see Display useEffect which converts back to an array.
+        // This function converts selected feeds to an object to store in
+        // Holster. See Display useEffect which converts back to an array.
         return f ? {...acc, [f]: true} : {...acc}
       }, {}),
       // Show an unread count for the group and display the author, text and
@@ -147,38 +161,20 @@ const FeedList = ({user, code, groups, showGroupList}) => {
       author: "",
       timestamp: Date.now(),
     }
-    let retry = 0
-    const interval = setInterval(() => {
-      if (!groupName) {
-        setDisabledButton(false)
-        setMessage("Group name required")
-        clearInterval(interval)
-        return
-      }
 
-      user
-        .get("public")
-        .get("groups")
-        .get(groupName)
-        .put(group, ack => {
-          if (ack.err) {
-            setDisabledButton(false)
-            setMessage("Could not create group")
-            console.error(ack.err)
-            clearInterval(interval)
-            return
-          }
-
-          clearInterval(interval)
+    user
+      .get("public")
+      .next("groups")
+      .next(groupName)
+      .put(group, err => {
+        if (err) {
+          setDisabledButton(false)
+          setMessage("Could not create group")
+          console.error(err)
+        } else {
           showGroupList(true)
-        })
-      if (retry > 5) {
-        setDisabledButton(false)
-        setMessage("Could not create group")
-        clearInterval(interval)
-      }
-      retry++
-    }, 1000)
+        }
+      })
   }
 
   return (

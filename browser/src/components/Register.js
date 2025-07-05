@@ -15,33 +15,14 @@ import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import SearchAppBar from "./SearchAppBar"
 
-import Gun from "gun"
-require("gun/lib/radix.js")
-require("gun/lib/radisk.js")
-require("gun/lib/store.js")
-require("gun/lib/rindexed.js")
-require("gun/sea")
-
-const gun = Gun({
-  peers: [
-    window.location.hostname === "localhost"
-      ? "http://localhost:8765/gun"
-      : window.location.origin + "/gun",
-  ],
-  axe: false,
-  secure: true,
-  localStorage: false,
-  store: window.RindexedDB(),
-})
-
-const Register = ({loggedIn, mode, setMode}) => {
+const Register = ({user, mode, setMode}) => {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
-  const [message, setMessage] = useState(loggedIn ? "Already logged in" : "")
-  const [disabledButton, setDisabledButton] = useState(loggedIn)
+  const [message, setMessage] = useState(user.is ? "Already logged in" : "")
+  const [disabledButton, setDisabledButton] = useState(user.is)
 
   const register = () => {
     if (!username) {
@@ -74,18 +55,17 @@ const Register = ({loggedIn, mode, setMode}) => {
           return
         }
 
-        const user = gun.user()
-        user.create(username, password, ack => {
-          if (ack.err) {
+        user.create(username, password, err => {
+          if (err) {
             setDisabledButton(false)
-            setMessage(ack.err)
+            setMessage(err)
             return
           }
 
-          user.auth(username, password, ack => {
-            if (ack.err) {
+          user.auth(username, password, err => {
+            if (err) {
               setDisabledButton(false)
-              setMessage(ack.err)
+              setMessage(err)
               return
             }
 
@@ -97,7 +77,8 @@ const Register = ({loggedIn, mode, setMode}) => {
               body: JSON.stringify({
                 code: code,
                 pub: user.is.pub,
-                alias: username,
+                epub: user.is.epub,
+                username: username,
                 email: email,
               }),
             })
@@ -105,7 +86,7 @@ const Register = ({loggedIn, mode, setMode}) => {
               .then(res => {
                 setDisabledButton(false)
                 if (!res.ok) {
-                  user.delete(username, password)
+                  user.delete(username, password, console.log)
                   setMessage(res.text)
                   return
                 }
@@ -120,7 +101,7 @@ const Register = ({loggedIn, mode, setMode}) => {
 
   return (
     <>
-      {loggedIn && <SearchAppBar mode={mode} setMode={setMode} />}
+      {user.is && <SearchAppBar mode={mode} setMode={setMode} />}
       <Container maxWidth="sm">
         <Grid container>
           <Grid item xs={12}>
