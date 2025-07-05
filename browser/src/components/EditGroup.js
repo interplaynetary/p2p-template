@@ -90,20 +90,26 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
   useEffect(() => {
     if (!user) return
 
-    const update = (f, url) => {
-      if (!url) return
+    const update = feeds => {
+      if (!feeds) return
 
-      updateFeed({
-        key: url,
-        title: f ? f.title : "",
-        description: f ? f.description : "",
-        html_url: f ? f.html_url : "",
-        language: f ? f.language : "",
-        image: f ? f.image : "",
-      })
+      for (const [url, f] of Object.entries(feeds)) {
+        if (!url) continue
+
+        updateFeed({
+          key: url,
+          title: f ? f.title : "",
+          description: f ? f.description : "",
+          html_url: f ? f.html_url : "",
+          language: f ? f.language : "",
+          image: f ? f.image : "",
+        })
+      }
     }
-    user.get("public").get("feeds").map().once(update)
-    user.get("public").get("feeds").map().on(update)
+    // Wait for websocket to connect.
+    setTimeout(() => {
+      user.get("public").next("feeds").on(update, true)
+    }, 1000)
   }, [user])
 
   const selectFeed = f => {
@@ -114,7 +120,7 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
     }
   }
 
-  const updateGroup = () => {
+  const updateGroup = async () => {
     if (!group) {
       setMessage("Group not set")
       return
@@ -135,59 +141,44 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
 
     const data = {
       feeds: allFeeds.reduce((acc, f) => {
-        // This function converts selected feeds to an object to store in gun.
-        // see Display useEffect which converts back to an array.
+        // This function converts selected feeds to an object to store in
+        // Holster. See Display useEffect which converts back to an array.
         return f ? {...acc, [f]: true} : {...acc}
       }, {}),
       count: 0,
       latest: 0,
       text: "",
       author: "",
+      timestamp: Date.now(),
     }
-    let retry = 0
-    const interval = setInterval(() => {
-      // Delete the old group if the name changes.
-      if (group.key && group.key !== groupName) {
-        user
-          .get("public")
-          .get("groups")
-          .get(group.key)
-          .put(
-            {
-              feeds: {},
-              count: 0,
-              latest: 0,
-              text: "",
-              author: "",
-            },
-            ack => {
-              if (ack.err) console.error(ack.err)
-            },
-          )
+    // Delete the old group if the name changes.
+    if (group.key && group.key !== groupName) {
+      const removed = {
+        feeds: null,
+        count: 0,
+        latest: 0,
+        text: "",
+        author: "",
+        timestamp: 0,
       }
-      user
-        .get("public")
-        .get("groups")
-        .get(groupName)
-        .put(data, ack => {
-          if (ack.err) {
-            setDisabledButton(false)
-            setMessage("Could not update group")
-            console.error(ack.err)
-            clearInterval(interval)
-            return
-          }
-
-          clearInterval(interval)
+      const err = await new Promise(res => {
+        user.get("public").next("groups").next(group.key).put(removed, res)
+      })
+      if (err) console.error(err)
+    }
+    user
+      .get("public")
+      .next("groups")
+      .next(groupName)
+      .put(data, err => {
+        if (err) {
+          setDisabledButton(false)
+          setMessage("Could not update group")
+          console.error(err)
+        } else {
           showGroupList(true)
-        })
-      if (retry > 5) {
-        setDisabledButton(false)
-        setMessage("Could not update group")
-        clearInterval(interval)
-      }
-      retry++
-    }, 1000)
+        }
+      })
   }
 
   return (

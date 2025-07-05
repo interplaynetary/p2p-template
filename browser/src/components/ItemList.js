@@ -5,6 +5,7 @@ import {init, reducer} from "../utils/reducer.js"
 import Item from "./Item"
 
 const ItemList = ({
+  user,
   host,
   group,
   groups,
@@ -14,12 +15,13 @@ const ItemList = ({
   newKeys,
   loadMoreItems,
   feeds,
+  updateStart,
+  setUpdateStart,
 }) => {
   const [items, updateItem] = useReducer(reducer(), init)
   const [groupKey, setGroupKey] = useState("")
   const [newFrom, setNewFrom] = useState(0)
   const [scrollToEnd, setScrollToEnd] = useState(false)
-  const [updateStart, setUpdateStart] = useState(false)
   const itemListRef = useRef()
   const itemRefs = useRef(new Map())
   const firstKeyIndex = useRef(0)
@@ -34,72 +36,28 @@ const ItemList = ({
     return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate())
   }
 
-  const mapEnclosure = useCallback(
-    async key => {
-      if (!host || !key) return null
+  const mapEnclosure = useCallback(e => {
+    if (!e) return null
 
-      let found = false
-      const e = host
-        .get("items" + day(key))
-        .get(key)
-        .get("enclosure")
-      const p = await e.get("photo").then()
-      const a = await e.get("audio").then()
-      const v = await e.get("video").then()
-
-      let enclosure = {}
-      if (p) {
-        found = true
-        enclosure.photo = []
-        delete p._
-        for (const [link, alt] of Object.entries(p)) {
-          enclosure.photo.push({link: link, alt: alt})
-        }
+    let found = false
+    let enclosure = {}
+    if (e.photo) {
+      found = true
+      enclosure.photo = []
+      for (const [link, alt] of Object.entries(e.photo)) {
+        enclosure.photo.push({link: link, alt: alt})
       }
-      if (a) {
-        found = true
-        enclosure.audio = []
-        delete a._
-        for (const audio of Object.keys(a)) {
-          enclosure.audio.push(audio)
-        }
-      }
-      if (v) {
-        found = true
-        enclosure.video = []
-        delete v._
-        for (const video of Object.keys(v)) {
-          enclosure.video.push(video)
-        }
-      }
-      return found ? enclosure : null
-    },
-    [host],
-  )
-
-  const mapCategory = useCallback(
-    async key => {
-      if (!host || !key) return null
-
-      let found = false
-      const c = await host
-        .get("items" + day(key))
-        .get(key)
-        .get("category")
-        .then()
-
-      let category = []
-      if (c) {
-        found = true
-        delete c._
-        for (const value of Object.keys(c)) {
-          category.push(value)
-        }
-      }
-      return found ? category : null
-    },
-    [host],
-  )
+    }
+    if (e.audio) {
+      found = true
+      enclosure.audio = Object.keys(e.audio)
+    }
+    if (e.video) {
+      found = true
+      enclosure.video = Object.keys(e.video)
+    }
+    return found ? enclosure : null
+  }, [])
 
   // Scroll to end so that the intersection observer is not triggered.
   useEffect(() => {
@@ -117,7 +75,7 @@ const ItemList = ({
   }, [scrollToEnd, items])
 
   useEffect(() => {
-    if (!host || !updateStart) return
+    if (!user || !host || !updateStart) return
 
     setUpdateStart(false)
 
@@ -132,10 +90,9 @@ const ItemList = ({
         const key = currentKeys[firstKeyIndex.current++]
         if (!key) continue
 
-        const item = await host
-          .get("items" + day(key))
-          .get(key)
-          .then()
+        const item = await new Promise(res => {
+          user.get([host, "items" + day(key)]).next(key, res)
+        })
         if (!item) continue
 
         const feed = feeds.get(item.url)
@@ -144,8 +101,8 @@ const ItemList = ({
           title: item.title,
           content: item.content,
           author: item.author,
-          category: await mapCategory(item.category ? key : null),
-          enclosure: await mapEnclosure(item.enclosure ? key : null),
+          category: item.category ? Object.keys(item.category) : null,
+          enclosure: mapEnclosure(item.enclosure),
           permalink: item.permalink,
           guid: item.guid,
           timestamp: item.timestamp,
@@ -164,9 +121,8 @@ const ItemList = ({
             // currentKeys is the available keys for the group and itemRefs is
             // the items that have already been rendered.
             if (currentKeys.length - itemRefs.current.size <= 10) {
+              // loadMoreItems sets updateStart.
               loadMoreItems()
-              // Wait for loadMoreItems to add to currentKeys.
-              setTimeout(() => setUpdateStart(true), 4000)
             } else {
               setUpdateStart(true)
             }
@@ -187,13 +143,14 @@ const ItemList = ({
     }
     update()
   }, [
+    user,
     host,
     updateStart,
+    setUpdateStart,
     loadMoreItems,
     currentKeys,
     feeds,
     mapEnclosure,
-    mapCategory,
   ])
 
   useEffect(() => {
@@ -213,10 +170,10 @@ const ItemList = ({
     resetGroup(group.key)
     setScrollToEnd(true)
     setUpdateStart(true)
-  }, [group, groupKey, currentKeys, resetGroup])
+  }, [group, groupKey, currentKeys, resetGroup, setUpdateStart])
 
   useEffect(() => {
-    if (!host || !groups || newKeys.length === 0) return
+    if (!user || !host || !groups || newKeys.length === 0) return
 
     if (!watchEnd.current) {
       watchEnd.current = new IntersectionObserver(e => {
@@ -239,10 +196,9 @@ const ItemList = ({
     newKeys.forEach(async key => {
       if (!key) return
 
-      const item = await host
-        .get("items" + day(key))
-        .get(key)
-        .then()
+      const item = await new Promise(res => {
+        user.get([host, "items" + day(key)]).next(key, res)
+      })
       if (!item) return
 
       groups.all.forEach(g => {
@@ -270,8 +226,8 @@ const ItemList = ({
         title: item.title,
         content: item.content,
         author: item.author,
-        category: await mapCategory(item.category ? key : null),
-        enclosure: await mapEnclosure(item.enclosure ? key : null),
+        category: item.category ? Object.keys(item.category) : null,
+        enclosure: mapEnclosure(item.enclosure),
         permalink: item.permalink,
         guid: item.guid,
         timestamp: item.timestamp,
@@ -301,6 +257,7 @@ const ItemList = ({
       setGroupStats(groupStats)
     }, 5000)
   }, [
+    user,
     host,
     group,
     groups,
@@ -309,7 +266,6 @@ const ItemList = ({
     newFrom,
     feeds,
     mapEnclosure,
-    mapCategory,
   ])
 
   return (

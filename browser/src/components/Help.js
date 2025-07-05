@@ -45,9 +45,10 @@ const Help = ({loggedIn, mode, setMode}) => {
                 </Typography>
                 <Typography sx={{pb: 1}}>
                   Accounts are created in RSStream using a distributed database
-                  called <Link href="https://gun.eco">GunDB</Link>. Invite codes
-                  provide a way to control the sign up process, by letting
-                  existing users decide who can create accounts.
+                  called{" "}
+                  <Link href="https://github.com/mblaney/holster">Holster</Link>
+                  . Invite codes provide a way to control the sign up process,
+                  by letting existing users decide who can create accounts.
                 </Typography>
                 <Typography sx={{pb: 1}}>
                   Sharing invite codes also allows a social graph of connected
@@ -69,7 +70,7 @@ const Help = ({loggedIn, mode, setMode}) => {
                   invite codes. Confirming your account is done via email, which
                   is provided during registration. Personal details such as your
                   email address and confirmation codes are encrypted when stored
-                  in GunDB.
+                  in Holster.
                 </Typography>
                 <Typography sx={{pb: 1}}>
                   Having an email address associated with your account means you
@@ -96,7 +97,7 @@ const Help = ({loggedIn, mode, setMode}) => {
                   RSStream is an open source project written in JavaScript using{" "}
                   <Link href="https://expressjs.com">Express</Link> and{" "}
                   <Link href="https://react.dev">React</Link>. It uses IndexedDB
-                  via GunDB, to create an offline first web application that
+                  via Holster, to create an offline first web application that
                   syncs between browsers. You can contribute and find out more
                   at{" "}
                   <Link href="https://github.com/mblaney/rsstream">

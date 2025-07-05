@@ -6,7 +6,7 @@ import List from "@mui/material/List"
 import Typography from "@mui/material/Typography"
 import Group from "./Group"
 
-const GroupList = ({user, groups, setGroup}) => {
+const GroupList = ({groups, setGroup}) => {
   const [message, setMessage] = useState("")
 
   useEffect(() => {
@@ -21,7 +21,7 @@ const GroupList = ({user, groups, setGroup}) => {
             " from the account menu to create your first group.",
         )
       }
-    }, 5000)
+    }, 2000)
     return () => clearTimeout(timeout)
   }, [groups])
 

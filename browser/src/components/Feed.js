@@ -10,13 +10,6 @@ import DeleteIcon from "@mui/icons-material/Delete"
 import PersonIcon from "@mui/icons-material/Person"
 import {urlAvatar} from "../utils/avatar.js"
 
-import Gun from "gun"
-require("gun/lib/radix.js")
-require("gun/lib/radisk.js")
-require("gun/lib/store.js")
-require("gun/lib/rindexed.js")
-require("gun/sea")
-
 const Feed = ({
   user,
   code,
@@ -31,16 +24,16 @@ const Feed = ({
 
     user
       .get("public")
-      .get("feeds")
-      .get(feed.key)
-      .put({title: ""}, async ack => {
-        if (ack.err) {
-          console.error(ack.err)
+      .next("feeds")
+      .next(feed.key)
+      .put({title: ""}, async err => {
+        if (err) {
+          console.error(err)
           return
         }
 
         try {
-          const signedUrl = await Gun.SEA.sign(feed.key, user._.sea)
+          const signedUrl = await user.SEA.sign(feed.key, user.is)
           const res = await fetch(
             `${window.location.origin}/remove-subscriber`,
             {
@@ -68,8 +61,8 @@ const Feed = ({
 
     const data = {
       feeds: feeds.reduce((acc, f) => {
-        // This function converts selected feeds to an object to store in gun.
-        // see Display useEffect which converts back to an array.
+        // This function converts selected feeds to an object to store in
+        // Holster. See Display useEffect which converts back to an array.
         return f ? {...acc, [f]: f !== remove} : {...acc}
       }, {}),
       count: 0,
@@ -79,10 +72,10 @@ const Feed = ({
     }
     user
       .get("public")
-      .get("groups")
-      .get(currentGroup)
-      .put(data, ack => {
-        if (ack.err) console.error(ack.err)
+      .next("groups")
+      .next(currentGroup)
+      .put(data, err => {
+        if (err) console.error(err)
       })
   }
 

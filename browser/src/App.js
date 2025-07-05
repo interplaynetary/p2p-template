@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useState} from "react"
 import {BrowserRouter, Routes, Route, Navigate} from "react-router-dom"
+import Holster from "@mblaney/holster/src/holster.js"
 import {red} from "@mui/material/colors"
 import {ThemeProvider, createTheme} from "@mui/material/styles"
 import CssBaseline from "@mui/material/CssBaseline"
@@ -14,28 +15,17 @@ import ResetPassword from "./components/ResetPassword"
 import UpdatePassword from "./components/UpdatePassword"
 import "./App.css"
 
-import Gun from "gun"
-require("gun/lib/radix.js")
-require("gun/lib/radisk.js")
-require("gun/lib/store.js")
-require("gun/lib/rindexed.js")
-require("gun/lib/then.js")
-require("gun/sea")
+// If on localhost assume Holster is directly available and use the default
+// settings, otherwise assume a secure connection is required.
+let peers
+if (window.location.hostname !== "localhost") {
+  peers = ["wss://" + window.location.hostname]
+}
 
-const gun = Gun({
-  // Assume Gun is directly available on localhost, otherwise reverse proxy.
-  peers: [
-    window.location.hostname === "localhost"
-      ? "http://localhost:8765/gun"
-      : window.location.origin + "/gun",
-  ],
-  axe: false,
-  secure: true,
-  localStorage: false,
-  store: window.RindexedDB(),
-})
+const holster = Holster({peers: peers, secure: true, indexedDB: true})
+const user = holster.user()
+user.recall()
 
-const user = gun.user().recall({sessionStorage: true})
 const params = new URLSearchParams(window.location.search)
 const pages = [
   "invite",
@@ -51,9 +41,8 @@ const redirect = params.get("redirect")
 const to = redirect ? (pages.includes(redirect) ? `/${redirect}` : "/") : ""
 
 const App = () => {
-  const [host, setHost] = useState(null)
-  const [pub, setPub] = useState(() => {
-    return localStorage.getItem("pub") || ""
+  const [host, setHost] = useState(() => {
+    return localStorage.getItem("host") || ""
   })
   const [code] = useState(() => {
     return sessionStorage.getItem("code") || ""
@@ -88,114 +77,139 @@ const App = () => {
   )
 
   useEffect(() => {
-    if (!pub) {
+    if (!host) {
       fetch(`${window.location.origin}/host-public-key`).then(res => {
-        if (res.ok) res.text().then(key => setPub(key))
+        if (res.ok) res.text().then(key => setHost(key))
       })
       return
     }
 
-    setHost(gun.user(pub))
-    localStorage.setItem("pub", pub)
+    localStorage.setItem("host", host)
     if (!user.is) return
 
-    const updateAccount = (account, accountCode) => {
-      if (!account) return
+    const updateAccounts = async accounts => {
+      if (!accounts) return
 
-      let check = {
-        pub: account.pub,
-        alias: account.alias,
-        name: account.name,
-        ref: account.ref,
-        host: account.host,
-      }
-      // Check this account against the users list of contacts.
-      const contacts = user.get("public").get("contacts")
-      contacts.once(async c => {
-        if (c) delete c._
+      // Check accounts against the users list of contacts.
+      const c = await new Promise(res => {
+        user.get("public").next("contacts", res)
+      })
+      if (!c) return
+
+      for (const [accountCode, account] of Object.entries(accounts)) {
+        if (!account) continue
+
+        let check = {
+          pub: account.pub,
+          username: account.username,
+          name: account.name,
+          ref: account.ref,
+          host: account.host,
+        }
+
         let found = false
-        for (const contactCode of Object.keys(c ?? {})) {
+        for (const [contactCode, contact] of Object.entries(c)) {
           if (contactCode !== accountCode) continue
 
           found = true
-          const contact = await contacts.get(contactCode).then()
+          // The account we're checking hasn't changed.
           if (contact.pub === check.pub) break
 
           // If the public key has changed for this contact then store their
           // new account details and re-share encrypted data with them to
           // help restore their account.
-          contacts.get(contactCode).put(check, ack => {
-            if (ack.err) console.error(ack.err)
+          const err = await new Promise(res => {
+            user
+              .get("public")
+              .next("contacts")
+              .next(contactCode)
+              .put(check, res)
           })
-          gun
-            .user(contact.pub)
-            .get("epub")
-            .once(oldEPub => {
-              if (!oldEPub) {
-                console.error("User not found for old public key")
-                return
-              }
+          if (err) console.error(err)
 
-              gun
-                .user(check.pub)
-                .get("epub")
-                .once(epub => {
-                  if (!epub) {
-                    console.error("User not found for new public key")
-                    return
-                  }
+          const oldEpub = await new Promise(res => {
+            user.get([contact.pub, "epub"], res)
+          })
+          if (!oldEpub) {
+            console.error("User not found for old public key")
+            break
+          }
 
-                  const shared = user.get("shared").get(contactCode)
-                  shared.once(async s => {
-                    if (!s) return
+          const epub = await new Promise(res => {
+            user.get([check.pub, "epub"], res)
+          })
+          if (!epub) {
+            console.error("User not found for new public key")
+            break
+          }
 
-                    delete s._
-                    const oldSecret = await Gun.SEA.secret(oldEPub, user._.sea)
-                    const secret = await Gun.SEA.secret(epub, user._.sea)
-                    for (const key of Object.keys(s)) {
-                      if (!key) continue
+          const shared = await new Promise(res => {
+            user.get("shared").next(contactCode, res)
+          })
+          if (!shared) break
 
-                      const oldEnc = await shared.get(key).then()
-                      let data = await Gun.SEA.decrypt(oldEnc, oldSecret)
-                      let enc = await Gun.SEA.encrypt(data, secret)
-                      shared.get(key).put(enc, ack => {
-                        if (ack.err) console.error(ack.err)
-                      })
-                    }
-                  })
-                })
+          const oldSecret = await holster.SEA.secret(oldEpub, user.is)
+          const secret = await holster.SEA.secret(epub, user.is)
+          const update = {}
+          for (const [key, oldEnc] of Object.entries(shared)) {
+            if (!key) continue
+
+            const data = await holster.SEA.decrypt(oldEnc, oldSecret)
+            const enc = await holster.SEA.encrypt(data, secret)
+            update[key] = enc
+          }
+          if (Object.keys(update).length !== 0) {
+            const err = await new Promise(res => {
+              user.get("shared").next(contactCode).put(update, res)
             })
-          break
+            if (err) console.error(err)
+          }
         }
         // Add the new contact if we referred them.
         if (!found && account.ref === code) {
-          contacts.get(accountCode).put(check, ack => {
-            if (ack.err) console.error(ack.err)
-          })
+          user
+            .get("public")
+            .next("contacts")
+            .next(accountCode)
+            .put(check, err => {
+              if (err) console.error(err)
+            })
         }
-      })
-    }
-    // Listen for account changes to add new contacts, update existing contacts.
-    gun.user(pub).get("accounts").map().on(updateAccount)
-
-    const updateFeed = (feed, url) => {
-      if (!url) return
-
-      if (feed && feed.title !== "") {
-        setFeeds(
-          f =>
-            new Map(
-              f.set(url, {
-                url: feed.html_url,
-                title: feed.title,
-                image: feed.image,
-              }),
-            ),
-        )
       }
-      const userFeed = user.get("public").get("feeds").get(url)
-      userFeed.once(found => {
-        if (!found || found.title === "") return
+    }
+    // Wait for websocket to connect, then listen for account changes to add
+    // new contacts and update existing contacts. Note that this only listens
+    // on the accounts node, not the nodes for each individual account. This
+    // means new accounts will trigger updates (which will check all accounts),
+    // but otherwise existing accounts are only checked on page load.
+    // Also the timeout is long because there is still an issue calling get()
+    // simultaneously, the callbacks get overwritten.
+    setTimeout(() => {
+      user.get([host, "accounts"]).on(updateAccounts, true)
+    }, 5000)
+
+    const updateFeeds = async feeds => {
+      if (!feeds) return
+
+      for (const [url, feed] of Object.entries(feeds)) {
+        if (!url) continue
+
+        if (feed && feed.title !== "") {
+          setFeeds(
+            f =>
+              new Map(
+                f.set(url, {
+                  url: feed.html_url,
+                  title: feed.title,
+                  image: feed.image,
+                }),
+              ),
+          )
+        }
+        const found = new Promise(res => {
+          user.get("public").next("feeds").next(url, res)
+        })
+        if (!found || found.title === "") continue
 
         if (feed && feed.title !== "") {
           // Feed details have been updated.
@@ -206,45 +220,49 @@ const App = () => {
             language: feed.language,
             image: feed.image,
           }
-          userFeed.put(data, ack => {
-            if (ack.err) console.error(ack.err)
+          const err = await new Promise(res => {
+            user.get("public").next("feeds").next(url).put(data, res)
           })
-          return
+          if (err) console.error(err)
+          continue
         }
 
         // Otherwise the feed was removed.
-        userFeed.put({title: ""}, async ack => {
-          if (ack.err) {
-            console.error(ack.err)
-            return
-          }
-
-          // Request to lower account subscribed count when a feed is removed.
-          try {
-            const signedUrl = await Gun.SEA.sign(url, user._.sea)
-            const res = await fetch(
-              `${window.location.origin}/remove-subscriber`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json;charset=utf-8",
-                },
-                body: JSON.stringify({code: code, url: signedUrl}),
-              },
-            )
-            if (!res.ok) {
-              console.error(res)
-            }
-          } catch (error) {
-            console.error(error)
-          }
+        const err = await new Promise(res => {
+          user.get("public").next("feeds").next(url).put({title: ""}, res)
         })
-      })
+        if (err) {
+          console.error(err)
+          continue
+        }
+
+        // Request to lower subscribed count when a feed is removed.
+        try {
+          const signedUrl = await holster.SEA.sign(url, user.is)
+          const res = await fetch(
+            `${window.location.origin}/remove-subscriber`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json;charset=utf-8",
+              },
+              body: JSON.stringify({code: code, url: signedUrl}),
+            },
+          )
+          if (!res.ok) {
+            console.error(res)
+          }
+        } catch (error) {
+          console.error(error)
+        }
+      }
     }
     // Listen for feed changes to apply to our own feed list.
-    gun.user(pub).get("feeds").map().once(updateFeed)
-    gun.user(pub).get("feeds").map().on(updateFeed)
-  }, [pub, code])
+    // This returns all feeds so any missed updates will be applied.
+    setTimeout(() => {
+      user.get([host, "feeds"]).on(updateFeeds, true)
+    }, 6000)
+  }, [host, code])
 
   return (
     <ThemeProvider theme={theme}>
@@ -259,14 +277,12 @@ const App = () => {
           />
           <Route
             path="/register"
-            element={
-              <Register loggedIn={user.is} mode={mode} setMode={setMode} />
-            }
+            element={<Register user={user} mode={mode} setMode={setMode} />}
           />
           <Route
             path="/login"
             element={
-              <Login host={host} user={user} mode={mode} setMode={setMode} />
+              <Login user={user} host={host} mode={mode} setMode={setMode} />
             }
           />
           <Route
@@ -291,7 +307,7 @@ const App = () => {
             path="/update-password"
             element={
               <UpdatePassword
-                loggedIn={user.is}
+                user={user}
                 current={params.get("username")}
                 code={params.get("code")}
                 reset={params.get("reset")}
@@ -305,8 +321,8 @@ const App = () => {
             element={
               user.is ? (
                 <Settings
-                  host={host}
                   user={user}
+                  host={host}
                   code={code}
                   mode={mode}
                   setMode={setMode}
@@ -327,8 +343,8 @@ const App = () => {
                 <Navigate to={to} />
               ) : user.is ? (
                 <Display
-                  host={host}
                   user={user}
+                  host={host}
                   code={code}
                   mode={mode}
                   setMode={setMode}
