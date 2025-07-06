@@ -29,3 +29,9 @@ p {
 a {
   color: #757575;
 }
+
+code {
+  background-color: #eeeeee;
+  font-family: monospace;
+  padding: 2px;
+}
