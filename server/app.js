@@ -41,7 +41,14 @@ const inviteCodes = new Map()
 const removeDays = new Set()
 
 console.log("Trying auth credentials for " + username)
-user.auth(username, password, auth)
+user.auth(username, password, err => {
+  if (err) {
+    console.log(err)
+  } else {
+    console.log(username + " logged in")
+    mapInviteCodes()
+  }
+})
 
 const app = express()
 app.use(bodyParser.json())
@@ -1059,42 +1066,6 @@ function newCode() {
     code += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return code
-}
-
-function auth(err) {
-  if (!err) {
-    console.log(username + " logged in")
-    mapInviteCodes()
-    return
-  }
-
-  console.log("No auth - creating an account for " + username)
-  user.create(username, password, err => {
-    if (err) {
-      console.log(err)
-      return
-    }
-
-    user.auth(username, password, async err => {
-      if (err) {
-        console.log(err)
-        return
-      }
-
-      // Note that the admin invite code doesn't have an account associated
-      // with it, but once it's been claimed all invite codes that get created
-      // will have an owner code that get stored as the referring account.
-      console.log("Creating admin invite code")
-      const enc = await holster.SEA.encrypt({code: "admin", owner: ""}, user.is)
-      user
-        .get("available")
-        .next("invite_codes")
-        .put(enc, true, err => {
-          if (err) console.log(err)
-          else mapInviteCodes()
-        })
-    })
-  })
 }
 
 function mapInviteCodes() {

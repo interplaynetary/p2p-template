@@ -9,6 +9,36 @@ Copy this repo to a new directory and run:
 
  - `cd server`
  - `npm install`
+
+Before running the server code, you need to create a host account. This isn't
+done within the app because it's possible for Holster to create multiple
+accounts under the same username. This needs to be avoided because all account
+data is stored under a single host account.
+
+To create the host account you can use the Node [REPL](https://nodejs.org/en/learn/command-line/how-to-use-the-nodejs-repl), which is also great for inspecting
+your Holster data via the API:
+
+```
+const {default: Holster} = await import("@mblaney/holster/src/holster.js")
+const holster = Holster()
+const user = holster.user()
+user.create("host", "password", console.log)
+
+// Next log in to the host account and create an invite code so that you can
+// create your first user account:
+user.auth("host", "password", console.log)
+const enc = await holster.SEA.encrypt({code: "admin", owner: ""}, user.is)
+user.get("available").next("invite_codes").put(enc, true, console.log)
+```
+
+Here `console.log` is being used as the callback function and will log `null` if
+the account was created. Make sure you provide a real username and password!
+
+Export the `HOLSTER_USER_NAME` and `HOLSTER_USER_PASSWORD` environment variables
+to match the details you provided above. All private data created in Holster
+relies on these credentials, so keep them safe.
+
+After you've created the account start the server with:
  - `node app.js`
 
 For production you can start with pm2:
@@ -22,11 +52,6 @@ For production you can start with pm2:
 This will save your environment in `~/.pm2/dump.pm2` so that it can be used on
 restarts, note that you need to run `pm2 unstartup` followed by the `pm2`
 commands listed above if you modify any required environment variables.
-
-You can export `HOLSTER_USER_NAME` and `HOLSTER_USER_PASSWORD` to change the
-default log in credentials for the Holster host account on the server. All
-private data created in Holster on the server relies on these credentials, so
-keep them safe.
 
 The credentials are also used to access private endpoints, for example to
 allocate invite codes to an account you can run:
