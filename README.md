@@ -28,6 +28,8 @@ user.create("host", "password", console.log)
 // create your first user account:
 user.auth("host", "password", console.log)
 const enc = await holster.SEA.encrypt({code: "admin", owner: ""}, user.is)
+
+// Wait for encrypt to finish and then put the data:
 user.get("available").next("invite_codes").put(enc, true, console.log)
 ```
 

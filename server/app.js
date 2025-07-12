@@ -222,7 +222,7 @@ app.post("/claim-invite-code", async (req, res) => {
 
   // Also map the code to the user's public key to make login easier.
   err = await new Promise(res => {
-    user.get("accountMap" + req.body.pub).put(code, res)
+    user.get("map").next("account:" + req.body.pub).put(code, res)
   })
   if (err) {
     console.log(err)
@@ -468,7 +468,7 @@ app.post("/update-password", async (req, res) => {
         return
       }
 
-      user.get("accountMap" + req.body.pub).put(code, err => {
+      user.get("map").next("account:" + req.body.pub).put(code, err => {
         if (err) {
           console.log(err)
           res.status(500).send("Host error")
@@ -930,17 +930,17 @@ app.post("/private/add-item", (req, res) => {
     const category = mapCategory(req.body.category)
     // Check if the item already has a key stored for it's guid.
     let key = await new Promise(res => {
-      user.get("guids" + req.body.guid, res)
+      user.get("guids").next(req.body.guid, res)
     })
     if (!key) {
       // Try and use the item's timestamp as the key if it's not already used.
       const t = req.body.timestamp
       const used = await new Promise(res => {
-        user.get("items" + day(t)).next(t, res)
+        user.get("items").next(day(t)).next(t, res)
       })
       key = used ? lastSaved : t
       const err = await new Promise(res => {
-        user.get("guids" + req.body.guid).put(key, res)
+        user.get("guids").next(req.body.guid).put(key, res)
       })
       if (err) console.log(err)
     }
@@ -958,7 +958,7 @@ app.post("/private/add-item", (req, res) => {
       if (category) data.category = category
       const err = await new Promise(res => {
         user
-          .get("items" + day(key))
+          .get("items").next(day(key))
           .next(key)
           .put(data, res)
       })
@@ -980,12 +980,12 @@ app.post("/private/add-item", (req, res) => {
 
     removeDays.add(dayKey)
     const removed = await new Promise(res => {
-      user.get("removed" + dayKey, res)
+      user.get("removed").next(dayKey, res)
     })
     if (removed) return
 
     const items = await new Promise(res => {
-      user.get("items" + dayKey, res)
+      user.get("items").next(dayKey, res)
     })
     if (!items) return
 
@@ -1001,7 +1001,7 @@ app.post("/private/add-item", (req, res) => {
       if (err) console.log(err)
     }
     // Flag this day as removed.
-    user.get("removed" + dayKey).put(true, err => {
+    user.get("removed").next(dayKey).put(true, err => {
       if (err) console.log(err)
     })
   }, wait)

@@ -127,7 +127,7 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
 
     daysLoaded.current.push(getDay.current)
     const seen = new Set()
-    user.get([host, "items" + getDay.current], items => {
+    user.get([host, "items"]).next(getDay.current, items => {
       if (!items) {
         setItemsCheck(true)
         setUpdateStart(true)
@@ -226,7 +226,9 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
       }
     }
     // Wait for websocket to connect.
-    setTimeout(() => user.get([host, "items" + today]).on(update, true), 1000)
+    setTimeout(() => {
+      user.get([host, "items"]).next(today).on(update, true)
+    }, 1000)
     setInterval(() => {
       if (updateStats.current) {
         setGroupStats(groupStats)
@@ -304,9 +306,9 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
         feeds: groupFeeds,
         count: g.count ?? 0,
         latest: g.latest ?? 0,
-        text: g.text,
-        author: g.author,
-        timestamp: g.timestamp,
+        text: g.text ?? "",
+        author: g.author ?? "",
+        timestamp: g.timestamp ?? 0,
       })
       setGroupsLoaded(gl => (gl.includes(name) ? gl : [...gl, name]))
     }

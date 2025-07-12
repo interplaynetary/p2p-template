@@ -25,7 +25,7 @@ const Login = ({user, host, mode, setMode}) => {
 
   const checkAccount = async () => {
     const code = await new Promise(res => {
-      user.get([host, "accountMap" + user.is.pub], res, {wait: 2000})
+      user.get([host, "map"]).next("account:" + user.is.pub, res, {wait: 2000})
     })
     if (!code) return
 

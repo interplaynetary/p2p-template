@@ -91,7 +91,7 @@ const ItemList = ({
         if (!key) continue
 
         const item = await new Promise(res => {
-          user.get([host, "items" + day(key)]).next(key, res)
+          user.get([host, "items"]).next(day(key)).next(key, res)
         })
         if (!item) continue
 
@@ -197,7 +197,7 @@ const ItemList = ({
       if (!key) return
 
       const item = await new Promise(res => {
-        user.get([host, "items" + day(key)]).next(key, res)
+        user.get([host, "items"]).next(day(key)).next(key, res)
       })
       if (!item) return
 

@@ -23,6 +23,9 @@ if (window.location.hostname !== "localhost") {
 }
 
 const holster = Holster({peers: peers, secure: true, indexedDB: true})
+// This provides access to the API via the console.
+window.holster = holster
+
 const user = holster.user()
 user.recall()
 
