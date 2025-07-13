@@ -209,7 +209,7 @@ const App = () => {
               ),
           )
         }
-        const found = new Promise(res => {
+        const found = await new Promise(res => {
           user.get("public").next("feeds").next(url, res)
         })
         if (!found || found.title === "") continue
