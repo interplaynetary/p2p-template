@@ -100,17 +100,17 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
   // Group stats (like unread count, latest item...) can be updated in both
   // group list mode and in the background while viewing a particular group.
   const setGroupStats = useCallback(
-    groupStats => {
+    async groupStats => {
       if (!user) return
 
-      groupStats.forEach(async (stats, key) => {
-        if (!key || !stats || stats.latest === 0) return
+      for (const [key, stats] of groupStats.entries()) {
+        if (!key || !stats || stats.latest === 0) continue
 
         const err = await new Promise(res => {
           user.get("public").next("groups").next(key).put(stats, res)
         })
         if (err) console.error(err)
-      })
+      }
     },
     [user],
   )
