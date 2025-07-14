@@ -181,81 +181,84 @@ const ItemList = ({
       })
     }
 
-    const groupStats = new Map()
-    groups.all.forEach(g =>
-      groupStats.set(g.key, {
-        count: !group || g.key !== group.key ? g.count : 0,
-        latest: 0,
-        text: "",
-        author: "",
-        timestamp: 0,
-      }),
-    )
-    let earliest = 0
-    let latest = 0
-    newKeys.forEach(async key => {
-      if (!key) return
+    ;(async () => {
+      const groupStats = new Map()
+      groups.all.forEach(g =>
+        groupStats.set(g.key, {
+          count: !group || g.key !== group.key ? g.count : 0,
+          latest: 0,
+          text: "",
+          author: "",
+          timestamp: 0,
+        }),
+      )
+      let earliest = 0
+      let latest = 0
+      for (let i = 0; i < newKeys.length; i++) {
+        const key = newKeys[i]
+        if (!key) return
 
-      const item = await new Promise(res => {
-        user.get([host, "items"]).next(day(key)).next(key, res)
-      })
-      if (!item) return
+        const item = await new Promise(res => {
+          user.get([host, "items"]).next(day(key)).next(key, res)
+        })
+        if (!item) return
 
-      groups.all.forEach(g => {
-        if (!g.feeds.includes(item.url)) return
+        groups.all.forEach(g => {
+          if (!g.feeds.includes(item.url)) return
 
-        let stats = groupStats.get(g.key)
-        if (key > stats.latest) {
-          stats.latest = key
-          stats.author = item.author
-          stats.timestamp = item.timestamp
-          const tag = /(<([^>]+)>)/g
-          const text = item.title
-            ? item.title.replace(tag, "")
-            : item.content.replace(tag, "")
-          stats.text = text.length > 200 ? text.substring(0, 200) : text
+          let stats = groupStats.get(g.key)
+          if (key > stats.latest) {
+            stats.latest = key
+            stats.author = item.author
+            stats.timestamp = item.timestamp
+            const tag = /(<([^>]+)>)/g
+            const text = item.title
+              ? item.title.replace(tag, "")
+              : item.content.replace(tag, "")
+            stats.text = text.length > 200 ? text.substring(0, 200) : text
+          }
+          if (!group || g.key !== group.key) stats.count++
+          groupStats.set(g.key, stats)
+        })
+        if (!group || !group.feeds.includes(item.url)) return
+
+        const feed = feeds.get(item.url)
+        updateItem({
+          key,
+          title: item.title,
+          content: item.content,
+          author: item.author,
+          category: item.category ? Object.keys(item.category) : null,
+          enclosure: mapEnclosure(item.enclosure),
+          permalink: item.permalink,
+          guid: item.guid,
+          timestamp: item.timestamp,
+          feedUrl: feed && feed.url ? feed.url : "",
+          feedTitle: feed && feed.title ? feed.title : "",
+          feedImage: feed && feed.image ? feed.image : "",
+          url: item.url,
+        })
+        if (key < earliest || earliest === 0) earliest = key
+        if (key > latest || latest === 0) latest = key
+      }
+
+      setTimeout(() => {
+        if (earliest !== 0 && newFrom === 0) {
+          // If there is no current newFrom marker then mark as new from
+          // earliest, the marker will be removed when scrolled to the end.
+          setNewFrom(earliest)
         }
-        if (!group || g.key !== group.key) stats.count++
-        groupStats.set(g.key, stats)
-      })
-      if (!group || !group.feeds.includes(item.url)) return
-
-      const feed = feeds.get(item.url)
-      updateItem({
-        key,
-        title: item.title,
-        content: item.content,
-        author: item.author,
-        category: item.category ? Object.keys(item.category) : null,
-        enclosure: mapEnclosure(item.enclosure),
-        permalink: item.permalink,
-        guid: item.guid,
-        timestamp: item.timestamp,
-        feedUrl: feed && feed.url ? feed.url : "",
-        feedTitle: feed && feed.title ? feed.title : "",
-        feedImage: feed && feed.image ? feed.image : "",
-        url: item.url,
-      })
-      if (key < earliest || earliest === 0) earliest = key
-      if (key > latest || latest === 0) latest = key
-    })
-
-    setTimeout(() => {
-      if (earliest !== 0 && newFrom === 0) {
-        // If there is no current newFrom marker then mark as new from
-        // earliest, the marker will be removed when scrolled to the end.
-        setNewFrom(earliest)
-      }
-      if (latest !== 0) {
-        // Stop watching the current last key.
-        const currentTarget = itemRefs.current.get(lastKey.current)
-        if (currentTarget) watchEnd.current.unobserve(currentTarget)
-        lastKey.current = latest
-        const newTarget = itemRefs.current.get(latest)
-        if (newTarget) watchEnd.current.observe(newTarget)
-      }
-      setGroupStats(groupStats)
-    }, 5000)
+        if (latest !== 0) {
+          // Stop watching the current last key.
+          const currentTarget = itemRefs.current.get(lastKey.current)
+          if (currentTarget) watchEnd.current.unobserve(currentTarget)
+          lastKey.current = latest
+          const newTarget = itemRefs.current.get(latest)
+          if (newTarget) watchEnd.current.observe(newTarget)
+        }
+        setGroupStats(groupStats)
+      }, 5000)
+    })()
   }, [
     user,
     host,
