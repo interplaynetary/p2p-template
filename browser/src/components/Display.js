@@ -225,10 +225,7 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
         }
       }
     }
-    // Wait for websocket to connect.
-    setTimeout(() => {
-      user.get([host, "items"]).next(today).on(update, true)
-    }, 1000)
+    user.get([host, "items"]).next(today).on(update, true)
     setInterval(() => {
       if (updateStats.current) {
         setGroupStats(groupStats)
@@ -312,25 +309,22 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
       })
       setGroupsLoaded(gl => (gl.includes(name) ? gl : [...gl, name]))
     }
-    // Wait for websocket to connect.
-    setTimeout(() => {
-      user.get("public").next("groups", async groups => {
-        if (!groups) return
+    user.get("public").next("groups", async groups => {
+      if (!groups) return
 
-        // Number of groups is stored to know when we're done loading.
-        setGroupCount(Object.keys(groups).length)
-        // Need to set a listener for each group.
-        for (const name of Object.keys(groups)) {
-          user
-            .get("public")
-            .next("groups")
-            .next(name)
-            .on(g => {
-              update(name, g)
-            }, true)
-        }
-      })
-    }, 1000)
+      // Number of groups is stored to know when we're done loading.
+      setGroupCount(Object.keys(groups).length)
+      // Need to set a listener for each group.
+      for (const name of Object.keys(groups)) {
+        user
+          .get("public")
+          .next("groups")
+          .next(name)
+          .on(g => {
+            update(name, g)
+          }, true)
+      }
+    })
   }, [user])
 
   return (

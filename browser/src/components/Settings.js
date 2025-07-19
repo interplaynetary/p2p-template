@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react"
+import {useEffect, useState} from "react"
 import {grey} from "@mui/material/colors"
 import Button from "@mui/material/Button"
 import Card from "@mui/material/Card"
@@ -31,54 +31,41 @@ const Settings = ({user, host, code, mode, setMode}) => {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [message, setMessage] = useState("")
   const [disabledButton, setDisabledButton] = useState(false)
-  const interval = useRef(0)
 
   useEffect(() => {
     if (!user || !host || !code) return
 
-    let set = false
     const updated = new Map()
-    // Wait for websocket to connect.
-    setTimeout(() => {
-      user.get([host, "epub"], async epub => {
-        if (!epub) {
-          console.error("No epub for host!")
-          return
-        }
+    user.get([host, "epub"], async epub => {
+      if (!epub) {
+        console.error("No epub for host!")
+        return
+      }
 
-        const secret = await user.SEA.secret({epub: epub}, user.is)
-        const update = async codes => {
-          if (!codes) return
+      const secret = await user.SEA.secret({epub: epub}, user.is)
+      const update = async codes => {
+        if (!codes) return
 
-          for (const [key, enc] of Object.entries(codes)) {
-            if (!key) continue
+        for (const [key, enc] of Object.entries(codes)) {
+          if (!key) continue
 
-            if (enc) {
-              updated.set(key, {
-                key: key,
-                code: await user.SEA.decrypt(enc, secret),
-              })
-            } else {
-              updated.delete(key)
-            }
-            set = true
+          if (enc) {
+            updated.set(key, {
+              key: key,
+              code: await user.SEA.decrypt(enc, secret),
+            })
+          } else {
+            updated.delete(key)
           }
         }
-        user
-          .get([host, "shared"])
-          .next("invite_codes")
-          .next(code)
-          .on(update, true)
-      })
-    }, 1000)
-    // Batch the update otherwise there are too many calls to setInvites.
-    clearInterval(interval.current)
-    interval.current = setInterval(() => {
-      if (!set) return
-
-      setInvites([...updated.values()])
-      set = false
-    }, 1000)
+        setInvites([...updated.values()])
+      }
+      user
+        .get([host, "shared"])
+        .next("invite_codes")
+        .next(code)
+        .on(update, true)
+    })
   }, [user, host, code])
 
   const select = target => {

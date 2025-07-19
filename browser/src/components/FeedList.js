@@ -101,17 +101,14 @@ const FeedList = ({user, code, groups, showGroupList}) => {
       }
     }
 
-    // Wait for websocket to connect.
-    setTimeout(() => {
-      user
-        .get("public")
-        .next("settings")
-        .next("hideDefaultFeeds", hideDefaultFeeds => {
-          setHideDefaultFeeds(hideDefaultFeeds)
+    user
+      .get("public")
+      .next("settings")
+      .next("hideDefaultFeeds", hideDefaultFeeds => {
+        setHideDefaultFeeds(hideDefaultFeeds)
 
-          user.get("public").next("feeds").on(update, true)
-        })
-    }, 1000)
+        user.get("public").next("feeds").on(update, true)
+      })
   }, [user])
 
   const dismissDefaults = () => {

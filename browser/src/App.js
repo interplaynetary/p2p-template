@@ -180,16 +180,7 @@ const App = () => {
         }
       }
     }
-    // Wait for websocket to connect, then listen for account changes to add
-    // new contacts and update existing contacts. Note that this only listens
-    // on the accounts node, not the nodes for each individual account. This
-    // means new accounts will trigger updates (which will check all accounts),
-    // but otherwise existing accounts are only checked on page load.
-    // Also the timeout is long because there is still an issue calling get()
-    // simultaneously, the callbacks get overwritten.
-    setTimeout(() => {
-      user.get([host, "accounts"]).on(updateAccounts, true)
-    }, 5000)
+    user.get([host, "accounts"]).on(updateAccounts, true)
 
     const updateFeeds = async feeds => {
       if (!feeds) return
@@ -261,10 +252,7 @@ const App = () => {
       }
     }
     // Listen for feed changes to apply to our own feed list.
-    // This returns all feeds so any missed updates will be applied.
-    setTimeout(() => {
-      user.get([host, "feeds"]).on(updateFeeds, true)
-    }, 6000)
+    user.get([host, "feeds"]).on(updateFeeds, true)
   }, [host, code])
 
   return (

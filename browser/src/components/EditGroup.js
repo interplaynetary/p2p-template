@@ -106,10 +106,7 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
         })
       }
     }
-    // Wait for websocket to connect.
-    setTimeout(() => {
-      user.get("public").next("feeds").on(update, true)
-    }, 1000)
+    user.get("public").next("feeds").on(update, true)
   }, [user])
 
   const selectFeed = f => {
