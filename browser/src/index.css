@@ -1,18 +1,17 @@
-* {
+body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: "Roboto";
+  font-family: Roboto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: contain;
 }
 
 html,
 body,
 #root {
   height: 100vh;
-}
-
-body {
-  overscroll-behavior: contain;
 }
 
 img {
@@ -32,6 +31,6 @@ a {
 
 code {
   background-color: #eeeeee;
-  font-family: monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, monospace;
   padding: 2px;
 }

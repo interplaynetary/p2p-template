@@ -6,10 +6,7 @@ import path from "path"
 import {fileURLToPath} from "url"
 import Holster from "@mblaney/holster/src/holster.js"
 
-const holster = Holster({
-  server: express().listen(8765),
-  secure: true,
-})
+const holster = Holster({secure: true})
 const user = holster.user()
 const username = process.env.HOLSTER_USER_NAME ?? "host"
 const password = process.env.HOLSTER_USER_PASSWORD ?? "password"
@@ -27,10 +24,6 @@ const basicAuth = (req, res, next) => {
     res.status(401).end()
   }
 }
-
-// lastSaved is the timestamp of the last time save was called. This allows
-// slowing calls to save so that the timestamp can be used as a unique key.
-var lastSaved = 0
 
 // inviteCodes is a map of invite codes and their (random) holster keys, stored
 // in memory to avoid decrypting them in each of the functions they're required.
@@ -54,6 +47,7 @@ const app = express()
 app.use(bodyParser.json())
 app.use(express.static(path.join(dirname, "../browser/build")))
 app.use("/private", basicAuth)
+app.listen(3000)
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(dirname, "../browser/build", "index.html"))
@@ -222,7 +216,10 @@ app.post("/claim-invite-code", async (req, res) => {
 
   // Also map the code to the user's public key to make login easier.
   err = await new Promise(res => {
-    user.get("map").next("account:" + req.body.pub).put(code, res)
+    user
+      .get("map")
+      .next("account:" + req.body.pub)
+      .put(code, res)
   })
   if (err) {
     console.log(err)
@@ -468,40 +465,43 @@ app.post("/update-password", async (req, res) => {
         return
       }
 
-      user.get("map").next("account:" + req.body.pub).put(code, err => {
-        if (err) {
-          console.log(err)
-          res.status(500).send("Host error")
-          return
-        }
+      user
+        .get("map")
+        .next("account:" + req.body.pub)
+        .put(code, err => {
+          if (err) {
+            console.log(err)
+            res.status(500).send("Host error")
+            return
+          }
 
-        // Also update shared invite codes for this account.
-        user
-          .get("shared")
-          .next("invite_codes")
-          .next(code, async codes => {
-            if (codes) {
-              const oldSecret = await holster.SEA.secret(account, user.is)
-              const newSecret = await holster.SEA.secret(data, user.is)
-              for (const [key, encrypted] of Object.entries(codes)) {
-                if (!key || !encrypted) continue
+          // Also update shared invite codes for this account.
+          user
+            .get("shared")
+            .next("invite_codes")
+            .next(code, async codes => {
+              if (codes) {
+                const oldSecret = await holster.SEA.secret(account, user.is)
+                const newSecret = await holster.SEA.secret(data, user.is)
+                for (const [key, encrypted] of Object.entries(codes)) {
+                  if (!key || !encrypted) continue
 
-                const dec = await holster.SEA.decrypt(encrypted, oldSecret)
-                const shared = await holster.SEA.encrypt(dec, newSecret)
-                const err = await new Promise(res => {
-                  user
-                    .get("shared")
-                    .next("invite_codes")
-                    .next(code)
-                    .next(key)
-                    .put(shared, res)
-                })
-                if (err) console.log(err)
+                  const dec = await holster.SEA.decrypt(encrypted, oldSecret)
+                  const shared = await holster.SEA.encrypt(dec, newSecret)
+                  const err = await new Promise(res => {
+                    user
+                      .get("shared")
+                      .next("invite_codes")
+                      .next(code)
+                      .next(key)
+                      .put(shared, res)
+                  })
+                  if (err) console.log(err)
+                }
               }
-            }
-            res.send(account.pub)
-          })
-      })
+              res.send(account.pub)
+            })
+        })
     })
 })
 
@@ -649,7 +649,7 @@ app.post("/add-subscriber", async (req, res) => {
   }
 
   const feed = await new Promise(res => {
-    user.get("feeds").next(url, res)
+    user.get("feeds").next(url, {".": "subscriber_count"}, res)
   })
   if (!feed) {
     console.log("Feed not found for add-subscriber", url)
@@ -712,7 +712,7 @@ app.post("/remove-subscriber", async (req, res) => {
   }
 
   const feed = await new Promise(res => {
-    user.get("feeds").next(url, res)
+    user.get("feeds").next(url, {".": "subscriber_count"}, res)
   })
   if (!feed) {
     console.log("Feed not found for remove-subscriber", url)
@@ -882,6 +882,7 @@ app.post("/private/remove-feed", (req, res) => {
     html_url: "",
     language: "",
     image: "",
+    items: null,
   }
   user
     .get("feeds")
@@ -897,7 +898,7 @@ app.post("/private/remove-feed", (req, res) => {
     })
 })
 
-app.post("/private/add-item", (req, res) => {
+app.post("/private/add-item", async (req, res) => {
   if (!req.body.url) {
     res.status(400).send("url required")
     return
@@ -913,101 +914,86 @@ app.post("/private/add-item", (req, res) => {
     return
   }
 
-  // limit and wait times are in milliseconds.
-  const limit = 10
-  var wait = 0
-  if (lastSaved !== 0) {
-    const elapsed = Date.now() - lastSaved
-    if (elapsed < limit) {
-      wait = limit - elapsed
-      console.log("Waiting " + wait + " ms before save")
-    }
+  const twoWeeksAgo = Date.now() - 1209600000
+  if (req.body.timestamp < twoWeeksAgo) {
+    // Ignore items that are older than 2 weeks.
+    res.end()
+    return
   }
-  setTimeout(async () => {
-    lastSaved = Date.now()
-    const twoWeeksAgo = lastSaved - 1209600000
-    const enclosure = mapEnclosure(req.body.enclosure)
-    const category = mapCategory(req.body.category)
-    // Check if the item already has a key stored for it's guid.
-    let key = await new Promise(res => {
-      user.get("guids").next(req.body.guid, res)
-    })
-    if (!key) {
-      // Try and use the item's timestamp as the key if it's not already used.
-      const t = req.body.timestamp
-      const used = await new Promise(res => {
-        user.get("items").next(day(t)).next(t, res)
-      })
-      key = used ? lastSaved : t
-      const err = await new Promise(res => {
-        user.get("guids").next(req.body.guid).put(key, res)
-      })
+
+  const data = {
+    title: req.body.title ?? "",
+    content: req.body.content ?? "",
+    author: req.body.author ?? "",
+    permalink: req.body.permalink ?? "",
+    guid: req.body.guid,
+    timestamp: req.body.timestamp,
+    url: req.body.url,
+  }
+  const enclosure = mapEnclosure(req.body.enclosure)
+  const category = mapCategory(req.body.category)
+  if (enclosure) data.enclosure = enclosure
+  if (category) data.category = category
+  const dayKey = day(req.body.timestamp)
+  const err = await new Promise(res => {
+    user
+      .get("feeds")
+      .next(req.body.url)
+      .next("items")
+      .next(dayKey)
+      .next(req.body.guid)
+      .put(data, res)
+  })
+  if (err) {
+    console.log(err)
+    res.status(500).send("Error saving item")
+    return
+  }
+
+  // Add the guid and url to a set for the given day to make removal easier.
+  const remove = {
+    guid: req.body.guid,
+    url: req.body.url,
+  }
+  user
+    .get("remove")
+    .next(dayKey)
+    .put(remove, true, err => {
       if (err) console.log(err)
-    }
-    if (key > twoWeeksAgo) {
-      const data = {
-        title: req.body.title ?? "",
-        content: req.body.content ?? "",
-        author: req.body.author ?? "",
-        permalink: req.body.permalink ?? "",
-        guid: req.body.guid,
-        timestamp: key,
-        url: req.body.url,
-      }
-      if (enclosure) data.enclosure = enclosure
-      if (category) data.category = category
-      const err = await new Promise(res => {
-        user
-          .get("items").next(day(key))
-          .next(key)
-          .put(data, res)
-      })
-      if (err) {
-        console.log(err)
-        res.status(500).send("Error saving item")
-        return
-      }
-
-      res.end()
-    } else {
-      // Ignore items that are older than 2 weeks.
-      res.end()
-    }
-
-    // Continue after response to also remove items older than 2 weeks.
-    const dayKey = day(twoWeeksAgo)
-    if (removeDays.has(dayKey)) return
-
-    removeDays.add(dayKey)
-    const removed = await new Promise(res => {
-      user.get("removed").next(dayKey, res)
     })
-    if (removed) return
+  res.end()
 
-    const items = await new Promise(res => {
-      user.get("items").next(dayKey, res)
-    })
-    if (!items) return
+  // Continue after response to also remove items older than 2 weeks.
+  const removeKey = day(twoWeeksAgo)
+  if (removeDays.has(removeKey)) return
 
-    for (const [key, item] of Object.entries(items)) {
+  removeDays.add(removeKey)
+  user.get("remove").next(removeKey, async remove => {
+    if (!remove) return
+
+    for (const item of Object.values(remove)) {
       if (!item) continue
 
       const err = await new Promise(res => {
         user
-          .get("items" + dayKey)
-          .next(key)
+          .get("feeds")
+          .next(item.url)
+          .next("items")
+          .next(removeKey)
+          .next(item.guid)
           .put(null, res)
       })
       if (err) console.log(err)
     }
-    // Flag this day as removed.
-    user.get("removed").next(dayKey).put(true, err => {
-      if (err) console.log(err)
-    })
-  }, wait)
+    // Can also remove the data on removeKey once feeds are updated.
+    user
+      .get("remove")
+      .next(removeKey)
+      .put(null, err => {
+        if (err) console.log(err)
+      })
+  })
 })
-
-app.listen(3000)
 
 function mapEnclosure(e) {
   if (!e) return null

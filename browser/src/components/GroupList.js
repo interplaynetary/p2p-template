@@ -32,9 +32,9 @@ const GroupList = ({groups, setGroup}) => {
           <List>
             {groups &&
               groups.all.map(
-                g =>
-                  g.feeds.length !== 0 && (
-                    <Group group={g} setGroup={setGroup} />
+                group =>
+                  group.feeds.length !== 0 && (
+                    <Group group={group} setGroup={setGroup} />
                   ),
               )}
           </List>

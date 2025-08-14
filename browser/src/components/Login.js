@@ -42,7 +42,7 @@ const Login = ({user, host, mode, setMode}) => {
     sessionStorage.setItem("name", account.name)
   }
 
-  const login = username => {
+  const login = u => {
     if (!user || !host) {
       setMessage("Host not available")
       localStorage.removeItem("host")
@@ -52,7 +52,7 @@ const Login = ({user, host, mode, setMode}) => {
 
     setDisabledButton(true)
     setMessage("Checking account...")
-    user.auth(username, password, async err => {
+    user.auth(u, password, async err => {
       if (!err) {
         // auth is ok so look up account details in host data.
         err = await checkAccount()
@@ -75,7 +75,7 @@ const Login = ({user, host, mode, setMode}) => {
       }
 
       if (err === "Wrong username or password") {
-        let match = username.match(/(.*)\.(\d)$/)
+        let match = u.match(/(.*)\.(\d)$/)
         if (match) {
           let increment = Number(match[2]) + 1
           if (increment === 10) {
@@ -86,7 +86,7 @@ const Login = ({user, host, mode, setMode}) => {
           login(`${match[1]}.${increment}`)
           return
         }
-        login(`${username}.1`)
+        login(`${u}.1`)
         return
       }
 

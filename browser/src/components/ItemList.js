@@ -5,20 +5,20 @@ import {init, reducer} from "../utils/reducer.js"
 import Item from "./Item"
 
 const ItemList = ({
-  user,
-  host,
   group,
   groups,
   setGroupStats,
   resetGroup,
   currentKeys,
   newKeys,
+  itemFeeds,
   loadMoreItems,
   feeds,
   updateStart,
   setUpdateStart,
 }) => {
-  const [items, updateItem] = useReducer(reducer(), init)
+  const sort = (a, b) => a.timestamp - b.timestamp
+  const [items, updateItem] = useReducer(reducer(sort), init)
   const [groupKey, setGroupKey] = useState("")
   const [newFrom, setNewFrom] = useState(0)
   const [scrollToEnd, setScrollToEnd] = useState(false)
@@ -30,11 +30,6 @@ const ItemList = ({
   const loadMore = useRef(0)
   const watchStart = useRef()
   const watchEnd = useRef()
-
-  const day = key => {
-    const t = key ? new Date(+key) : new Date()
-    return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate())
-  }
 
   const mapEnclosure = useCallback(e => {
     if (!e) return null
@@ -75,7 +70,7 @@ const ItemList = ({
   }, [scrollToEnd, items])
 
   useEffect(() => {
-    if (!user || !host || !updateStart) return
+    if (!updateStart) return
 
     setUpdateStart(false)
 
@@ -90,12 +85,15 @@ const ItemList = ({
         const key = currentKeys[firstKeyIndex.current++]
         if (!key) continue
 
-        const item = await new Promise(res => {
-          user.get([host, "items"]).next(day(key)).next(key, res)
-        })
+        const {url, day} = itemFeeds.get(key)
+        if (!url || !day) continue
+
+        const feed = feeds.get(url)
+        if (!feed || !feed.items || !feed.items[day]) continue
+
+        const item = feed.items[day][key]
         if (!item) continue
 
-        const feed = feeds.get(item.url)
         updateItem({
           key,
           title: item.title,
@@ -106,9 +104,9 @@ const ItemList = ({
           permalink: item.permalink,
           guid: item.guid,
           timestamp: item.timestamp,
-          feedUrl: feed && feed.url ? feed.url : "",
-          feedTitle: feed && feed.title ? feed.title : "",
-          feedImage: feed && feed.image ? feed.image : "",
+          feedUrl: feed.url,
+          feedTitle: feed.title ? feed.title : "",
+          feedImage: feed.image ? feed.image : "",
           url: item.url,
         })
       }
@@ -143,12 +141,11 @@ const ItemList = ({
     }
     update()
   }, [
-    user,
-    host,
     updateStart,
     setUpdateStart,
     loadMoreItems,
     currentKeys,
+    itemFeeds,
     feeds,
     mapEnclosure,
   ])
@@ -173,7 +170,7 @@ const ItemList = ({
   }, [group, groupKey, currentKeys, resetGroup, setUpdateStart])
 
   useEffect(() => {
-    if (!user || !host || !groups || newKeys.length === 0) return
+    if (!groups || newKeys.length === 0) return
 
     if (!watchEnd.current) {
       watchEnd.current = new IntersectionObserver(e => {
@@ -196,19 +193,23 @@ const ItemList = ({
       let latest = 0
       for (let i = 0; i < newKeys.length; i++) {
         const key = newKeys[i]
-        if (!key) return
+        if (!key) continue
 
-        const item = await new Promise(res => {
-          user.get([host, "items"]).next(day(key)).next(key, res)
-        })
-        if (!item) return
+        const {url, day} = itemFeeds.get(key)
+        if (!url || !day) continue
+
+        const feed = feeds.get(url)
+        if (!feed || !feed.items || !feed.items[day]) continue
+
+        const item = feed.items[day][key]
+        if (!item) continue
 
         groups.all.forEach(g => {
           if (!g.feeds.includes(item.url)) return
 
           let stats = groupStats.get(g.key)
-          if (key > stats.latest) {
-            stats.latest = key
+          if (item.timestamp > stats.latest) {
+            stats.latest = item.timestamp
             stats.author = item.author
             stats.timestamp = item.timestamp
             const tag = /(<([^>]+)>)/g
@@ -220,9 +221,8 @@ const ItemList = ({
           if (!group || g.key !== group.key) stats.count++
           groupStats.set(g.key, stats)
         })
-        if (!group || !group.feeds.includes(item.url)) return
+        if (!group || !group.feeds.includes(item.url)) continue
 
-        const feed = feeds.get(item.url)
         updateItem({
           key,
           title: item.title,
@@ -233,9 +233,9 @@ const ItemList = ({
           permalink: item.permalink,
           guid: item.guid,
           timestamp: item.timestamp,
-          feedUrl: feed && feed.url ? feed.url : "",
-          feedTitle: feed && feed.title ? feed.title : "",
-          feedImage: feed && feed.image ? feed.image : "",
+          feedUrl: feed.url,
+          feedTitle: feed.title ? feed.title : "",
+          feedImage: feed.image ? feed.image : "",
           url: item.url,
         })
         if (key < earliest || earliest === 0) earliest = key
@@ -260,11 +260,10 @@ const ItemList = ({
       }, 5000)
     })()
   }, [
-    user,
-    host,
     group,
     groups,
     newKeys,
+    itemFeeds,
     setGroupStats,
     newFrom,
     feeds,

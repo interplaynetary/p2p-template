@@ -136,11 +136,11 @@ const AddFeed = ({user, host, code, setAddFeed}) => {
       }
 
       const data = {
-        title: json.add.title,
-        description: json.add.description,
-        html_url: json.add.html_url,
-        language: json.add.language,
-        image: json.add.image,
+        title: json.add.title ?? "",
+        description: json.add.description ?? "",
+        html_url: json.add.html_url ?? "",
+        language: json.add.language ?? "",
+        image: json.add.image ?? "",
       }
       user
         .get("public")

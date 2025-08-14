@@ -84,10 +84,10 @@ const FeedList = ({user, code, groups, showGroupList}) => {
   useEffect(() => {
     if (!user) return
 
-    const update = feeds => {
-      if (!feeds) return
+    const update = allFeeds => {
+      if (!allFeeds) return
 
-      for (const [url, feed] of Object.entries(feeds)) {
+      for (const [url, feed] of Object.entries(allFeeds)) {
         if (!url) return
 
         updateFeed({
@@ -134,7 +134,7 @@ const FeedList = ({user, code, groups, showGroupList}) => {
     }
   }
 
-  const createGroup = () => {
+  const createGroup = async () => {
     if (!groupName) {
       setDisabledButton(false)
       setMessage("Group name required")
@@ -144,12 +144,23 @@ const FeedList = ({user, code, groups, showGroupList}) => {
     setDisabledButton(true)
     setMessage("Creating group...")
 
+    // Convert selected feeds to an object to store in Holster.
+    // See Display useEffect which converts back to an array.
+    let f = {}
+    for (let i = 0; i < selected.length; i++) {
+      const url = selected[i]
+      const feed = feeds.all.find(current => current.key === url)
+      if (!feed) continue
+
+      f[url] = true
+      // Store each feed for the user to listen for updates in App.js.
+      const err = await new Promise(res => {
+        user.get("public").next("feeds").next(url).put(feed, res)
+      })
+      if (err) console.error(err)
+    }
     const group = {
-      feeds: selected.reduce((acc, f) => {
-        // This function converts selected feeds to an object to store in
-        // Holster. See Display useEffect which converts back to an array.
-        return f ? {...acc, [f]: true} : {...acc}
-      }, {}),
+      feeds: f,
       // Show an unread count for the group and display the author, text and
       // timestamp of the latest item. (latest field is the item key.)
       count: 0,

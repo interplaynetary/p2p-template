@@ -90,10 +90,10 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
   useEffect(() => {
     if (!user) return
 
-    const update = feeds => {
-      if (!feeds) return
+    const update = allFeeds => {
+      if (!allFeeds) return
 
-      for (const [url, f] of Object.entries(feeds)) {
+      for (const [url, f] of Object.entries(allFeeds)) {
         if (!url) continue
 
         updateFeed({
@@ -129,19 +129,30 @@ const EditGroup = ({user, code, groups, currentGroup, showGroupList}) => {
 
     const allFeeds = [...group.feeds, ...selected]
     if (allFeeds.length === 0) {
-      const message = "Removing all feeds will remove the group. Continue?"
-      if (!window.confirm(message)) return
+      const check = "Removing all feeds will remove the group. Continue?"
+      if (!window.confirm(check)) return
     }
 
     setDisabledButton(true)
     setMessage("Updating group...")
 
+    // Convert feeds to an object to store in Holster.
+    // See Display useEffect which converts back to an array.
+    let f = {}
+    for (let i = 0; i < allFeeds.length; i++) {
+      const url = allFeeds[i]
+      const feed = feeds.all.find(current => current.key === url)
+      if (!feed) continue
+
+      f[url] = true
+      // Store each feed for the user to listen for updates in App.js.
+      const err = await new Promise(res => {
+        user.get("public").next("feeds").next(url).put(feed, res)
+      })
+      if (err) console.error(err)
+    }
     const data = {
-      feeds: allFeeds.reduce((acc, f) => {
-        // This function converts selected feeds to an object to store in
-        // Holster. See Display useEffect which converts back to an array.
-        return f ? {...acc, [f]: true} : {...acc}
-      }, {}),
+      feeds: f,
       count: 0,
       latest: 0,
       text: "",

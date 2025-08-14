@@ -13,7 +13,6 @@ import Settings from "./components/Settings"
 import ValidateEmail from "./components/ValidateEmail"
 import ResetPassword from "./components/ResetPassword"
 import UpdatePassword from "./components/UpdatePassword"
-import "./App.css"
 
 // If on localhost assume Holster is directly available and use the default
 // settings, otherwise assume a secure connection is required.
@@ -182,10 +181,10 @@ const App = () => {
     }
     user.get([host, "accounts"]).on(updateAccounts, true)
 
-    const updateFeeds = async feeds => {
-      if (!feeds) return
+    const updateFeeds = async allFeeds => {
+      if (!allFeeds) return
 
-      for (const [url, feed] of Object.entries(feeds)) {
+      for (const [url, feed] of Object.entries(allFeeds)) {
         if (!url) continue
 
         if (feed && feed.title !== "") {
@@ -205,19 +204,41 @@ const App = () => {
         })
         if (!found || found.title === "") continue
 
-        if (feed && feed.title !== "") {
+        if (feed && feed.title) {
           // Feed details have been updated.
           const data = {
             title: feed.title,
-            description: feed.description,
-            html_url: feed.html_url,
-            language: feed.language,
-            image: feed.image,
+            description: feed.description ?? "",
+            html_url: feed.html_url ?? "",
+            language: feed.language ?? "",
+            image: feed.image ?? "",
           }
           const err = await new Promise(res => {
             user.get("public").next("feeds").next(url).put(data, res)
           })
           if (err) console.error(err)
+
+          // Also set up a listener for updates to items in the feed.
+          user
+            .get([host, "feeds"])
+            .next(url)
+            .next("items")
+            .on(items => {
+              if (!items) return
+
+              setFeeds(
+                f =>
+                  new Map(
+                    f.set(url, {
+                      url: feed.html_url,
+                      title: feed.title,
+                      image: feed.image,
+                      updated: Date.now(),
+                      items: items,
+                    }),
+                  ),
+              )
+            }, true)
           continue
         }
 
