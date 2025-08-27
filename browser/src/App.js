@@ -220,9 +220,8 @@ const App = () => {
 
           // Also set up a listener for updates to items in the feed.
           user
-            .get([host, "feeds"])
+            .get([host, "feedItems"])
             .next(url)
-            .next("items")
             .on(items => {
               if (!items) return
 

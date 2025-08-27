@@ -882,7 +882,6 @@ app.post("/private/remove-feed", (req, res) => {
     html_url: "",
     language: "",
     image: "",
-    items: null,
   }
   user
     .get("feeds")
@@ -937,9 +936,8 @@ app.post("/private/add-item", async (req, res) => {
   const dayKey = day(req.body.timestamp)
   const err = await new Promise(res => {
     user
-      .get("feeds")
+      .get("feedItems")
       .next(req.body.url)
-      .next("items")
       .next(dayKey)
       .next(req.body.guid)
       .put(data, res)
@@ -976,9 +974,8 @@ app.post("/private/add-item", async (req, res) => {
 
       const err = await new Promise(res => {
         user
-          .get("feeds")
+          .get("feedItems")
           .next(item.url)
-          .next("items")
           .next(removeKey)
           .next(item.guid)
           .put(null, res)

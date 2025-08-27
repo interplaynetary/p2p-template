@@ -45,6 +45,7 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
     setFeedList(true)
     setAddFeed(false)
     setGroup(null)
+    setMessage("")
     window.history.pushState(null, "")
   }
 
@@ -54,6 +55,7 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
     setFeedList(false)
     setAddFeed(false)
     setGroup(null)
+    setMessage("")
     window.history.pushState(null, "")
   }
 
@@ -63,6 +65,7 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
     setFeedList(true)
     setAddFeed(true)
     setGroup(null)
+    setMessage("")
     window.history.pushState(null, "")
   }
 
@@ -76,6 +79,7 @@ const Display = ({user, host, code, mode, setMode, feeds}) => {
     setCurrentGroup("")
     setFeedList(false)
     setAddFeed(false)
+    setMessage("")
     setGroup(null)
   }
 
