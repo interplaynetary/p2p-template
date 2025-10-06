@@ -1,0 +1,11 @@
+# dependencies
+/node_modules
+
+# storage
+/radata
+
+# misc
+*~
+
+# production build
+/build
